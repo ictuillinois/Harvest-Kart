@@ -65,4 +65,16 @@ export const MODEL_URLS = {
   sailboat: asset('models/beach/sailboat.glb'),
   seagull: asset('models/beach/seagull.glb'),
   palmTree: asset('models/beach/palm.glb'),
+  // USA City
+  trafficCone: asset('models/usa/traffic_cone.glb'),
+  mailbox: asset('models/usa/mailbox.glb'),
+  trashcan: asset('models/usa/trashcan.glb'),
+  // Peru Mountains
+  llama: asset('models/peru/llama.glb'),
+  stoneWall: asset('models/peru/stone_wall.glb'),
+  flowers: asset('models/peru/flowers.glb'),
+  hut: asset('models/peru/hut.glb'),
+  // Racing (shared)
+  tires: asset('models/racing/tires.glb'),
+  raceBarrier: asset('models/racing/barrier.glb'),
 };

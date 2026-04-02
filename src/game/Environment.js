@@ -416,11 +416,18 @@ export class Environment {
         }
       }
 
-      // Roadside urban props: dumpsters, traffic lights, benches
+      // Roadside urban props
       this._scatterProps(
-        [MODEL_URLS.dumpster, MODEL_URLS.trafficLight, MODEL_URLS.bench, MODEL_URLS.firehydrant],
-        12, [1.2, 3], 28, 1.3
+        [MODEL_URLS.dumpster, MODEL_URLS.trafficLight, MODEL_URLS.bench, MODEL_URLS.firehydrant,
+         MODEL_URLS.trashcan, MODEL_URLS.mailbox],
+        16, [1.2, 3], 22, 1.3
       );
+
+      // Traffic cones along road edges
+      this._scatterProps([MODEL_URLS.trafficCone], 12, [0.8, 1.5], 26, 1.0);
+
+      // Tire stacks and barriers at roadside
+      this._scatterProps([MODEL_URLS.tires, MODEL_URLS.raceBarrier], 6, [1.5, 3.5], 50, 1.0);
 
       // Parked cars along roadside
       this._scatterProps(
@@ -530,21 +537,31 @@ export class Environment {
       }
     }
 
-    // --- Loaded bushes scattered between trees ---
+    // --- Loaded models ---
     if (this.modelsReady) {
-      this._scatterProps([MODEL_URLS.bush], 20, [1.5, 8], 18, 1.8);
+      // Bushes and flowers scattered between trees
+      this._scatterProps([MODEL_URLS.bush], 16, [1.5, 8], 20, 1.8);
+      this._scatterProps([MODEL_URLS.flowers], 14, [2, 10], 24, 0.8);
 
-      // Small buildings (Inca-village style using building models)
-      for (let i = 0; i < 4; i++) {
+      // Llamas grazing alongside the road
+      this._scatterProps([MODEL_URLS.llama], 8, [3, 12], 38, 0.6);
+
+      // Stone walls (Inca ruins alongside road)
+      this._scatterProps([MODEL_URLS.stoneWall], 6, [2, 6], 52, 1.2);
+
+      // Andean huts (small villages)
+      for (let i = 0; i < 5; i++) {
         const side = i % 2 === 0 ? -1 : 1;
-        const url = [MODEL_URLS.buildingA, MODEL_URLS.buildingB][Math.floor(Math.random() * 2)];
         this._placeModel(
-          url,
-          side * (ROAD_WIDTH / 2 + 10 + Math.random() * 5), 0,
-          -i * 80 - 40,
-          1.5, Math.random() * Math.PI * 2
+          MODEL_URLS.hut,
+          side * (ROAD_WIDTH / 2 + 8 + Math.random() * 6), 0,
+          -i * 65 - 30,
+          1.2 + Math.random() * 0.5, Math.random() * Math.PI * 2
         );
       }
+
+      // Race barriers along road edges
+      this._scatterProps([MODEL_URLS.tires, MODEL_URLS.raceBarrier], 6, [0.8, 2], 55, 0.9);
     }
 
     // --- Inca-like terraces (keep procedural) ---
