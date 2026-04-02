@@ -3,152 +3,84 @@ export class StartScreen {
     this.el = document.createElement('div');
     this.el.id = 'start-screen';
     this.el.innerHTML = `
-      <div class="ss-title-block">
-        <div class="ss-star ss-star-l">&#9733;</div>
-        <div class="ss-star ss-star-r">&#9733;</div>
-        <div class="ss-title-harvest">HARVEST</div>
-        <div class="ss-title-kart">KART</div>
-      </div>
-      <div class="ss-prompt">PRESS HERE TO BEGIN</div>
+      <div class="ss-prompt">PRESS HERE TO START</div>
     `;
 
-    this.el.style.cssText = `
-      position: fixed; inset: 0; z-index: 100;
-      display: flex; flex-direction: column;
-      align-items: center; justify-content: center;
-      cursor: pointer;
-      font-family: 'Segoe UI', Impact, Tahoma, sans-serif;
-      animation: ssIn 0.6s ease-out;
-    `;
+    document.body.appendChild(this.el);
 
     const style = document.createElement('style');
     style.textContent = `
-      @keyframes ssIn {
-        from { opacity: 0; transform: scale(1.05); }
-        to   { opacity: 1; transform: scale(1); }
+      /* ── full-screen container ── */
+      #start-screen {
+        position: fixed; inset: 0; z-index: 100;
+        display: flex; align-items: flex-end; justify-content: center;
+        cursor: pointer;
+        animation: ssIn 0.8s ease-out;
+
+        /*
+         * Layer 1 (top): the artwork, centered, never cropped
+         * Layer 2 (bottom): gradient that matches the image edges
+         *   - top  = sky blue  sampled from the PNG top edge
+         *   - bottom = dark asphalt sampled from the PNG bottom edge
+         */
+        background:
+          url('/Start_Screen.png') center center / contain no-repeat,
+          linear-gradient(
+            180deg,
+            #6ec1e8  0%,
+            #6ec1e8 15%,
+            #4a8ab5 35%,
+            #3a3a3a 65%,
+            #222222 85%,
+            #1a1a1a 100%
+          );
       }
 
-      /* ── overlay: let 3D scene peek through ── */
-      #start-screen::before {
+      @keyframes ssIn {
+        from { opacity: 0; }
+        to   { opacity: 1; }
+      }
+
+      /*
+       * Subtle darkening vignette at the very bottom so the
+       * text always reads clearly, even over bright image areas.
+       */
+      #start-screen::after {
         content: '';
-        position: absolute; inset: 0;
+        position: absolute; left: 0; right: 0; bottom: 0;
+        height: 30%;
         background: linear-gradient(
           180deg,
-          rgba(30,140,255,0.15) 0%,
-          rgba(0,0,0,0.10) 40%,
-          rgba(0,0,0,0.45) 75%,
-          rgba(0,0,0,0.70) 100%
+          rgba(0,0,0,0) 0%,
+          rgba(0,0,0,0.55) 100%
         );
         pointer-events: none;
       }
 
-      /* ── title container ── */
-      .ss-title-block {
-        position: relative;
-        text-align: center;
-        margin-bottom: 40px;
-        z-index: 1;
-      }
-
-      /* ── HARVEST ── */
-      .ss-title-harvest {
-        font-family: Impact, 'Arial Black', sans-serif;
-        font-size: clamp(3.5rem, 12vw, 7.5rem);
-        font-weight: 900;
-        line-height: 0.95;
-        letter-spacing: 6px;
-        color: #ff8c00;
-        background: linear-gradient(
-          180deg,
-          #ffe04a 0%,
-          #ffb300 30%,
-          #ff6a00 70%,
-          #d44000 100%
-        );
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        background-clip: text;
-        filter: drop-shadow(0 2px 0 #7a2000)
-                drop-shadow(0 4px 0 #5a1500)
-                drop-shadow(0 6px 0 #3a0a00)
-                drop-shadow(0 8px 12px rgba(0,0,0,0.5));
-        paint-order: stroke fill;
-        -webkit-text-stroke: 2px #7a2000;
-      }
-
-      /* ── KART ── */
-      .ss-title-kart {
-        font-family: Impact, 'Arial Black', sans-serif;
-        font-size: clamp(3rem, 10vw, 6.5rem);
-        font-weight: 900;
-        line-height: 0.95;
-        letter-spacing: 10px;
-        color: #ff8c00;
-        background: linear-gradient(
-          180deg,
-          #ffe04a 0%,
-          #ffb300 30%,
-          #ff6a00 70%,
-          #d44000 100%
-        );
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        background-clip: text;
-        filter: drop-shadow(0 2px 0 #7a2000)
-                drop-shadow(0 4px 0 #5a1500)
-                drop-shadow(0 6px 0 #3a0a00)
-                drop-shadow(0 8px 12px rgba(0,0,0,0.5));
-        paint-order: stroke fill;
-        -webkit-text-stroke: 2px #7a2000;
-        margin-top: -4px;
-      }
-
-      /* ── decorative stars ── */
-      .ss-star {
-        position: absolute;
-        font-size: clamp(1.8rem, 4vw, 3rem);
-        color: #ffe04a;
-        filter: drop-shadow(0 0 6px rgba(255,200,0,0.8));
-        z-index: 2;
-        animation: ssSpin 4s linear infinite;
-      }
-      .ss-star-l { top: -10px; left: -10px; }
-      .ss-star-r { top: -10px; right: -10px; animation-direction: reverse; }
-      @keyframes ssSpin {
-        0%   { transform: rotate(0deg)   scale(1);   }
-        50%  { transform: rotate(180deg) scale(1.15); }
-        100% { transform: rotate(360deg) scale(1);    }
-      }
-
-      /* ── PRESS HERE TO BEGIN ── */
+      /* ── PRESS HERE TO START ── */
       .ss-prompt {
-        position: relative; z-index: 1;
-        font-family: Impact, 'Arial Black', sans-serif;
-        font-size: clamp(1.1rem, 3.5vw, 1.7rem);
+        position: relative;
+        z-index: 2;
+        padding-bottom: clamp(36px, 7vh, 72px);
+        font-family: Impact, 'Arial Black', Tahoma, sans-serif;
+        font-size: clamp(1.1rem, 3.8vw, 1.9rem);
         font-weight: 700;
-        letter-spacing: 4px;
+        letter-spacing: 5px;
         color: #fff;
         text-shadow:
-          0 0 10px rgba(255,255,255,0.5),
-          0 2px 4px rgba(0,0,0,0.8);
-        animation: ssFlash 1.6s ease-in-out infinite;
-      }
-      @keyframes ssFlash {
-        0%, 100% { opacity: 1; }
-        50%      { opacity: 0.35; }
+          0 0 12px rgba(255,255,255,0.45),
+          0 1px 0  rgba(0,0,0,0.9),
+          0 3px 6px rgba(0,0,0,0.7);
+        animation: ssFlash 1.8s ease-in-out infinite;
       }
 
-      /* ── responsive ── */
-      @media (max-width: 500px) {
-        .ss-title-block { margin-bottom: 28px; }
-        .ss-title-harvest { letter-spacing: 3px; -webkit-text-stroke: 1.5px #7a2000; }
-        .ss-title-kart    { letter-spacing: 5px; -webkit-text-stroke: 1.5px #7a2000; }
+      @keyframes ssFlash {
+        0%, 100% { opacity: 1;   }
+        50%      { opacity: 0.3; }
       }
     `;
     document.head.appendChild(style);
-    document.body.appendChild(this.el);
 
-    // Clicking anywhere on the screen starts the game
     this.el.addEventListener('click', () => onStart());
   }
 
