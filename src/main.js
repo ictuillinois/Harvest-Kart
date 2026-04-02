@@ -15,6 +15,7 @@ import { HUD } from './ui/HUD.js';
 import { WinScreen } from './ui/WinScreen.js';
 
 import { setupControls } from './utils/controls.js';
+import { playPlateHit, playLampLit, playComboBreak, playWinFanfare, playLaneSwitch } from './utils/audio.js';
 import {
   MIN_SPEED, MAX_SPEED,
   PEDAL_ACCELERATION, COAST_DECELERATION,
@@ -100,6 +101,7 @@ const controls = setupControls((direction) => {
   if (gameState.state !== 'playing') return;
   kart.switchLane(direction);
   gameState.currentLane = kart.currentLane;
+  playLaneSwitch();
 });
 
 // --- State change handling ---
@@ -142,6 +144,7 @@ gameState.on('stateChange', ({ from, to }) => {
     case 'complete':
       controls.hideButtons();
       winScreen.show(gameState.platesHit, gameState.score, gameState.maxCombo);
+      playWinFanfare();
       break;
   }
 });
@@ -168,15 +171,18 @@ gameState.on('plateHit', ({ currentCharge, combo, score }) => {
   hud.updateCharge(currentCharge);
   hud.updateCombo(combo);
   hud.updateScore(score);
+  playPlateHit();
 });
 
 gameState.on('comboBreak', () => {
   hud.updateCombo(0);
+  playComboBreak();
 });
 
 gameState.on('lampLit', ({ lampPostsLit }) => {
   // Celebrate the full bar before resetting
   hud.celebrateCharge();
+  playLampLit();
   setTimeout(() => {
     hud.updateLamps(lampPostsLit);
     lampPosts.lightNext();
