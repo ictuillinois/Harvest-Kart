@@ -187,12 +187,13 @@ function animate() {
   renderer.render(scene, camera);
 }
 
-// --- Bootstrap: preload models, then show start screen ---
-async function init() {
-  animate();
+// --- Bootstrap ---
+// Show start screen immediately (solid, covers the black canvas).
+// Load models behind it so nothing leaks through.
+startScreen.show();
+animate();
+
+(async () => {
   await environment.preload();
   await environment.build(0);
-  startScreen.show();
-}
-
-init();
+})();

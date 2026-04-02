@@ -15,7 +15,7 @@ export class StartScreen {
         position: fixed; inset: 0; z-index: 100;
         display: flex; align-items: flex-end; justify-content: center;
         cursor: pointer;
-        animation: ssIn 0.8s ease-out;
+        /* no fade-in — screen is solid from frame 0 */
 
         /*
          * Layer 1: the artwork — cover so it always fills the viewport
@@ -40,10 +40,7 @@ export class StartScreen {
           );
       }
 
-      @keyframes ssIn {
-        from { opacity: 0; }
-        to   { opacity: 1; }
-      }
+      /* start screen is always opaque — no fade that leaks the 3D scene */
 
       /*
        * Subtle darkening vignette at the very bottom so the
