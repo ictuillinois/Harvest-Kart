@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { Tween, Easing } from '@tweenjs/tween.js';
+import { tweenGroup } from '../utils/tweenGroup.js';
 import { COLORS, TOTAL_LAMP_POSTS, ROAD_WIDTH } from '../utils/constants.js';
 
 export class LampPost {
@@ -85,7 +86,7 @@ export class LampPost {
     post.lit = true;
 
     // Dramatically increase light intensity (dim → very bright)
-    new Tween(post.light)
+    new Tween(post.light, tweenGroup)
       .to({ intensity: 25, distance: 35 }, 1000)
       .easing(Easing.Quadratic.Out)
       .start();
@@ -93,7 +94,7 @@ export class LampPost {
     // Bright emissive glow on bulb
     const targetColor = new THREE.Color(COLORS.lampOn);
     const color = { r: post.headMat.emissive.r, g: post.headMat.emissive.g, b: post.headMat.emissive.b };
-    new Tween(color)
+    new Tween(color, tweenGroup)
       .to({ r: targetColor.r, g: targetColor.g, b: targetColor.b }, 1000)
       .easing(Easing.Quadratic.Out)
       .onUpdate(() => {
@@ -105,7 +106,7 @@ export class LampPost {
     post.headMat.color.setHex(COLORS.lampOn);
 
     // Light cone becomes visible
-    new Tween(post.coneMat)
+    new Tween(post.coneMat, tweenGroup)
       .to({ opacity: 0.15 }, 1000)
       .easing(Easing.Quadratic.Out)
       .start();

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { update as updateTweens } from '@tweenjs/tween.js';
+import { tweenGroup } from './utils/tweenGroup.js';
 
 import { Road } from './game/Road.js';
 import { Kart } from './game/Kart.js';
@@ -166,7 +166,7 @@ function animate() {
   requestAnimationFrame(animate);
   const delta = Math.min(clock.getDelta(), 0.05);
 
-  updateTweens();
+  tweenGroup.update();
 
   // Always animate sky (clouds, stars) even on menus
   environment.update(delta, gameState.state === 'playing' ? gameState.speed : 0);

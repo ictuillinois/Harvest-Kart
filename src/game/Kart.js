@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { Tween, Easing } from '@tweenjs/tween.js';
+import { tweenGroup } from '../utils/tweenGroup.js';
 import { LANE_POSITIONS, LANE_SWITCH_DURATION, DRIVER_TYPES } from '../utils/constants.js';
 
 export class Kart {
@@ -452,7 +453,7 @@ export class Kart {
     this.isSwitching = true;
 
     const targetX = LANE_POSITIONS[this.currentLane];
-    new Tween(this.group.position)
+    new Tween(this.group.position, tweenGroup)
       .to({ x: targetX }, LANE_SWITCH_DURATION)
       .easing(Easing.Quadratic.Out)
       .onComplete(() => { this.isSwitching = false; })
