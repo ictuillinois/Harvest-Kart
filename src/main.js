@@ -309,7 +309,7 @@ function animate() {
     hud.updateSpeed(speedToMph(speed));
 
     road.update(delta, speed);
-    kart.update(delta, speed);
+    kart.update(delta, speed, controls.isPedalDown());
     plates.update(delta, speed);
     lampPosts.update(delta, speed);
 

@@ -6,6 +6,22 @@ import {
 
 const PLATE_POOL_SIZE = 20;
 
+// Procedural radial glow texture for plate sprites
+function createGlowTexture() {
+  const size = 64;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  const gradient = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+  gradient.addColorStop(0, 'rgba(57,255,20,0.6)');
+  gradient.addColorStop(0.4, 'rgba(57,255,20,0.2)');
+  gradient.addColorStop(1, 'rgba(57,255,20,0)');
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, size, size);
+  return new THREE.CanvasTexture(canvas);
+}
+
 export class Plate {
   constructor(scene) {
     this.scene = scene;
@@ -15,6 +31,13 @@ export class Plate {
     this.spawnInterval = PLATE_SPAWN_INTERVAL;
 
     const plateGeo = new THREE.CylinderGeometry(0.8, 0.8, 0.08, 16);
+    const glowTex = createGlowTexture();
+    const glowMat = new THREE.SpriteMaterial({
+      map: glowTex,
+      blending: THREE.AdditiveBlending,
+      transparent: true,
+      depthWrite: false,
+    });
 
     for (let i = 0; i < PLATE_POOL_SIZE; i++) {
       const mat = new THREE.MeshStandardMaterial({
@@ -30,6 +53,13 @@ export class Plate {
       mesh.position.set(0, 0.05, -999);
       mesh.visible = false;
       mesh.userData = { active: false, hit: false, lane: 0 };
+
+      // Glow sprite (child of plate — moves with it)
+      const glow = new THREE.Sprite(glowMat.clone());
+      glow.scale.set(3, 3, 1);
+      glow.position.y = 0.1;
+      mesh.add(glow);
+
       scene.add(mesh);
       this.plates.push(mesh);
     }

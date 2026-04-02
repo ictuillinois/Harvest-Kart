@@ -480,13 +480,63 @@ export class Kart {
       .start();
   }
 
-  update(delta, speed) {
+  update(delta, speed, isAccelerating = false) {
     const spinRate = speed * 0.3;
     this.wheels.forEach(w => {
-      // Spin the wheel group's first child (the tire cylinder) around X
-      w.children.forEach(child => {
-        child.rotation.x += spinRate * delta;
-      });
+      if (w.children[0]) {
+        w.children[0].rotation.x += spinRate * delta;
+      }
     });
+
+    // Exhaust particles when accelerating
+    if (isAccelerating && speed > 20) {
+      this._emitExhaust(delta);
+    }
+    this._updateExhaust(delta, speed);
+  }
+
+  _emitExhaust(delta) {
+    if (!this._exhaustParticles) {
+      // Create exhaust particle pool (lazy init)
+      this._exhaustParticles = [];
+      const geo = new THREE.SphereGeometry(0.06, 4, 4);
+      const mat = new THREE.MeshBasicMaterial({ color: 0x888888, transparent: true, opacity: 0.5 });
+      for (let i = 0; i < 8; i++) {
+        const p = new THREE.Mesh(geo, mat.clone());
+        p.visible = false;
+        p.userData = { life: 0, vy: 0 };
+        this.group.parent.add(p); // add to scene, not kart group
+        this._exhaustParticles.push(p);
+      }
+    }
+
+    // Spawn 1-2 particles per frame
+    for (const p of this._exhaustParticles) {
+      if (p.visible) continue;
+      p.visible = true;
+      p.position.set(
+        this.group.position.x + (Math.random() - 0.5) * 0.3,
+        0.4,
+        this.group.position.z + 1.8
+      );
+      p.scale.setScalar(0.5 + Math.random() * 0.5);
+      p.material.opacity = 0.4;
+      p.userData.life = 0.4 + Math.random() * 0.3;
+      p.userData.vy = 0.5 + Math.random() * 0.5;
+      break; // only spawn 1 per frame
+    }
+  }
+
+  _updateExhaust(delta, speed) {
+    if (!this._exhaustParticles) return;
+    for (const p of this._exhaustParticles) {
+      if (!p.visible) continue;
+      p.userData.life -= delta;
+      if (p.userData.life <= 0) { p.visible = false; continue; }
+      p.position.y += p.userData.vy * delta;
+      p.position.z += speed * delta; // move with road scroll
+      p.material.opacity = p.userData.life * 0.8;
+      p.scale.multiplyScalar(1 + delta * 2); // expand
+    }
   }
 }
