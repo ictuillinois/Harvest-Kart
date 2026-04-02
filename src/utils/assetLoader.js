@@ -76,12 +76,13 @@ export const MODEL_URLS = {
   buildingF: asset('models/buildings/building_F.gltf'),
   buildingG: asset('models/buildings/building_G.gltf'),
   buildingH: asset('models/buildings/building_H.gltf'),
-  // KayKit props (internal: 0.1-1.0h)
+  // KayKit props
   bush: asset('models/props/bush.gltf'),
   bench: asset('models/props/bench.gltf'),
   firehydrant: asset('models/props/firehydrant.gltf'),
   trafficLight: asset('models/props/trafficlight_A.gltf'),
   dumpster: asset('models/props/dumpster.gltf'),
+  // NOTE: streetlight + watertower removed (unused)
   // KayKit cars (internal: ~0.1h — very small unit system)
   carSedan: asset('models/props/car_sedan.gltf'),
   carTaxi: asset('models/props/car_taxi.gltf'),
