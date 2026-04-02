@@ -51,6 +51,9 @@ function goHome() {
   gameState.reset();
   hud.reset();
   lampPosts.resetAll();
+  kart.currentLane = 1;
+  kart.isSwitching = false;
+  kart.group.position.x = 0;
   gameState.transition('menu');
 }
 

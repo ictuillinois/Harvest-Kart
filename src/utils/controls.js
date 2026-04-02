@@ -141,11 +141,13 @@ export function setupControls(onSwitch) {
   // =================================================================
   leftBtn.addEventListener('pointerdown', (e) => {
     e.preventDefault();
+    e.stopPropagation();
     flash(leftBtn);
     triggerSwitch('left');
   });
   rightBtn.addEventListener('pointerdown', (e) => {
     e.preventDefault();
+    e.stopPropagation();
     flash(rightBtn);
     triggerSwitch('right');
   });

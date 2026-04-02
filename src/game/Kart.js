@@ -431,11 +431,14 @@ export class Kart {
 
   setDriver(index) {
     const driver = DRIVER_TYPES[index] || DRIVER_TYPES[0];
-    // Remove old driver group
     if (this.driverGroup) {
       this.group.remove(this.driverGroup);
     }
     this._buildKart(driver);
+    // Reset lane state so controls work immediately
+    this.currentLane = 1;
+    this.isSwitching = false;
+    this.group.position.x = LANE_POSITIONS[1];
   }
 
   switchLane(direction) {
