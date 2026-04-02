@@ -70,10 +70,7 @@ export function setupControls(onSwitch) {
       padding: 0;
     }
 
-    /* ── arrow buttons ── */
-    .ctrl-arrow {
-      width: 64px; height: 64px;
-    }
+    .ctrl-arrow { width: 64px; height: 64px; }
 
     /* ── active state (touch + keyboard) ── */
     .ctrl-btn.active,
@@ -91,12 +88,21 @@ export function setupControls(onSwitch) {
       border-color: rgba(255,180,0,0.5);
       background: rgba(40,20,0,0.5);
     }
+    /* idle pulse — draws attention to pedal on game start */
+    .ctrl-pedal:not(.active):not(.touched) {
+      animation: pedalPulse 2s ease-in-out infinite;
+    }
+    @keyframes pedalPulse {
+      0%, 100% { border-color: rgba(255,180,0,0.3); box-shadow: none; }
+      50%      { border-color: rgba(255,180,0,0.7); box-shadow: 0 0 14px rgba(255,160,0,0.3); }
+    }
     .ctrl-pedal.active,
     .ctrl-pedal:active {
       background: rgba(255,160,0,0.45) !important;
       border-color: #ffaa00 !important;
       box-shadow: 0 0 22px rgba(255,160,0,0.6), inset 0 0 14px rgba(255,160,0,0.2) !important;
       transform: scale(0.88);
+      animation: none;
     }
     .pedal-label {
       font-family: Impact, 'Arial Black', sans-serif;
@@ -105,6 +111,12 @@ export function setupControls(onSwitch) {
       font-weight: 700;
       color: rgba(255,220,100,0.95);
       text-shadow: 0 1px 3px rgba(0,0,0,0.5);
+    }
+
+    /* ── focus accessibility ── */
+    .ctrl-btn:focus-visible {
+      outline: 2px solid #39ff14;
+      outline-offset: 4px;
     }
 
     /* ── hover on desktop ── */
@@ -130,39 +142,37 @@ export function setupControls(onSwitch) {
   const rightBtn = container.querySelector('#ctrl-right');
   const pedalBtn = container.querySelector('#ctrl-pedal');
 
-  // --- Highlight helpers ---
-  function flash(btn) {
-    btn.classList.add('active');
-    setTimeout(() => btn.classList.remove('active'), 150);
-  }
-
   // =================================================================
   //  ARROW EVENTS — pointerdown for instant response
   // =================================================================
   leftBtn.addEventListener('pointerdown', (e) => {
     e.preventDefault();
     e.stopPropagation();
-    flash(leftBtn);
+    leftBtn.classList.add('active');
     triggerSwitch('left');
   });
+  leftBtn.addEventListener('pointerup', () => leftBtn.classList.remove('active'));
+  leftBtn.addEventListener('pointerleave', () => leftBtn.classList.remove('active'));
+
   rightBtn.addEventListener('pointerdown', (e) => {
     e.preventDefault();
     e.stopPropagation();
-    flash(rightBtn);
+    rightBtn.classList.add('active');
     triggerSwitch('right');
   });
+  rightBtn.addEventListener('pointerup', () => rightBtn.classList.remove('active'));
+  rightBtn.addEventListener('pointerleave', () => rightBtn.classList.remove('active'));
 
   // =================================================================
   //  PEDAL EVENTS — hold to accelerate
   // =================================================================
-  // Track active pointers on the pedal for multi-touch
   const pedalPointers = new Set();
 
   function pedalStart(e) {
     e.preventDefault();
     pedalPointers.add(e.pointerId);
     _pedalDown = true;
-    pedalBtn.classList.add('active');
+    pedalBtn.classList.add('active', 'touched');
     pedalBtn.setPointerCapture(e.pointerId);
   }
 
@@ -185,7 +195,7 @@ export function setupControls(onSwitch) {
   });
 
   // =================================================================
-  //  KEYBOARD
+  //  KEYBOARD — sustained hold for arrows + pedal
   // =================================================================
   const keysDown = new Set();
 
@@ -194,21 +204,26 @@ export function setupControls(onSwitch) {
     keysDown.add(e.key);
 
     if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
-      flash(leftBtn);
+      leftBtn.classList.add('active');
       triggerSwitch('left');
     } else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
-      flash(rightBtn);
+      rightBtn.classList.add('active');
       triggerSwitch('right');
     } else if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W' || e.key === ' ') {
       _pedalDown = true;
-      pedalBtn.classList.add('active');
+      pedalBtn.classList.add('active', 'touched');
     }
   });
 
   window.addEventListener('keyup', (e) => {
     keysDown.delete(e.key);
-    if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W' || e.key === ' ') {
-      // Only release if no other pedal key is still held
+
+    // Release arrow highlight on keyup
+    if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
+      leftBtn.classList.remove('active');
+    } else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
+      rightBtn.classList.remove('active');
+    } else if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W' || e.key === ' ') {
       const pedalKeys = ['ArrowUp', 'w', 'W', ' '];
       if (!pedalKeys.some(k => keysDown.has(k))) {
         _pedalDown = false;
@@ -218,7 +233,7 @@ export function setupControls(onSwitch) {
   });
 
   // =================================================================
-  //  SWIPE fallback (anywhere on screen except buttons)
+  //  SWIPE fallback
   // =================================================================
   let swipeStartX = 0;
   let swipeStartTime = 0;
@@ -235,8 +250,10 @@ export function setupControls(onSwitch) {
     const dt = Date.now() - swipeStartTime;
     if (dt < 500 && Math.abs(dx) > 30) {
       const dir = dx < 0 ? 'left' : 'right';
-      flash(dir === 'left' ? leftBtn : rightBtn);
+      const btn = dir === 'left' ? leftBtn : rightBtn;
+      btn.classList.add('active');
       triggerSwitch(dir);
+      setTimeout(() => btn.classList.remove('active'), 150);
     }
   });
 
@@ -244,7 +261,11 @@ export function setupControls(onSwitch) {
   //  PUBLIC API
   // =================================================================
   return {
-    showButtons() { container.style.display = 'flex'; },
+    showButtons() {
+      container.style.display = 'flex';
+      // Reset pedal pulse on each game start
+      pedalBtn.classList.remove('touched');
+    },
     hideButtons() { container.style.display = 'none'; },
     isPedalDown() { return _pedalDown; },
   };
