@@ -56,13 +56,14 @@ export class MapSelect {
       /* ── Backdrop ── */
       .ms-backdrop {
         position: absolute; inset: 0;
-        background: linear-gradient(135deg, #0a0520 0%, #0d1a2e 50%, #1a0a3a 100%);
+        background: linear-gradient(180deg, #2a6a90 0%, #5a8a50 35%, #3a5a30 60%, #1e2e18 100%);
       }
       .ms-backdrop::before {
         content: ''; position: absolute; inset: 0;
         background:
-          radial-gradient(ellipse at 30% 60%, rgba(255,170,50,0.05) 0%, transparent 50%),
-          radial-gradient(ellipse at 70% 40%, rgba(100,120,255,0.05) 0%, transparent 50%);
+          radial-gradient(ellipse at 30% 20%, rgba(71,176,232,0.12) 0%, transparent 50%),
+          radial-gradient(ellipse at 70% 30%, rgba(200,168,72,0.10) 0%, transparent 50%),
+          radial-gradient(ellipse at 50% 80%, rgba(42,48,32,0.3) 0%, transparent 50%);
       }
 
       /* ── Content ── */

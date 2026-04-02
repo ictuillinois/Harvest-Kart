@@ -49,18 +49,18 @@ export class DriverSelect {
       /* ── Animated gradient backdrop ── */
       .ds-backdrop {
         position: absolute; inset: 0;
-        background: linear-gradient(135deg, #0a0520 0%, #1a0a3a 40%, #0d1a2e 100%);
+        background: linear-gradient(180deg, #2a6a90 0%, #5a8a50 35%, #3a5a30 60%, #1e2e18 100%);
       }
       .ds-backdrop::before {
         content: ''; position: absolute; inset: 0;
         background:
-          radial-gradient(ellipse at 20% 50%, rgba(57,255,20,0.06) 0%, transparent 60%),
-          radial-gradient(ellipse at 80% 50%, rgba(100,80,255,0.06) 0%, transparent 60%),
-          radial-gradient(ellipse at 50% 0%, rgba(255,180,0,0.05) 0%, transparent 50%);
+          radial-gradient(ellipse at 30% 20%, rgba(71,176,232,0.12) 0%, transparent 50%),
+          radial-gradient(ellipse at 70% 30%, rgba(200,168,72,0.10) 0%, transparent 50%),
+          radial-gradient(ellipse at 50% 80%, rgba(42,48,32,0.3) 0%, transparent 50%);
         animation: dsGlow 6s ease-in-out infinite alternate;
       }
       @keyframes dsGlow {
-        0%   { opacity: 0.6; }
+        0%   { opacity: 0.7; }
         100% { opacity: 1; }
       }
 
