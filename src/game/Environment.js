@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { Sky } from 'three/addons/objects/Sky.js';
 import { ROAD_WIDTH, ROAD_SEGMENT_LENGTH, MAP_THEMES } from '../utils/constants.js';
+import { getModel, preloadAll, MODEL_URLS } from '../utils/assetLoader.js';
 
 export class Environment {
   constructor(scene, renderer) {
@@ -16,9 +17,18 @@ export class Environment {
     this.ground = null;
     this.starField = null;
     this.currentTheme = null;
+    this.modelsReady = false;
   }
 
-  build(themeIndex) {
+  /**
+   * Preload all 3D models. Call once before first build().
+   */
+  async preload() {
+    await preloadAll(Object.values(MODEL_URLS));
+    this.modelsReady = true;
+  }
+
+  async build(themeIndex) {
     // --- Cleanup ---
     for (const obj of this.themeObjects) {
       this.scene.remove(obj);
@@ -37,27 +47,23 @@ export class Environment {
     this.currentTheme = theme;
 
     // =================================================================
-    //  SKY — Preetham atmospheric scattering + procedural FBM clouds
+    //  SKY
     // =================================================================
     this.sky = new Sky();
     this.sky.scale.setScalar(10000);
     this.scene.add(this.sky);
 
     const skyUniforms = this.sky.material.uniforms;
-
-    // Atmosphere
     skyUniforms['turbidity'].value = theme.sky.turbidity;
     skyUniforms['rayleigh'].value = theme.sky.rayleigh;
     skyUniforms['mieCoefficient'].value = theme.sky.mieCoefficient;
     skyUniforms['mieDirectionalG'].value = theme.sky.mieDirectionalG;
 
-    // Sun position from elevation + azimuth
     const phi = THREE.MathUtils.degToRad(90 - theme.sky.sunElevation);
     const theta = THREE.MathUtils.degToRad(theme.sky.sunAzimuth);
     this.sunDirection.setFromSphericalCoords(1, phi, theta);
     skyUniforms['sunPosition'].value.copy(this.sunDirection);
 
-    // Procedural clouds
     skyUniforms['cloudCoverage'].value = theme.clouds.coverage;
     skyUniforms['cloudDensity'].value = theme.clouds.density;
     skyUniforms['cloudScale'].value = theme.clouds.scale;
@@ -65,17 +71,13 @@ export class Environment {
     skyUniforms['cloudElevation'].value = theme.clouds.elevation;
     skyUniforms['time'].value = 0;
 
-    // Tone-mapping exposure per theme
     this.renderer.toneMappingExposure = theme.sky.exposure;
 
     // =================================================================
-    //  FOG — tinted to match horizon
+    //  FOG + LIGHTING + GROUND
     // =================================================================
     this.scene.fog = new THREE.FogExp2(theme.fog, theme.fogDensity);
 
-    // =================================================================
-    //  LIGHTING — synced to sun direction
-    // =================================================================
     this.ambientLight = new THREE.AmbientLight(theme.ambientColor, theme.ambientIntensity);
     this.scene.add(this.ambientLight);
 
@@ -83,14 +85,9 @@ export class Environment {
     this.dirLight.position.copy(this.sunDirection).multiplyScalar(100);
     this.scene.add(this.dirLight);
 
-    this.hemiLight = new THREE.HemisphereLight(
-      theme.dirColor, theme.ground, 0.25
-    );
+    this.hemiLight = new THREE.HemisphereLight(theme.dirColor, theme.ground, 0.25);
     this.scene.add(this.hemiLight);
 
-    // =================================================================
-    //  GROUND
-    // =================================================================
     const groundGeo = new THREE.PlaneGeometry(800, 800);
     const groundMat = new THREE.MeshStandardMaterial({ color: theme.ground, roughness: 1 });
     this.ground = new THREE.Mesh(groundGeo, groundMat);
@@ -99,14 +96,12 @@ export class Environment {
     this.scene.add(this.ground);
 
     // =================================================================
-    //  STARS (USA night theme)
+    //  STARS (USA)
     // =================================================================
-    if (theme.stars) {
-      this._buildStarField();
-    }
+    if (theme.stars) this._buildStarField();
 
     // =================================================================
-    //  BARRIERS (shared across all maps)
+    //  BARRIERS
     // =================================================================
     const barrierMat = new THREE.MeshStandardMaterial({ color: 0x888888, metalness: 0.5, roughness: 0.6 });
     for (const side of [-1, 1]) {
@@ -121,7 +116,7 @@ export class Environment {
     }
 
     // =================================================================
-    //  THEME-SPECIFIC DECORATIONS
+    //  THEME DECORATIONS
     // =================================================================
     switch (theme.id) {
       case 'brazil': this._buildBrazil(); break;
@@ -130,8 +125,43 @@ export class Environment {
     }
   }
 
+  // --- Helper: place a loaded model ---
+  _placeModel(url, x, y, z, scale = 1, rotY = 0) {
+    const model = getModel(url);
+    model.position.set(x, y, z);
+    model.scale.setScalar(scale);
+    model.rotation.y = rotY;
+    this.scene.add(model);
+    this.themeObjects.push(model);
+    this.decorations.push(model);
+    return model;
+  }
+
+  // --- Helper: place model without scrolling (static sky objects) ---
+  _placeStatic(url, x, y, z, scale = 1, rotY = 0) {
+    const model = getModel(url);
+    model.position.set(x, y, z);
+    model.scale.setScalar(scale);
+    model.rotation.y = rotY;
+    this.scene.add(model);
+    this.themeObjects.push(model);
+    return model;
+  }
+
+  // --- Helper: scatter roadside props ---
+  _scatterProps(propUrls, count, xRange, zSpacing, scale = 1) {
+    for (let i = 0; i < count; i++) {
+      const side = i % 2 === 0 ? -1 : 1;
+      const url = propUrls[Math.floor(Math.random() * propUrls.length)];
+      const x = side * (ROAD_WIDTH / 2 + xRange[0] + Math.random() * (xRange[1] - xRange[0]));
+      const z = -i * zSpacing - Math.random() * zSpacing * 0.5;
+      const s = scale * (0.8 + Math.random() * 0.4);
+      this._placeModel(url, x, 0, z, s, Math.random() * Math.PI * 2);
+    }
+  }
+
   // =====================================================================
-  //  STAR FIELD — thousands of points on a large sphere
+  //  STAR FIELD
   // =====================================================================
   _buildStarField() {
     const COUNT = 2500;
@@ -139,15 +169,12 @@ export class Environment {
     const sizes = new Float32Array(COUNT);
 
     for (let i = 0; i < COUNT; i++) {
-      // Random positions on a sphere, biased to upper hemisphere
       const r = 400 + Math.random() * 100;
       const theta = Math.random() * Math.PI * 2;
-      const phi = Math.acos(Math.random() * 0.85); // mostly above horizon
-
+      const phi = Math.acos(Math.random() * 0.85);
       positions[i * 3] = r * Math.sin(phi) * Math.cos(theta);
       positions[i * 3 + 1] = r * Math.cos(phi);
       positions[i * 3 + 2] = r * Math.sin(phi) * Math.sin(theta);
-
       sizes[i] = 0.5 + Math.random() * 2.0;
     }
 
@@ -155,19 +182,14 @@ export class Environment {
     geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
     geo.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
 
-    // Custom shader for twinkle effect
     const mat = new THREE.ShaderMaterial({
-      uniforms: {
-        time: { value: 0 },
-        color: { value: new THREE.Color(0xffffff) },
-      },
+      uniforms: { time: { value: 0 }, color: { value: new THREE.Color(0xffffff) } },
       vertexShader: `
         attribute float size;
         uniform float time;
         varying float vBrightness;
         void main() {
           vec4 mvPos = modelViewMatrix * vec4(position, 1.0);
-          // Twinkle: each star gets a unique phase from its position
           float phase = dot(position, vec3(12.9898, 78.233, 45.164));
           vBrightness = 0.5 + 0.5 * sin(time * (1.5 + fract(phase) * 2.0) + phase);
           gl_PointSize = size * vBrightness * (300.0 / -mvPos.z);
@@ -178,7 +200,6 @@ export class Environment {
         uniform vec3 color;
         varying float vBrightness;
         void main() {
-          // Soft circular point
           float d = length(gl_PointCoord - vec2(0.5));
           if (d > 0.5) discard;
           float alpha = smoothstep(0.5, 0.1, d) * vBrightness;
@@ -198,37 +219,20 @@ export class Environment {
   //  BRAZIL — tropical vibes
   // =====================================================================
   _buildBrazil() {
-    // --- Sun glow meshes (complement the Sky shader's sun disc) ---
+    // --- Sun glow ---
     const sunPos = this.sunDirection.clone().multiplyScalar(300);
-    // Outer corona
-    const coronaGeo = new THREE.SphereGeometry(30, 32, 32);
-    const coronaMat = new THREE.MeshBasicMaterial({
-      color: 0xffaa33, transparent: true, opacity: 0.12, depthWrite: false
-    });
-    const corona = new THREE.Mesh(coronaGeo, coronaMat);
-    corona.position.copy(sunPos);
-    this.scene.add(corona);
-    this.themeObjects.push(corona);
+    for (const [size, color, opacity] of [[30, 0xffaa33, 0.12], [18, 0xffdd66, 0.2], [8, 0xffee88, 1.0]]) {
+      const geo = new THREE.SphereGeometry(size, 32, 32);
+      const mat = new THREE.MeshBasicMaterial({
+        color, transparent: opacity < 1, opacity, depthWrite: false
+      });
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.position.copy(sunPos);
+      this.scene.add(mesh);
+      this.themeObjects.push(mesh);
+    }
 
-    // Middle glow
-    const glowGeo = new THREE.SphereGeometry(18, 32, 32);
-    const glowMat = new THREE.MeshBasicMaterial({
-      color: 0xffdd66, transparent: true, opacity: 0.2, depthWrite: false
-    });
-    const glow = new THREE.Mesh(glowGeo, glowMat);
-    glow.position.copy(sunPos);
-    this.scene.add(glow);
-    this.themeObjects.push(glow);
-
-    // Core
-    const coreGeo = new THREE.SphereGeometry(8, 32, 32);
-    const coreMat = new THREE.MeshBasicMaterial({ color: 0xffee88 });
-    const core = new THREE.Mesh(coreGeo, coreMat);
-    core.position.copy(sunPos);
-    this.scene.add(core);
-    this.themeObjects.push(core);
-
-    // --- Palm trees ---
+    // --- Palm trees (procedural — no palm GLB available) ---
     const trunkMat = new THREE.MeshStandardMaterial({ color: 0x8B6914, roughness: 0.9 });
     const leafMat = new THREE.MeshStandardMaterial({ color: 0x228B22, roughness: 0.7 });
 
@@ -236,7 +240,6 @@ export class Environment {
       for (let i = 0; i < 12; i++) {
         const palmGroup = new THREE.Group();
         const height = 5 + Math.random() * 4;
-
         for (let s = 0; s < 5; s++) {
           const segGeo = new THREE.CylinderGeometry(0.15 - s * 0.02, 0.18 - s * 0.02, height / 5, 6);
           const seg = new THREE.Mesh(segGeo, trunkMat);
@@ -244,7 +247,6 @@ export class Environment {
           seg.position.x = Math.sin(s * 0.15) * 0.3;
           palmGroup.add(seg);
         }
-
         for (let f = 0; f < 7; f++) {
           const leafGeo = new THREE.BoxGeometry(0.3, 0.05, 2.5 + Math.random());
           const leaf = new THREE.Mesh(leafGeo, leafMat);
@@ -253,10 +255,8 @@ export class Environment {
           leaf.rotation.x = 0.4 + Math.random() * 0.3;
           palmGroup.add(leaf);
         }
-
         palmGroup.position.set(
-          side * (ROAD_WIDTH / 2 + 2 + Math.random() * 5),
-          0,
+          side * (ROAD_WIDTH / 2 + 2 + Math.random() * 5), 0,
           -i * 28 - Math.random() * 10
         );
         this.scene.add(palmGroup);
@@ -265,35 +265,25 @@ export class Environment {
       }
     }
 
-    // --- Colorful low-rise buildings ---
-    const buildingColors = [0xffccaa, 0xffddbb, 0xff9966, 0xffaa88, 0xeedd99, 0xffcc77];
-    for (const side of [-1, 1]) {
-      for (let i = 0; i < 10; i++) {
-        const w = 3 + Math.random() * 4;
-        const h = 3 + Math.random() * 6;
-        const d = 3 + Math.random() * 4;
-        const color = buildingColors[Math.floor(Math.random() * buildingColors.length)];
-        const bGeo = new THREE.BoxGeometry(w, h, d);
-        const bMat = new THREE.MeshStandardMaterial({ color, roughness: 0.8 });
-        const building = new THREE.Mesh(bGeo, bMat);
-        building.position.set(
-          side * (ROAD_WIDTH / 2 + 6 + Math.random() * 8),
-          h / 2,
-          -i * 30 - Math.random() * 15
-        );
-        this.scene.add(building);
-        this.themeObjects.push(building);
-        this.decorations.push(building);
-
-        const roofGeo = new THREE.BoxGeometry(w + 0.2, 0.1, d + 0.2);
-        const roofMat = new THREE.MeshStandardMaterial({ color: 0xcc8866 });
-        const roof = new THREE.Mesh(roofGeo, roofMat);
-        roof.position.y = h / 2 + 0.05;
-        building.add(roof);
+    // --- Buildings (loaded KayKit models) ---
+    const brazilBuildings = [MODEL_URLS.buildingA, MODEL_URLS.buildingB, MODEL_URLS.buildingC, MODEL_URLS.buildingD];
+    if (this.modelsReady) {
+      for (const side of [-1, 1]) {
+        for (let i = 0; i < 10; i++) {
+          const url = brazilBuildings[Math.floor(Math.random() * brazilBuildings.length)];
+          const x = side * (ROAD_WIDTH / 2 + 6 + Math.random() * 6);
+          const z = -i * 30 - Math.random() * 15;
+          const s = 1.8 + Math.random() * 1.5;
+          this._placeModel(url, x, 0, z, s, side > 0 ? Math.PI : 0);
+        }
       }
+
+      // --- Roadside props: bushes, benches, fire hydrants ---
+      this._scatterProps([MODEL_URLS.bush], 16, [1.5, 4], 22, 1.5);
+      this._scatterProps([MODEL_URLS.bench, MODEL_URLS.firehydrant], 8, [1.2, 2], 40, 1.2);
     }
 
-    // --- Beach sand ---
+    // Beach sand
     const sandGeo = new THREE.PlaneGeometry(200, 30);
     const sandMat = new THREE.MeshStandardMaterial({ color: 0xf4d99a, roughness: 1 });
     const sand = new THREE.Mesh(sandGeo, sandMat);
@@ -307,104 +297,73 @@ export class Environment {
   //  USA — night city
   // =====================================================================
   _buildUSA() {
-    // --- Moon with crater detail + glow ---
+    // --- Moon ---
     const moonGroup = new THREE.Group();
-    // Core sphere
     const moonGeo = new THREE.SphereGeometry(10, 32, 32);
     const moonMat = new THREE.MeshBasicMaterial({ color: 0xeeeeff });
-    const moon = new THREE.Mesh(moonGeo, moonMat);
-    moonGroup.add(moon);
+    moonGroup.add(new THREE.Mesh(moonGeo, moonMat));
 
-    // Craters (darker subtle circles)
     const craterMat = new THREE.MeshBasicMaterial({ color: 0xccccdd });
     for (let i = 0; i < 5; i++) {
       const cGeo = new THREE.CircleGeometry(1 + Math.random() * 2, 12);
       const crater = new THREE.Mesh(cGeo, craterMat);
-      const angle1 = Math.random() * Math.PI * 0.6 - 0.3;
-      const angle2 = Math.random() * Math.PI * 0.6 - 0.3;
-      crater.position.set(
-        Math.sin(angle1) * 9,
-        Math.sin(angle2) * 9,
-        -Math.cos(angle1) * Math.cos(angle2) * 10 - 0.5
-      );
+      const a1 = Math.random() * 0.6 - 0.3, a2 = Math.random() * 0.6 - 0.3;
+      crater.position.set(Math.sin(a1) * 9, Math.sin(a2) * 9, -Math.cos(a1) * Math.cos(a2) * 10 - 0.5);
       crater.lookAt(0, 0, 0);
       moonGroup.add(crater);
     }
 
-    // Moon glow halo
     const moonGlowGeo = new THREE.SphereGeometry(18, 32, 32);
-    const moonGlowMat = new THREE.MeshBasicMaterial({
-      color: 0x8888cc, transparent: true, opacity: 0.08, depthWrite: false
-    });
-    const moonGlow = new THREE.Mesh(moonGlowGeo, moonGlowMat);
-    moonGroup.add(moonGlow);
-
+    const moonGlowMat = new THREE.MeshBasicMaterial({ color: 0x8888cc, transparent: true, opacity: 0.08, depthWrite: false });
+    moonGroup.add(new THREE.Mesh(moonGlowGeo, moonGlowMat));
     moonGroup.position.set(-60, 130, -280);
     this.scene.add(moonGroup);
     this.themeObjects.push(moonGroup);
 
-    // Moonlight
     const moonLight = new THREE.PointLight(0x6677aa, 0.4, 500);
     moonLight.position.copy(moonGroup.position);
     this.scene.add(moonLight);
     this.themeObjects.push(moonLight);
 
-    // --- Tall modern skyscrapers ---
-    const glassColors = [0x1a1a3e, 0x222244, 0x252548, 0x2a2a55, 0x1e1e42];
-    const windowMat = new THREE.MeshBasicMaterial({ color: 0xffcc66 });
+    // --- Tall buildings (loaded KayKit models, scaled up) ---
+    const usaBuildings = [
+      MODEL_URLS.buildingE, MODEL_URLS.buildingF, MODEL_URLS.buildingG, MODEL_URLS.buildingH,
+      MODEL_URLS.buildingC, MODEL_URLS.buildingD,
+    ];
 
-    for (const side of [-1, 1]) {
-      for (let i = 0; i < 18; i++) {
-        const w = 4 + Math.random() * 8;
-        const h = 10 + Math.random() * 35;
-        const d = 4 + Math.random() * 6;
-        const color = glassColors[Math.floor(Math.random() * glassColors.length)];
+    if (this.modelsReady) {
+      for (const side of [-1, 1]) {
+        for (let i = 0; i < 16; i++) {
+          const url = usaBuildings[Math.floor(Math.random() * usaBuildings.length)];
+          const x = side * (ROAD_WIDTH / 2 + 4 + Math.random() * 10);
+          const z = -i * 22 - Math.random() * 10;
+          const s = 3.0 + Math.random() * 4.0; // tall city scale
+          const model = this._placeModel(url, x, 0, z, s, side > 0 ? Math.PI : 0);
 
-        const bGeo = new THREE.BoxGeometry(w, h, d);
-        const bMat = new THREE.MeshStandardMaterial({ color, metalness: 0.6, roughness: 0.3 });
-        const building = new THREE.Mesh(bGeo, bMat);
-        building.position.set(
-          side * (ROAD_WIDTH / 2 + 4 + Math.random() * 12),
-          h / 2,
-          -i * 22 - Math.random() * 10
-        );
-        this.scene.add(building);
-        this.themeObjects.push(building);
-        this.decorations.push(building);
-
-        const rows = Math.floor(h / 3);
-        const cols = Math.floor(w / 2);
-        for (let wy = 0; wy < Math.min(rows, 8); wy++) {
-          for (let wx = 0; wx < Math.min(cols, 3); wx++) {
-            if (Math.random() > 0.4) continue;
-            const winGeo = new THREE.BoxGeometry(0.6, 0.9, 0.05);
-            const win = new THREE.Mesh(winGeo, windowMat);
-            win.position.set(
-              (wx - (cols - 1) / 2) * 1.8,
-              -h / 2 + 2 + wy * 3,
-              -d / 2 - 0.03
-            );
-            building.add(win);
-          }
-        }
-
-        if (h > 30) {
-          const antGeo = new THREE.CylinderGeometry(0.05, 0.08, 5, 6);
-          const antMat = new THREE.MeshStandardMaterial({ color: 0x888888, metalness: 0.8 });
-          const ant = new THREE.Mesh(antGeo, antMat);
-          ant.position.y = h / 2 + 2.5;
-          building.add(ant);
-
-          const blinkGeo = new THREE.SphereGeometry(0.15, 6, 6);
-          const blinkMat = new THREE.MeshBasicMaterial({ color: 0xff0000 });
-          const blink = new THREE.Mesh(blinkGeo, blinkMat);
-          blink.position.y = h / 2 + 5;
-          building.add(blink);
+          // Tint buildings darker for nighttime city feel
+          model.traverse((child) => {
+            if (child.isMesh && child.material) {
+              child.material = child.material.clone();
+              child.material.color.multiplyScalar(0.35);
+            }
+          });
         }
       }
+
+      // Roadside urban props: dumpsters, traffic lights, benches
+      this._scatterProps(
+        [MODEL_URLS.dumpster, MODEL_URLS.trafficLight, MODEL_URLS.bench, MODEL_URLS.firehydrant],
+        12, [1.2, 3], 28, 1.3
+      );
+
+      // Parked cars along roadside
+      this._scatterProps(
+        [MODEL_URLS.carSedan, MODEL_URLS.carTaxi, MODEL_URLS.carHatchback],
+        8, [1.5, 3], 40, 1.2
+      );
     }
 
-    // --- Neon signs ---
+    // --- Neon signs (keep as emissive boxes — good for neon effect) ---
     const neonColors = [0xff00ff, 0x00ffff, 0xff4444, 0x44ff44];
     for (let i = 0; i < 6; i++) {
       const side = i % 2 === 0 ? -1 : 1;
@@ -412,11 +371,7 @@ export class Environment {
       const nColor = neonColors[Math.floor(Math.random() * neonColors.length)];
       const nMat = new THREE.MeshBasicMaterial({ color: nColor });
       const neon = new THREE.Mesh(nGeo, nMat);
-      neon.position.set(
-        side * (ROAD_WIDTH / 2 + 3),
-        4 + Math.random() * 3,
-        -i * 40 - 20
-      );
+      neon.position.set(side * (ROAD_WIDTH / 2 + 3), 4 + Math.random() * 3, -i * 40 - 20);
       this.scene.add(neon);
       this.themeObjects.push(neon);
       this.decorations.push(neon);
@@ -427,15 +382,13 @@ export class Environment {
   //  PERU — mountains & valleys
   // =====================================================================
   _buildPeru() {
-    // --- Mountains ---
+    // --- Mountains (keep procedural — they look good at large scale) ---
     const mountainColors = [0x556B2F, 0x4a7a3a, 0x6B8E23, 0x5a8a4a, 0x3a6a2a];
-
     for (const side of [-1, 1]) {
       for (let i = 0; i < 8; i++) {
         const radius = 15 + Math.random() * 25;
         const height = 20 + Math.random() * 50;
         const color = mountainColors[Math.floor(Math.random() * mountainColors.length)];
-
         const mGeo = new THREE.ConeGeometry(radius, height, 6 + Math.floor(Math.random() * 4));
         const mMat = new THREE.MeshStandardMaterial({ color, roughness: 0.9 });
         const mountain = new THREE.Mesh(mGeo, mMat);
@@ -462,14 +415,12 @@ export class Environment {
       for (let i = 0; i < 10; i++) {
         const hillGeo = new THREE.SphereGeometry(8 + Math.random() * 6, 12, 8);
         const hillMat = new THREE.MeshStandardMaterial({
-          color: 0x4a8a2a + Math.floor(Math.random() * 0x101010),
-          roughness: 0.9
+          color: 0x4a8a2a + Math.floor(Math.random() * 0x101010), roughness: 0.9
         });
         const hill = new THREE.Mesh(hillGeo, hillMat);
         hill.scale.y = 0.4;
         hill.position.set(
-          side * (ROAD_WIDTH / 2 + 5 + Math.random() * 10),
-          -1,
+          side * (ROAD_WIDTH / 2 + 5 + Math.random() * 10), -1,
           -i * 30 - Math.random() * 15
         );
         this.scene.add(hill);
@@ -478,7 +429,7 @@ export class Environment {
       }
     }
 
-    // --- Trees ---
+    // --- Trees (procedural + loaded bushes alongside) ---
     const foliageColors = [0x2d5a1e, 0x3a6a2a, 0x1a5a1a, 0x4a8a3a];
     const trunkMat = new THREE.MeshStandardMaterial({ color: 0x4a3728 });
 
@@ -497,16 +448,14 @@ export class Environment {
           const fGeo = new THREE.SphereGeometry(0.8 + Math.random() * 0.6, 8, 6);
           const foliage = new THREE.Mesh(fGeo, fMat);
           foliage.position.set(
-            (Math.random() - 0.5) * 0.6,
-            trunkH + 0.5 + f * 0.4,
+            (Math.random() - 0.5) * 0.6, trunkH + 0.5 + f * 0.4,
             (Math.random() - 0.5) * 0.6
           );
           treeGroup.add(foliage);
         }
 
         treeGroup.position.set(
-          side * (ROAD_WIDTH / 2 + 2 + Math.random() * 6),
-          0,
+          side * (ROAD_WIDTH / 2 + 2 + Math.random() * 6), 0,
           -i * 22 - Math.random() * 10
         );
         this.scene.add(treeGroup);
@@ -515,7 +464,24 @@ export class Environment {
       }
     }
 
-    // --- Inca-like terraces ---
+    // --- Loaded bushes scattered between trees ---
+    if (this.modelsReady) {
+      this._scatterProps([MODEL_URLS.bush], 20, [1.5, 8], 18, 1.8);
+
+      // Small buildings (Inca-village style using building models)
+      for (let i = 0; i < 4; i++) {
+        const side = i % 2 === 0 ? -1 : 1;
+        const url = [MODEL_URLS.buildingA, MODEL_URLS.buildingB][Math.floor(Math.random() * 2)];
+        this._placeModel(
+          url,
+          side * (ROAD_WIDTH / 2 + 10 + Math.random() * 5), 0,
+          -i * 80 - 40,
+          1.5, Math.random() * Math.PI * 2
+        );
+      }
+    }
+
+    // --- Inca-like terraces (keep procedural) ---
     const terrMat = new THREE.MeshStandardMaterial({ color: 0x8B7355, roughness: 0.9 });
     for (let i = 0; i < 3; i++) {
       const terrGroup = new THREE.Group();
@@ -527,33 +493,22 @@ export class Environment {
         terrGroup.add(step);
       }
       terrGroup.position.set(
-        (i % 2 === 0 ? -1 : 1) * (ROAD_WIDTH / 2 + 10 + Math.random() * 5),
-        0,
+        (i % 2 === 0 ? -1 : 1) * (ROAD_WIDTH / 2 + 10 + Math.random() * 5), 0,
         -i * 80 - 40
       );
       this.scene.add(terrGroup);
       this.themeObjects.push(terrGroup);
       this.decorations.push(terrGroup);
     }
-
-    // (No manual cloud meshes needed — procedural clouds are in the Sky shader)
   }
 
   // =====================================================================
-  //  UPDATE — animate clouds, stars, and scroll decorations
+  //  UPDATE
   // =====================================================================
   update(delta, speed) {
-    // Animate procedural clouds
-    if (this.sky) {
-      this.sky.material.uniforms['time'].value += delta;
-    }
+    if (this.sky) this.sky.material.uniforms['time'].value += delta;
+    if (this.starField) this.starField.material.uniforms.time.value += delta;
 
-    // Twinkle stars
-    if (this.starField) {
-      this.starField.material.uniforms.time.value += delta;
-    }
-
-    // Scroll decorations
     const move = speed * delta;
     for (const deco of this.decorations) {
       deco.position.z += move;

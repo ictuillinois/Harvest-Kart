@@ -44,9 +44,6 @@ const plates = new Plate(scene);
 const lampPosts = new LampPost(scene);
 const environment = new Environment(scene, renderer);
 
-// Build a default environment so the 3D scene isn't empty on the menu
-environment.build(0);
-
 // --- UI ---
 const startScreen = new StartScreen(() => {
   gameState.transition('driverSelect');
@@ -58,9 +55,9 @@ const driverSelect = new DriverSelect((driverIndex) => {
   gameState.transition('mapSelect');
 });
 
-const mapSelect = new MapSelect((mapIndex) => {
+const mapSelect = new MapSelect(async (mapIndex) => {
   gameState.selectedMap = mapIndex;
-  environment.build(mapIndex);
+  await environment.build(mapIndex);
   gameState.transition('playing');
 });
 
@@ -156,13 +153,25 @@ function animate() {
       gameState.hitPlate();
     }
 
-    // Camera follows kart laterally
     camera.position.x += (kart.group.position.x * 0.3 - camera.position.x) * 0.1;
   }
 
   renderer.render(scene, camera);
 }
 
-// --- Start ---
-startScreen.show();
-animate();
+// --- Bootstrap: preload models, then show start screen ---
+async function init() {
+  // Start rendering immediately (sky will show while models load)
+  animate();
+
+  // Preload all 3D models in background
+  await environment.preload();
+
+  // Build default environment with loaded models
+  await environment.build(0);
+
+  // Show start screen
+  startScreen.show();
+}
+
+init();
