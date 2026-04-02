@@ -14,46 +14,46 @@ export class LampPost {
     for (let i = 0; i < TOTAL_LAMP_POSTS; i++) {
       const group = new THREE.Group();
 
-      // Pole
-      const poleGeo = new THREE.CylinderGeometry(0.12, 0.15, 6, 8);
+      // Pole (3 units tall — proportional to kart at ~1 unit tall)
+      const poleGeo = new THREE.CylinderGeometry(0.06, 0.08, 3, 8);
       const pole = new THREE.Mesh(poleGeo, poleMat);
-      pole.position.y = 3;
+      pole.position.y = 1.5;
       group.add(pole);
 
-      // Arm
-      const armGeo = new THREE.CylinderGeometry(0.06, 0.06, 2.5, 6);
+      // Arm extending toward road
+      const armGeo = new THREE.CylinderGeometry(0.03, 0.03, 1.2, 6);
       const arm = new THREE.Mesh(armGeo, poleMat);
       arm.rotation.z = Math.PI / 2;
-      arm.position.set(-1.25, 5.8, 0);
+      arm.position.set(-0.6, 2.9, 0);
       group.add(arm);
 
-      // Lamp housing (box around the bulb)
-      const housingGeo = new THREE.BoxGeometry(0.8, 0.3, 0.5);
+      // Lamp housing
+      const housingGeo = new THREE.BoxGeometry(0.4, 0.15, 0.25);
       const housingMat = new THREE.MeshStandardMaterial({ color: 0x555555, metalness: 0.4 });
       const housing = new THREE.Mesh(housingGeo, housingMat);
-      housing.position.set(-2.5, 5.85, 0);
+      housing.position.set(-1.2, 2.95, 0);
       group.add(housing);
 
       // Lamp head (bulb)
       const headMat = new THREE.MeshStandardMaterial({
         color: COLORS.lampDim,
         emissive: COLORS.lampDim,
-        emissiveIntensity: 0.15,  // very dim initial glow
+        emissiveIntensity: 0.15,
         metalness: 0.2,
         roughness: 0.4,
       });
-      const headGeo = new THREE.SphereGeometry(0.35, 12, 12);
+      const headGeo = new THREE.SphereGeometry(0.18, 10, 10);
       const head = new THREE.Mesh(headGeo, headMat);
-      head.position.set(-2.5, 5.6, 0);
+      head.position.set(-1.2, 2.8, 0);
       group.add(head);
 
-      // PointLight — starts very dim (not off, just barely visible)
-      const light = new THREE.PointLight(COLORS.lampLight, 0.3, 12, 2);
-      light.position.set(-2.5, 5.5, 0);
+      // PointLight
+      const light = new THREE.PointLight(COLORS.lampLight, 0.3, 15, 2);
+      light.position.set(-1.2, 2.7, 0);
       group.add(light);
 
-      // Light cone visual (dim glow cone beneath lamp)
-      const coneGeo = new THREE.ConeGeometry(1.5, 5, 8, 1, true);
+      // Light cone visual
+      const coneGeo = new THREE.ConeGeometry(0.8, 2.5, 8, 1, true);
       const coneMat = new THREE.MeshBasicMaterial({
         color: COLORS.lampDim,
         transparent: true,
@@ -61,14 +61,14 @@ export class LampPost {
         side: THREE.DoubleSide,
       });
       const cone = new THREE.Mesh(coneGeo, coneMat);
-      cone.position.set(-2.5, 3, 0);
+      cone.position.set(-1.2, 1.5, 0);
       cone.rotation.x = Math.PI;
       group.add(cone);
 
-      // Place along road sides
+      // Place along road sides (pushed out a bit so arm doesn't cross lanes)
       const side = i % 2 === 0 ? 1 : -1;
       group.position.set(
-        side * (ROAD_WIDTH / 2 + 0.5),
+        side * (ROAD_WIDTH / 2 + 1.5),
         0,
         -30 - i * 35
       );
@@ -87,7 +87,7 @@ export class LampPost {
 
     // Dramatically increase light intensity (dim → very bright)
     new Tween(post.light, tweenGroup)
-      .to({ intensity: 25, distance: 35 }, 1000)
+      .to({ intensity: 20, distance: 20 }, 1000)
       .easing(Easing.Quadratic.Out)
       .start();
 
@@ -125,7 +125,7 @@ export class LampPost {
     for (const post of this.posts) {
       post.lit = false;
       post.light.intensity = 0.3;
-      post.light.distance = 12;
+      post.light.distance = 15;
       post.headMat.color.setHex(COLORS.lampDim);
       post.headMat.emissive.setHex(COLORS.lampDim);
       post.headMat.emissiveIntensity = 0.15;

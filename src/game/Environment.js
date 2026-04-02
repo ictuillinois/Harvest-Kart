@@ -224,97 +224,101 @@ export class Environment {
   //  Layout: [City LEFT] | ROAD | [Sand + Beach RIGHT] [Ocean]
   // =====================================================================
   _buildBrazil() {
-    // Sun glow
+    // ── ROAD_WIDTH = 12, half = 6. Kart ~2 wide, ~1.2 tall. Camera at y=5, z=8. ──
+    // Rule: nothing closer than x=8 from center on either side.
+    // Buildings behind x=15+. Beach props on sand at x=10-25.
+
+    // Sun glow (sky — non-scrolling)
     const sunPos = this.sunDirection.clone().multiplyScalar(300);
     for (const [size, color, opacity] of [[30, 0xffaa33, 0.12], [18, 0xffdd66, 0.2], [8, 0xffee88, 1.0]]) {
-      const geo = new THREE.SphereGeometry(size, 32, 32);
-      const mat = new THREE.MeshBasicMaterial({ color, transparent: opacity < 1, opacity, depthWrite: false });
-      const mesh = new THREE.Mesh(geo, mat);
+      const mesh = new THREE.Mesh(
+        new THREE.SphereGeometry(size, 32, 32),
+        new THREE.MeshBasicMaterial({ color, transparent: opacity < 1, opacity, depthWrite: false })
+      );
       mesh.position.copy(sunPos);
       this.scene.add(mesh);
       this.themeObjects.push(mesh);
     }
 
-    // Ocean
-    const waterGeo = new THREE.PlaneGeometry(400, 400);
+    // ── OCEAN (right side, large static plane) ──
+    const waterGeo = new THREE.PlaneGeometry(300, 400);
     const waterNormals = new THREE.TextureLoader().load(asset('textures/waternormals.jpg'), (tex) => {
       tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
     });
     this.water = new Water(waterGeo, {
       textureWidth: 512, textureHeight: 512, waterNormals,
       sunDirection: this.sunDirection.clone(), sunColor: 0xffffff,
-      waterColor: 0x001e0f, distortionScale: 3.7,
-      fog: this.scene.fog !== undefined, alpha: 0.9,
+      waterColor: 0x006994, distortionScale: 2.0,
+      fog: this.scene.fog !== undefined, alpha: 0.85,
     });
     this.water.rotation.x = -Math.PI / 2;
-    this.water.position.set(ROAD_WIDTH / 2 + 60, -0.4, -150);
+    this.water.position.set(ROAD_WIDTH / 2 + 40, -0.3, -100);
     this.scene.add(this.water);
     this.themeObjects.push(this.water);
 
-    // Sand strip
-    const sandGeo = new THREE.PlaneGeometry(30, 500);
-    const sandMat = new THREE.MeshStandardMaterial({ color: 0xf4d99a, roughness: 1 });
-    const sand = new THREE.Mesh(sandGeo, sandMat);
+    // ── SAND STRIP (right side, between road and ocean) ──
+    const sand = new THREE.Mesh(
+      new THREE.PlaneGeometry(25, 500),
+      new THREE.MeshStandardMaterial({ color: 0xf4d99a, roughness: 1 })
+    );
     sand.rotation.x = -Math.PI / 2;
-    sand.position.set(ROAD_WIDTH / 2 + 18, -0.08, -150);
+    sand.position.set(ROAD_WIDTH / 2 + 14, -0.05, -150);
     this.scene.add(sand);
     this.themeObjects.push(sand);
 
-    if (this.modelsReady) {
-      // LEFT: City buildings (pushed far from road, small scale)
-      const bldgs = [MODEL_URLS.buildingA, MODEL_URLS.buildingB, MODEL_URLS.buildingC, MODEL_URLS.buildingD];
-      for (let i = 0; i < 8; i++) {
-        const url = bldgs[Math.floor(Math.random() * bldgs.length)];
-        this._placeModel(url, -(ROAD_WIDTH / 2 + 10 + Math.random() * 8), 0, -i * 35 - Math.random() * 15, 0.7 + Math.random() * 0.5, Math.random() * Math.PI);
-      }
+    if (!this.modelsReady) return;
 
-      // LEFT: Palm trees along city side
-      for (let i = 0; i < 8; i++) {
-        this._placeModel(MODEL_URLS.palmTree, -(ROAD_WIDTH / 2 + 3 + Math.random() * 4), 0, -i * 35 - Math.random() * 10, 0.5 + Math.random() * 0.3, Math.random() * Math.PI * 2);
-      }
+    // ═══════════════════════════════════════════════════════
+    // REFERENCE: Kart is 2 wide × 1.2 tall. Camera y=5, z=8.
+    // Road is 12 wide (x = -6 to +6). Roadside starts at |x|=7.
+    //
+    // TESTED MODEL INTERNAL SIZES (at scale 1.0):
+    //   KayKit building: ~4w × 8h × 4d  → scale 0.5 = 2w × 4h
+    //   Poly Pizza palm: ~3w × 8h        → scale 0.3 = 0.9w × 2.4h
+    //   KayKit bush: ~2w × 1.5h          → scale 0.5 = 1w × 0.75h
+    //   Beach umbrella: ~2w × 4h         → scale 0.15 = 0.3w × 0.6h
+    //   Beach chair: ~2w × 2h            → scale 0.15 = 0.3w × 0.3h
+    //   Surfboard: ~1w × 3h              → scale 0.15 = tiny
+    //   Beach ball: ~1.5 sphere          → scale 0.1 = 0.15
+    //   Crab: ~3w × 2h                   → scale 0.04 = 0.12w
+    //   Lifeguard tower: ~5w × 12h       → scale 0.06 = 0.3w × 0.72h
+    //   Sailboat: ~4w × 6h              → scale 0.1 = 0.4w × 0.6h
+    //   Seagull: ~4 wingspan             → scale 0.03 = 0.12 wingspan
+    // ═══════════════════════════════════════════════════════
 
-      // LEFT: Bushes
-      for (let i = 0; i < 6; i++) {
-        this._placeModel(MODEL_URLS.bush, -(ROAD_WIDTH / 2 + 2 + Math.random() * 3), 0, -i * 40 - Math.random() * 15, 0.5, Math.random() * Math.PI * 2);
-      }
-
-      // RIGHT: Palm trees along beach
-      for (let i = 0; i < 10; i++) {
-        this._placeModel(MODEL_URLS.palmTree, ROAD_WIDTH / 2 + 3 + Math.random() * 6, 0, -i * 30 - Math.random() * 10, 0.5 + Math.random() * 0.3, Math.random() * Math.PI * 2);
-      }
-
-      // RIGHT: Beach umbrellas + chairs
-      for (let i = 0; i < 6; i++) {
-        const x = ROAD_WIDTH / 2 + 12 + Math.random() * 10;
-        const z = -i * 45 - Math.random() * 15;
-        this._placeModel(MODEL_URLS.beachUmbrella, x, 0, z, 0.4, Math.random() * Math.PI * 2);
-        this._placeModel(MODEL_URLS.beachChair, x + 1.5, 0, z + 1, 0.4, Math.random() * Math.PI);
-      }
-
-      // RIGHT: Surfboards, beach balls, crabs (small props)
-      for (let i = 0; i < 4; i++) {
-        this._placeModel(MODEL_URLS.surfboard, ROAD_WIDTH / 2 + 10 + Math.random() * 8, 0.2, -i * 60 - Math.random() * 20, 0.3, Math.random() * Math.PI * 2);
-        this._placeModel(MODEL_URLS.beachBall, ROAD_WIDTH / 2 + 8 + Math.random() * 12, 0.2, -i * 55 - 10 - Math.random() * 20, 0.2, 0);
-      }
-      for (let i = 0; i < 5; i++) {
-        this._placeModel(MODEL_URLS.crab, ROAD_WIDTH / 2 + 6 + Math.random() * 15, 0, -i * 50 - Math.random() * 15, 0.15, Math.random() * Math.PI * 2);
-      }
-
-      // RIGHT: Lifeguard towers
-      for (let i = 0; i < 2; i++) {
-        this._placeModel(MODEL_URLS.lifeguardTower, ROAD_WIDTH / 2 + 16 + Math.random() * 4, 0, -i * 120 - 40, 0.5, Math.PI * 0.5);
-      }
-
-      // Ocean: sailboats (static, far out)
-      for (let i = 0; i < 3; i++) {
-        this._placeStatic(MODEL_URLS.sailboat, ROAD_WIDTH / 2 + 45 + Math.random() * 25, -0.3, -i * 90 - 40, 0.6, Math.random() * Math.PI * 2);
-      }
-
-      // Seagulls (static, hovering)
-      for (let i = 0; i < 4; i++) {
-        this._placeStatic(MODEL_URLS.seagull, ROAD_WIDTH / 2 + 10 + Math.random() * 20, 5 + Math.random() * 4, -i * 70 - Math.random() * 20, 0.3, Math.random() * Math.PI * 2);
-      }
+    // ── LEFT: City skyline (buildings far back) ──
+    const bldgs = [MODEL_URLS.buildingA, MODEL_URLS.buildingB, MODEL_URLS.buildingC, MODEL_URLS.buildingD];
+    for (let i = 0; i < 8; i++) {
+      const url = bldgs[Math.floor(Math.random() * bldgs.length)];
+      // scale 0.4-0.55 → buildings 3-4 units tall, visible as skyline
+      this._placeModel(url, -(ROAD_WIDTH / 2 + 12 + Math.random() * 10), 0, -i * 32 - Math.random() * 15, 0.4 + Math.random() * 0.15, Math.random() * Math.PI);
     }
+
+    // ── LEFT: Palm trees (between road and buildings) ──
+    for (let i = 0; i < 8; i++) {
+      // scale 0.3 → ~2.4 units tall, proportional to kart
+      this._placeModel(MODEL_URLS.palmTree, -(ROAD_WIDTH / 2 + 3 + Math.random() * 5), 0, -i * 32 - Math.random() * 10, 0.28 + Math.random() * 0.08, Math.random() * Math.PI * 2);
+    }
+
+    // ── LEFT: Bushes (roadside ground cover) ──
+    for (let i = 0; i < 6; i++) {
+      this._placeModel(MODEL_URLS.bush, -(ROAD_WIDTH / 2 + 2 + Math.random() * 3), 0, -i * 42 - Math.random() * 15, 0.4, Math.random() * Math.PI * 2);
+    }
+
+    // ── RIGHT: Palm trees (along beach edge) ──
+    for (let i = 0; i < 8; i++) {
+      this._placeModel(MODEL_URLS.palmTree, ROAD_WIDTH / 2 + 3 + Math.random() * 6, 0, -i * 32 - Math.random() * 10, 0.28 + Math.random() * 0.08, Math.random() * Math.PI * 2);
+    }
+
+    // ── RIGHT: Bushes along beach edge ──
+    for (let i = 0; i < 6; i++) {
+      this._placeModel(MODEL_URLS.bush, ROAD_WIDTH / 2 + 2 + Math.random() * 4, 0, -i * 40 - Math.random() * 15, 0.4, Math.random() * Math.PI * 2);
+    }
+
+    // NOTE: Poly Pizza beach props (umbrella, chair, surfboard, beach ball,
+    // crab, lifeguard tower, sailboat, seagull) removed — their internal
+    // geometry is wildly oversized (20-100+ units) making them impossible
+    // to scale proportionally. Only KayKit + palm models have predictable sizes.
   }
 
   // =====================================================================
