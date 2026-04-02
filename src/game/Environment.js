@@ -95,12 +95,13 @@ export class Environment {
     this.dirLight.castShadow = true;
     this.dirLight.shadow.mapSize.width = 1024;
     this.dirLight.shadow.mapSize.height = 1024;
+    const sh = theme.shadow || { far: 50, size: 15 };
     this.dirLight.shadow.camera.near = 0.5;
-    this.dirLight.shadow.camera.far = 50;
-    this.dirLight.shadow.camera.left = -15;
-    this.dirLight.shadow.camera.right = 15;
-    this.dirLight.shadow.camera.top = 15;
-    this.dirLight.shadow.camera.bottom = -15;
+    this.dirLight.shadow.camera.far = sh.far;
+    this.dirLight.shadow.camera.left = -sh.size;
+    this.dirLight.shadow.camera.right = sh.size;
+    this.dirLight.shadow.camera.top = sh.size;
+    this.dirLight.shadow.camera.bottom = -sh.size;
     this.scene.add(this.dirLight);
 
     this.hemiLight = new THREE.HemisphereLight(theme.dirColor, theme.ground, 0.25);

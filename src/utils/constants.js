@@ -118,6 +118,8 @@ export const MAP_THEMES = [
     dirColor: 0xffdd88,
     dirIntensity: 1.2,
     stars: false,
+    shadow: { far: 60, size: 20 },
+    colorGrade: { saturation: 1.15, contrast: 1.05, brightness: 1.0 },
   },
   {
     id: 'usa',
@@ -150,6 +152,8 @@ export const MAP_THEMES = [
     dirColor: 0x6677aa,
     dirIntensity: 0.4,
     stars: true,
+    shadow: { far: 40, size: 15 },
+    colorGrade: { saturation: 1.0, contrast: 1.15, brightness: 0.95 },
   },
   {
     id: 'peru',
@@ -182,6 +186,8 @@ export const MAP_THEMES = [
     dirColor: 0xffffcc,
     dirIntensity: 1.0,
     stars: false,
+    shadow: { far: 50, size: 18 },
+    colorGrade: { saturation: 1.05, contrast: 1.0, brightness: 1.05 },
   },
 ];
 

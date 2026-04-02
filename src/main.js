@@ -20,7 +20,7 @@ import { WinScreen } from './ui/WinScreen.js';
 import { setupControls } from './utils/controls.js';
 import { playPlateHit, playLampLit, playComboBreak, playWinFanfare, playLaneSwitch } from './utils/audio.js';
 import {
-  MIN_SPEED, MAX_SPEED,
+  MIN_SPEED, MAX_SPEED, MAP_THEMES,
   PEDAL_ACCELERATION, COAST_DECELERATION,
   MIN_SPEED_MPH, MAX_SPEED_MPH,
   PLATE_SPAWN_INTERVAL,
@@ -28,14 +28,15 @@ import {
   CAMERA_FOV_MIN, CAMERA_FOV_MAX, CAMERA_SHAKE_THRESHOLD
 } from './utils/constants.js';
 
-// --- Renderer ---
-const renderer = new THREE.WebGLRenderer({ antialias: true });
+// --- Renderer (with mobile optimization) ---
+const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || window.innerWidth < 768;
+const renderer = new THREE.WebGLRenderer({ antialias: !isMobile });
 renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, isMobile ? 1.5 : 2));
 renderer.toneMapping = THREE.AgXToneMapping;
 renderer.toneMappingExposure = 1.0;
 renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.shadowMap.type = isMobile ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
 document.body.appendChild(renderer.domElement);
 
 // --- Scene & Camera ---
@@ -78,6 +79,37 @@ const vignetteShader = {
   `,
 };
 composer.addPass(new ShaderPass(vignetteShader));
+
+// Color grading: per-theme saturation, contrast, brightness
+const colorGradeShader = {
+  uniforms: {
+    tDiffuse: { value: null },
+    saturation: { value: 1.0 },
+    contrast: { value: 1.0 },
+    brightness: { value: 1.0 },
+  },
+  vertexShader: `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+  fragmentShader: `
+    uniform sampler2D tDiffuse;
+    uniform float saturation;
+    uniform float contrast;
+    uniform float brightness;
+    varying vec2 vUv;
+    void main() {
+      vec4 color = texture2D(tDiffuse, vUv);
+      // Brightness
+      color.rgb *= brightness;
+      // Contrast (around 0.5 midpoint)
+      color.rgb = (color.rgb - 0.5) * contrast + 0.5;
+      // Saturation (luminance-preserving)
+      float luma = dot(color.rgb, vec3(0.299, 0.587, 0.114));
+      color.rgb = mix(vec3(luma), color.rgb, saturation);
+      gl_FragColor = color;
+    }
+  `,
+};
+const colorGradePass = new ShaderPass(colorGradeShader);
+composer.addPass(colorGradePass);
 
 // --- Game objects ---
 const gameState = new GameState();
@@ -126,6 +158,11 @@ const mapSelect = new MapSelect(
   async (mapIndex) => {
     gameState.selectedMap = mapIndex;
     await environment.build(mapIndex);
+    // Apply per-theme color grading
+    const cg = MAP_THEMES[mapIndex]?.colorGrade || { saturation: 1, contrast: 1, brightness: 1 };
+    colorGradePass.uniforms.saturation.value = cg.saturation;
+    colorGradePass.uniforms.contrast.value = cg.contrast;
+    colorGradePass.uniforms.brightness.value = cg.brightness;
     gameState.transition('playing');
   },
   () => gameState.transition('driverSelect')
