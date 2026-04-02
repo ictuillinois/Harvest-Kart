@@ -13,6 +13,10 @@ export class Kart {
 
     this._buildKart(DRIVER_TYPES[0]);
     this.group.position.set(LANE_POSITIONS[1], 0, 0);
+    // Enable shadows on all kart meshes
+    this.group.traverse((child) => {
+      if (child.isMesh) { child.castShadow = true; }
+    });
     scene.add(this.group);
   }
 
@@ -453,10 +457,26 @@ export class Kart {
     this.isSwitching = true;
 
     const targetX = LANE_POSITIONS[this.currentLane];
+    const tiltAngle = direction === 'left' ? 0.2 : -0.2;
+
+    // Tilt kart into the turn
+    new Tween(this.group.rotation, tweenGroup)
+      .to({ z: tiltAngle }, LANE_SWITCH_DURATION * 0.4)
+      .easing(Easing.Quadratic.Out)
+      .start();
+
+    // Move to target lane
     new Tween(this.group.position, tweenGroup)
       .to({ x: targetX }, LANE_SWITCH_DURATION)
       .easing(Easing.Quadratic.Out)
-      .onComplete(() => { this.isSwitching = false; })
+      .onComplete(() => {
+        this.isSwitching = false;
+        // Straighten out
+        new Tween(this.group.rotation, tweenGroup)
+          .to({ z: 0 }, LANE_SWITCH_DURATION * 0.5)
+          .easing(Easing.Quadratic.Out)
+          .start();
+      })
       .start();
   }
 

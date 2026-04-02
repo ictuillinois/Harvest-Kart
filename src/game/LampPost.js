@@ -14,24 +14,24 @@ export class LampPost {
     for (let i = 0; i < TOTAL_LAMP_POSTS; i++) {
       const group = new THREE.Group();
 
-      // Pole (3 units tall — proportional to kart at ~1 unit tall)
-      const poleGeo = new THREE.CylinderGeometry(0.06, 0.08, 3, 8);
+      // Pole (4.5 units tall — prominent along road, taller than kart+driver)
+      const poleGeo = new THREE.CylinderGeometry(0.08, 0.1, 4.5, 8);
       const pole = new THREE.Mesh(poleGeo, poleMat);
-      pole.position.y = 1.5;
+      pole.position.y = 2.25;
       group.add(pole);
 
       // Arm extending toward road
-      const armGeo = new THREE.CylinderGeometry(0.03, 0.03, 1.2, 6);
+      const armGeo = new THREE.CylinderGeometry(0.04, 0.04, 1.8, 6);
       const arm = new THREE.Mesh(armGeo, poleMat);
       arm.rotation.z = Math.PI / 2;
-      arm.position.set(-0.6, 2.9, 0);
+      arm.position.set(-0.9, 4.3, 0);
       group.add(arm);
 
       // Lamp housing
-      const housingGeo = new THREE.BoxGeometry(0.4, 0.15, 0.25);
+      const housingGeo = new THREE.BoxGeometry(0.5, 0.2, 0.35);
       const housingMat = new THREE.MeshStandardMaterial({ color: 0x555555, metalness: 0.4 });
       const housing = new THREE.Mesh(housingGeo, housingMat);
-      housing.position.set(-1.2, 2.95, 0);
+      housing.position.set(-1.8, 4.35, 0);
       group.add(housing);
 
       // Lamp head (bulb)
@@ -42,18 +42,18 @@ export class LampPost {
         metalness: 0.2,
         roughness: 0.4,
       });
-      const headGeo = new THREE.SphereGeometry(0.18, 10, 10);
+      const headGeo = new THREE.SphereGeometry(0.25, 10, 10);
       const head = new THREE.Mesh(headGeo, headMat);
-      head.position.set(-1.2, 2.8, 0);
+      head.position.set(-1.8, 4.15, 0);
       group.add(head);
 
       // PointLight
-      const light = new THREE.PointLight(COLORS.lampLight, 0.3, 15, 2);
-      light.position.set(-1.2, 2.7, 0);
+      const light = new THREE.PointLight(COLORS.lampLight, 0.3, 18, 2);
+      light.position.set(-1.8, 4.0, 0);
       group.add(light);
 
       // Light cone visual
-      const coneGeo = new THREE.ConeGeometry(0.8, 2.5, 8, 1, true);
+      const coneGeo = new THREE.ConeGeometry(1.0, 3.5, 8, 1, true);
       const coneMat = new THREE.MeshBasicMaterial({
         color: COLORS.lampDim,
         transparent: true,
@@ -61,11 +61,11 @@ export class LampPost {
         side: THREE.DoubleSide,
       });
       const cone = new THREE.Mesh(coneGeo, coneMat);
-      cone.position.set(-1.2, 1.5, 0);
+      cone.position.set(-1.8, 2.2, 0);
       cone.rotation.x = Math.PI;
       group.add(cone);
 
-      // Place along road sides (pushed out a bit so arm doesn't cross lanes)
+      // Place along road sides
       const side = i % 2 === 0 ? 1 : -1;
       group.position.set(
         side * (ROAD_WIDTH / 2 + 1.5),

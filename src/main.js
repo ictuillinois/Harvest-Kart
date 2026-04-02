@@ -1,4 +1,7 @@
 import * as THREE from 'three';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { tweenGroup } from './utils/tweenGroup.js';
 
 import { Road } from './game/Road.js';
@@ -30,6 +33,8 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.0;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 document.body.appendChild(renderer.domElement);
 
 // --- Scene & Camera ---
@@ -39,6 +44,39 @@ scene.fog = new THREE.FogExp2(0x1a0533, 0.006);
 const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
 camera.position.set(CAMERA_OFFSET.x, CAMERA_OFFSET.y, CAMERA_OFFSET.z);
 camera.lookAt(0, 1, -CAMERA_LOOK_AHEAD);
+
+// --- Post-processing ---
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+
+// NOTE: Bloom removed — Preetham sky HDR output produces extreme
+// brightness near the sun disc that any bloom threshold catches,
+// washing out the entire scene. Shadows + vignette are sufficient.
+
+// Vignette: subtle darkening at edges
+const vignetteShader = {
+  uniforms: {
+    tDiffuse: { value: null },
+    darkness: { value: 0.4 },
+    offset: { value: 1.3 },
+  },
+  vertexShader: `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+  fragmentShader: `
+    uniform sampler2D tDiffuse;
+    uniform float darkness;
+    uniform float offset;
+    varying vec2 vUv;
+    void main() {
+      vec4 color = texture2D(tDiffuse, vUv);
+      vec2 center = vUv - 0.5;
+      float dist = length(center) * 2.0;
+      float vig = 1.0 - darkness * smoothstep(offset - 0.5, offset, dist);
+      color.rgb *= vig;
+      gl_FragColor = color;
+    }
+  `,
+};
+composer.addPass(new ShaderPass(vignetteShader));
 
 // --- Game objects ---
 const gameState = new GameState();
@@ -204,6 +242,7 @@ window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
+  composer.setSize(window.innerWidth, window.innerHeight);
 });
 
 // --- Game loop ---
@@ -246,7 +285,7 @@ function animate() {
     camera.position.x += (kart.group.position.x * 0.3 - camera.position.x) * 0.1;
   }
 
-  renderer.render(scene, camera);
+  composer.render();
 }
 
 // --- Bootstrap ---

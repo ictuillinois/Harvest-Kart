@@ -87,6 +87,15 @@ export class Environment {
 
     this.dirLight = new THREE.DirectionalLight(theme.dirColor, theme.dirIntensity);
     this.dirLight.position.copy(this.sunDirection).multiplyScalar(100);
+    this.dirLight.castShadow = true;
+    this.dirLight.shadow.mapSize.width = 1024;
+    this.dirLight.shadow.mapSize.height = 1024;
+    this.dirLight.shadow.camera.near = 0.5;
+    this.dirLight.shadow.camera.far = 50;
+    this.dirLight.shadow.camera.left = -15;
+    this.dirLight.shadow.camera.right = 15;
+    this.dirLight.shadow.camera.top = 15;
+    this.dirLight.shadow.camera.bottom = -15;
     this.scene.add(this.dirLight);
 
     this.hemiLight = new THREE.HemisphereLight(theme.dirColor, theme.ground, 0.25);
@@ -97,6 +106,7 @@ export class Environment {
     this.ground = new THREE.Mesh(groundGeo, groundMat);
     this.ground.rotation.x = -Math.PI / 2;
     this.ground.position.y = -0.1;
+    this.ground.receiveShadow = true;
     this.scene.add(this.ground);
 
     // =================================================================
@@ -230,17 +240,9 @@ export class Environment {
     // Poly Pizza palm internal: ~3w × 8h → scale 0.5 = 1.5w × 4h (visible trees)
     // KayKit bush internal: ~2w × 1.5h   → scale 0.5 = 1w × 0.75h
 
-    // ── Sun glow ──
-    const sunPos = this.sunDirection.clone().multiplyScalar(300);
-    for (const [size, color, opacity] of [[30, 0xffaa33, 0.12], [18, 0xffdd66, 0.2], [8, 0xffee88, 1.0]]) {
-      const mesh = new THREE.Mesh(
-        new THREE.SphereGeometry(size, 32, 32),
-        new THREE.MeshBasicMaterial({ color, transparent: opacity < 1, opacity, depthWrite: false })
-      );
-      mesh.position.copy(sunPos);
-      this.scene.add(mesh);
-      this.themeObjects.push(mesh);
-    }
+    // Sun glow removed — the Sky shader's Preetham model already renders
+    // the sun disc. MeshBasicMaterial glow spheres were blowing out the
+    // bloom post-processing pass with pure white.
 
     // ── OCEAN — right side, close enough to be visible ──
     // Water plane starts at x=16 (just past the sand), extends far right
@@ -272,43 +274,41 @@ export class Environment {
     if (!this.modelsReady) return;
 
     // ══════════════════════════════════════════
-    //  LEFT SIDE — City: buildings → palms → road
-    //  Buildings at x = -(10 to 18), palms at x = -(7 to 10)
+    //  LEFT — Buildings (back) → Palms (mid) → Bushes (road edge)
     // ══════════════════════════════════════════
 
-    // Buildings: scale 0.6-0.8 → ~5-6 units tall. Close enough to see detail.
+    // Buildings: scale 1.0-1.4 → 8-11 units tall. Prominent skyline.
     const bldgs = [MODEL_URLS.buildingA, MODEL_URLS.buildingB, MODEL_URLS.buildingC, MODEL_URLS.buildingD];
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < 12; i++) {
       const url = bldgs[Math.floor(Math.random() * bldgs.length)];
-      const x = -(ROAD_WIDTH / 2 + 5 + Math.random() * 8);
-      this._placeModel(url, x, 0, -i * 28 - Math.random() * 12, 0.6 + Math.random() * 0.2, Math.random() * Math.PI);
+      const x = -(ROAD_WIDTH / 2 + 6 + Math.random() * 8);
+      this._placeModel(url, x, 0, -i * 25 - Math.random() * 10, 1.0 + Math.random() * 0.4, Math.random() * Math.PI);
     }
 
-    // Palm trees: scale 0.5 → ~4 units tall. Between road and buildings.
+    // Palms: scale 0.8-1.0 → 6-8 units tall. Clearly visible tropical trees.
+    for (let i = 0; i < 12; i++) {
+      const x = -(ROAD_WIDTH / 2 + 1.5 + Math.random() * 3);
+      this._placeModel(MODEL_URLS.palmTree, x, 0, -i * 24 - Math.random() * 10, 0.8 + Math.random() * 0.2, Math.random() * Math.PI * 2);
+    }
+
+    // Bushes: close to road edge, low ground cover
     for (let i = 0; i < 10; i++) {
-      const x = -(ROAD_WIDTH / 2 + 2 + Math.random() * 3);
-      this._placeModel(MODEL_URLS.palmTree, x, 0, -i * 28 - Math.random() * 10, 0.45 + Math.random() * 0.15, Math.random() * Math.PI * 2);
+      this._placeModel(MODEL_URLS.bush, -(ROAD_WIDTH / 2 + 0.8 + Math.random() * 1.5), 0, -i * 28 - Math.random() * 12, 0.6, Math.random() * Math.PI * 2);
     }
 
-    // Bushes: between palms and road edge
+    // ══════════════════════════════════════════
+    //  RIGHT — Bushes (road edge) → Palms → Sand → Ocean
+    // ══════════════════════════════════════════
+
+    // Palms along beach
+    for (let i = 0; i < 12; i++) {
+      const x = ROAD_WIDTH / 2 + 1.5 + Math.random() * 4;
+      this._placeModel(MODEL_URLS.palmTree, x, 0, -i * 24 - Math.random() * 10, 0.8 + Math.random() * 0.2, Math.random() * Math.PI * 2);
+    }
+
+    // Bushes beach side
     for (let i = 0; i < 8; i++) {
-      this._placeModel(MODEL_URLS.bush, -(ROAD_WIDTH / 2 + 1.5 + Math.random() * 2), 0, -i * 35 - Math.random() * 15, 0.5, Math.random() * Math.PI * 2);
-    }
-
-    // ══════════════════════════════════════════
-    //  RIGHT SIDE — Beach: road → palms → sand → ocean
-    //  Palms at x = +(7 to 12), sand at x = +8..+14, ocean at x = +16+
-    // ══════════════════════════════════════════
-
-    // Palm trees along beach
-    for (let i = 0; i < 10; i++) {
-      const x = ROAD_WIDTH / 2 + 2 + Math.random() * 5;
-      this._placeModel(MODEL_URLS.palmTree, x, 0, -i * 28 - Math.random() * 10, 0.45 + Math.random() * 0.15, Math.random() * Math.PI * 2);
-    }
-
-    // Bushes on beach side
-    for (let i = 0; i < 6; i++) {
-      this._placeModel(MODEL_URLS.bush, ROAD_WIDTH / 2 + 1.5 + Math.random() * 3, 0, -i * 40 - Math.random() * 15, 0.5, Math.random() * Math.PI * 2);
+      this._placeModel(MODEL_URLS.bush, ROAD_WIDTH / 2 + 0.8 + Math.random() * 2, 0, -i * 32 - Math.random() * 12, 0.6, Math.random() * Math.PI * 2);
     }
   }
 

@@ -137,9 +137,12 @@ export class Plate {
       if (!plate.userData.active) continue;
       plate.position.z += move;
 
-      // Pulse glow
+      // Animate: pulse glow + hover bob + slow spin
       if (!plate.userData.hit) {
-        plate.material.emissiveIntensity = 0.5 + Math.sin(performance.now() * 0.005) * 0.3;
+        const t = performance.now() * 0.001;
+        plate.material.emissiveIntensity = 0.5 + Math.sin(t * 5) * 0.3;
+        plate.position.y = 0.05 + Math.sin(t * 3 + plate.position.x) * 0.08;
+        plate.rotation.y += delta * 1.5;
       }
 
       // Deactivate plates that passed behind — track misses
