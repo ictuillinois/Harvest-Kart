@@ -26,6 +26,7 @@ export class HUD {
           <span class="hud-score" id="hud-score">0</span>
           <span class="hud-combo" id="hud-combo"></span>
         </div>
+        <div class="hud-stage" id="hud-stage">STAGE 1/4</div>
       </div>
       <div class="hud-right">
         <button class="hud-pause-btn" id="hud-pause" aria-label="Pause">&#9646;&#9646;</button>
@@ -123,6 +124,26 @@ export class HUD {
       .hud-score { font-family: 'Courier New', monospace; font-size: 0.9rem; font-weight: 900; color: rgba(255,255,255,0.8); letter-spacing: 1px; }
       .hud-combo { font-family: Impact, 'Arial Black', sans-serif; font-size: 0.85rem; font-weight: 700; color: #ffaa00; text-shadow: 0 0 6px rgba(255,170,0,0.5); letter-spacing: 1px; transition: transform 0.15s; }
       .hud-combo.pop { transform: scale(1.4); }
+      .hud-stage {
+        font-family: Impact, 'Arial Black', sans-serif;
+        font-size: 0.7rem; color: rgba(255,255,255,0.5);
+        letter-spacing: 2px; margin-top: 1px;
+      }
+
+      /* Floating score text */
+      .hud-float-score {
+        position: fixed; z-index: 55;
+        font-family: Impact, 'Arial Black', sans-serif;
+        font-size: 1.2rem; font-weight: 900;
+        color: #39ff14;
+        text-shadow: 0 0 6px rgba(57,255,20,0.6);
+        pointer-events: none;
+        animation: floatUp 0.8s ease-out forwards;
+      }
+      @keyframes floatUp {
+        0%   { opacity: 1; transform: translateY(0); }
+        100% { opacity: 0; transform: translateY(-40px); }
+      }
 
       .hud-right { display: flex; align-items: flex-start; gap: 10px; }
       .hud-pause-btn {
@@ -252,6 +273,7 @@ export class HUD {
     this.lampCount = this.el.querySelector('#hud-lamp-count');
     this.scoreEl = this.el.querySelector('#hud-score');
     this.comboEl = this.el.querySelector('#hud-combo');
+    this.stageEl = this.el.querySelector('#hud-stage');
     this.dashSpeed = this.dashboard.querySelector('#dash-speed');
     this.dashArcFill = this.dashboard.querySelector('#dash-arc-fill');
     this.dashGear = this.dashboard.querySelector('#dash-gear');
@@ -312,6 +334,21 @@ export class HUD {
     this.dashGear.textContent = gear;
   }
 
+  updateStage(lampPostsLit, total) {
+    this.stageEl.textContent = `STAGE ${lampPostsLit + 1}/${total}`;
+  }
+
+  showFloatingScore(points) {
+    const el = document.createElement('div');
+    el.className = 'hud-float-score';
+    el.textContent = `+${points}`;
+    el.style.left = '50%';
+    el.style.top = '45%';
+    el.style.transform = 'translateX(-50%)';
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 800);
+  }
+
   showPause() { this.pauseOverlay.style.display = 'flex'; }
   hidePause() { this.pauseOverlay.style.display = 'none'; }
 
@@ -321,6 +358,7 @@ export class HUD {
     this.updateSpeed(20);
     this.updateScore(0);
     this.updateCombo(0);
+    this.updateStage(0, 4);
     this.hidePause();
   }
 

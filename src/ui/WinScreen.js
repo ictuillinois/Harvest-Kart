@@ -118,6 +118,21 @@ export class WinScreen {
     this.el.querySelector('#win-plates').textContent = platesHit;
     this.el.querySelector('#win-score').textContent = score.toLocaleString();
     this.el.querySelector('#win-combo').textContent = 'x' + maxCombo;
+
+    // High score persistence
+    const prevBest = parseInt(localStorage.getItem('harvestKart_highScore') || '0');
+    if (score > prevBest) {
+      localStorage.setItem('harvestKart_highScore', score.toString());
+      // Show "NEW BEST!" indicator
+      const title = this.el.querySelector('.win-title');
+      title.textContent = 'NEW BEST!';
+      title.style.color = '#ffaa00';
+      setTimeout(() => {
+        title.textContent = 'HIGHWAY POWERED!';
+        title.style.color = '#39ff14';
+      }, 2000);
+    }
+
     this.el.style.display = 'flex';
   }
 

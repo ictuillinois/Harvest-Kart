@@ -247,6 +247,8 @@ gameState.on('plateHit', ({ currentCharge, combo, score }) => {
   hud.updateCharge(currentCharge);
   hud.updateCombo(combo);
   hud.updateScore(score);
+  const points = 100 + Math.min(combo - 1, 9) * 25;
+  hud.showFloatingScore(points);
   playPlateHit();
 });
 
@@ -261,6 +263,7 @@ gameState.on('lampLit', ({ lampPostsLit }) => {
   playLampLit();
   setTimeout(() => {
     hud.updateLamps(lampPostsLit);
+    hud.updateStage(lampPostsLit, 4);
     lampPosts.lightNext();
     hud.updateCharge(0);
     // Increase difficulty: spawn plates faster after each lamp
