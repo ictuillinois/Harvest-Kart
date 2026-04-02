@@ -43,7 +43,9 @@ export const DRIVER_TYPES = [
   {
     name: 'Prof. Werner',
     description: 'The wise inventor',
+    tagline: 'Years of research meet the open road',
     type: 'professor',
+    avatar: '/characters/professor.svg',
     skinColor: 0xf0c8a0,
     hairColor: 0xcccccc,
     shirtColor: 0xffffff,
@@ -54,7 +56,9 @@ export const DRIVER_TYPES = [
   {
     name: 'Little Max',
     description: 'The curious kid',
+    tagline: 'Fastest wheels on the playground',
     type: 'kid',
+    avatar: '/characters/kid.svg',
     skinColor: 0xdeb887,
     hairColor: 0x4a3728,
     shirtColor: 0xff6b35,
@@ -65,7 +69,9 @@ export const DRIVER_TYPES = [
   {
     name: 'Dr. Sarah',
     description: 'The young scientist',
+    tagline: 'Powered by science and determination',
     type: 'woman',
+    avatar: '/characters/woman.svg',
     skinColor: 0xf5deb3,
     hairColor: 0xf0d060,
     shirtColor: 0x9b59b6,

@@ -4,163 +4,270 @@ export class DriverSelect {
   constructor(onSelect) {
     this.el = document.createElement('div');
     this.el.id = 'driver-select';
+    this.activeIndex = -1;
 
-    const cards = DRIVER_TYPES.map((d, i) => {
-      const bodyColor = '#' + d.kartBody.toString(16).padStart(6, '0');
-      const shirtColor = '#' + d.shirtColor.toString(16).padStart(6, '0');
-      const skinColor = '#' + d.skinColor.toString(16).padStart(6, '0');
-      const hairColor = '#' + d.hairColor.toString(16).padStart(6, '0');
-      const pantsColor = '#' + d.pantsColor.toString(16).padStart(6, '0');
+    const kartColor = (hex) => '#' + hex.toString(16).padStart(6, '0');
 
-      let characterIcon = '';
-      if (d.type === 'professor') {
-        characterIcon = `
-          <div class="driver-avatar">
-            <div class="driver-hair" style="background:${hairColor};width:36px;height:10px;border-radius:6px 6px 0 0;"></div>
-            <div class="driver-head" style="background:${skinColor};">
-              <div class="driver-glasses">
-                <span class="lens"></span><span class="bridge"></span><span class="lens"></span>
-              </div>
-              <div class="driver-mustache" style="background:${hairColor};"></div>
-            </div>
-            <div class="driver-body" style="background:${shirtColor};">
-              <div class="driver-collar"></div>
-            </div>
-            <div class="driver-legs" style="background:${pantsColor};"></div>
-          </div>`;
-      } else if (d.type === 'kid') {
-        characterIcon = `
-          <div class="driver-avatar kid-avatar">
-            <div class="driver-cap" style="background:#ff4444;">
-              <div class="cap-brim"></div>
-            </div>
-            <div class="driver-head" style="background:${skinColor};">
-              <div class="driver-freckles">
-                <span></span><span></span><span></span>
-              </div>
-            </div>
-            <div class="driver-body" style="background:${shirtColor};"></div>
-            <div class="driver-legs" style="background:${pantsColor};"></div>
-            <div class="driver-backpack"></div>
-          </div>`;
-      } else {
-        characterIcon = `
-          <div class="driver-avatar">
-            <div class="driver-hair-long" style="background:${hairColor};"></div>
-            <div class="driver-head" style="background:${skinColor};">
-              <div class="driver-earrings"><span></span><span></span></div>
-              <div class="driver-lips"></div>
-            </div>
-            <div class="driver-body" style="background:${shirtColor};"></div>
-            <div class="driver-legs" style="background:${pantsColor};"></div>
-          </div>`;
-      }
-
-      return `
-        <div class="driver-card" data-index="${i}">
-          <div class="driver-preview" style="background: linear-gradient(135deg, ${bodyColor}44, ${shirtColor}66);">
-            ${characterIcon}
+    const cards = DRIVER_TYPES.map((d, i) => `
+      <div class="ds-card" data-index="${i}">
+        <div class="ds-ring" style="--ring-color:${kartColor(d.kartBody)}">
+          <img class="ds-avatar" src="${d.avatar}" alt="${d.name}" draggable="false" />
+        </div>
+        <div class="ds-info">
+          <div class="ds-name">${d.name}</div>
+          <div class="ds-tagline">${d.tagline}</div>
+          <div class="ds-kart-color">
+            <span class="ds-color-dot" style="background:${kartColor(d.kartBody)}"></span>
+            <span class="ds-color-dot" style="background:${kartColor(d.kartAccent)}"></span>
+            ${d.description}
           </div>
-          <p class="driver-name">${d.name}</p>
-          <p class="driver-desc">${d.description}</p>
-        </div>`;
-    }).join('');
+          <div class="ds-select-prompt">TAP TO SELECT</div>
+        </div>
+      </div>
+    `).join('');
 
     this.el.innerHTML = `
-      <div class="dselect-content">
-        <h2 class="dselect-title">CHOOSE YOUR DRIVER</h2>
-        <div class="driver-cards">${cards}</div>
+      <div class="ds-backdrop"></div>
+      <div class="ds-content">
+        <h2 class="ds-title">CHOOSE YOUR DRIVER</h2>
+        <div class="ds-cards">${cards}</div>
       </div>
     `;
 
-    this.el.style.cssText = `
-      position: fixed; inset: 0; z-index: 100;
-      display: none; align-items: center; justify-content: center;
-      background: rgba(26,5,51,0.95);
-      font-family: 'Segoe UI', Tahoma, sans-serif;
-    `;
+    document.body.appendChild(this.el);
 
     const style = document.createElement('style');
     style.textContent = `
-      .dselect-content { text-align: center; padding: 24px; max-width: 700px; }
-      .dselect-title {
-        font-size: 2.2rem; color: #fff; margin-bottom: 28px;
-        text-shadow: 0 0 20px rgba(57,255,20,0.4); letter-spacing: 3px;
-      }
-      .driver-cards { display: flex; gap: 20px; justify-content: center; flex-wrap: wrap; }
-      .driver-card {
-        cursor: pointer; padding: 16px; border-radius: 16px;
-        background: rgba(255,255,255,0.06); border: 2px solid rgba(255,255,255,0.12);
-        transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
-        width: 170px;
-      }
-      .driver-card:hover {
-        transform: translateY(-6px) scale(1.04);
-        border-color: #39ff14;
-        box-shadow: 0 0 25px rgba(57,255,20,0.3);
-      }
-      .driver-preview {
-        width: 130px; height: 140px; border-radius: 12px;
-        margin: 0 auto 12px; display: flex; align-items: center; justify-content: center;
-        position: relative; overflow: hidden;
-      }
-      .driver-name { color: #fff; font-size: 1.05rem; font-weight: 700; margin: 4px 0 2px; }
-      .driver-desc { color: rgba(255,255,255,0.55); font-size: 0.82rem; }
-
-      /* Driver avatar shared */
-      .driver-avatar { display: flex; flex-direction: column; align-items: center; position: relative; }
-      .kid-avatar { transform: scale(0.85); }
-      .driver-head {
-        width: 36px; height: 36px; border-radius: 50%;
-        position: relative; z-index: 2;
-        display: flex; align-items: center; justify-content: center; flex-direction: column;
-      }
-      .driver-body {
-        width: 40px; height: 30px; border-radius: 4px 4px 0 0;
-        margin-top: -4px; z-index: 1;
-      }
-      .driver-legs {
-        width: 36px; height: 16px; border-radius: 0 0 4px 4px;
-        display: flex; gap: 4px; justify-content: center;
+      /* ── Fullscreen overlay ── */
+      #driver-select {
+        position: fixed; inset: 0; z-index: 100;
+        display: none; align-items: center; justify-content: center;
+        font-family: 'Segoe UI', Tahoma, sans-serif;
       }
 
-      /* Professor */
-      .driver-glasses { display: flex; align-items: center; gap: 2px; margin-top: 2px; }
-      .driver-glasses .lens {
-        width: 10px; height: 10px; border: 1.5px solid #444;
-        border-radius: 50%; background: rgba(136,204,255,0.3);
+      /* ── Animated gradient backdrop ── */
+      .ds-backdrop {
+        position: absolute; inset: 0;
+        background: linear-gradient(135deg, #0a0520 0%, #1a0a3a 40%, #0d1a2e 100%);
       }
-      .driver-glasses .bridge { width: 4px; height: 1.5px; background: #444; }
-      .driver-mustache { width: 16px; height: 4px; border-radius: 2px; margin-top: 1px; }
-      .driver-collar { width: 44px; height: 6px; background: #f0f0f0; border-radius: 3px; margin: -2px auto 0; }
-
-      /* Kid */
-      .driver-cap { width: 38px; height: 16px; border-radius: 16px 16px 0 0; position: relative; z-index: 3; }
-      .cap-brim { width: 28px; height: 5px; background: inherit; position: absolute; bottom: -2px; left: -4px; border-radius: 2px; filter: brightness(0.85); }
-      .driver-freckles { display: flex; gap: 3px; margin-top: 6px; }
-      .driver-freckles span { width: 3px; height: 3px; background: #bb8855; border-radius: 50%; }
-      .driver-backpack {
-        width: 22px; height: 26px; background: #2980b9; border-radius: 4px;
-        position: absolute; right: 14px; top: 34px; z-index: 0;
+      .ds-backdrop::before {
+        content: ''; position: absolute; inset: 0;
+        background:
+          radial-gradient(ellipse at 20% 50%, rgba(57,255,20,0.06) 0%, transparent 60%),
+          radial-gradient(ellipse at 80% 50%, rgba(100,80,255,0.06) 0%, transparent 60%),
+          radial-gradient(ellipse at 50% 0%, rgba(255,180,0,0.05) 0%, transparent 50%);
+        animation: dsGlow 6s ease-in-out infinite alternate;
+      }
+      @keyframes dsGlow {
+        0%   { opacity: 0.6; }
+        100% { opacity: 1; }
       }
 
-      /* Woman */
-      .driver-hair-long {
-        width: 42px; height: 20px; border-radius: 20px 20px 4px 4px;
-        margin-bottom: -10px; z-index: 3;
+      /* ── Content container ── */
+      .ds-content {
+        position: relative; z-index: 1;
+        text-align: center;
+        padding: 20px;
+        width: 100%;
+        max-width: 780px;
       }
-      .driver-earrings { display: flex; justify-content: space-between; width: 40px; position: absolute; top: 16px; }
-      .driver-earrings span { width: 5px; height: 5px; background: #ffd700; border-radius: 50%; }
-      .driver-lips { width: 8px; height: 3px; background: #cc4455; border-radius: 2px; margin-top: 4px; }
+
+      /* ── Title ── */
+      .ds-title {
+        font-family: Impact, 'Arial Black', sans-serif;
+        font-size: clamp(1.6rem, 5vw, 2.5rem);
+        color: #fff;
+        letter-spacing: 4px;
+        margin-bottom: clamp(20px, 4vh, 40px);
+        text-shadow: 0 0 30px rgba(57,255,20,0.3), 0 2px 4px rgba(0,0,0,0.5);
+      }
+
+      /* ── Cards row ── */
+      .ds-cards {
+        display: flex;
+        justify-content: center;
+        gap: clamp(12px, 3vw, 28px);
+        align-items: flex-start;
+      }
+
+      /* ── Individual card ── */
+      .ds-card {
+        display: flex; flex-direction: column; align-items: center;
+        cursor: pointer;
+        padding: 16px 14px 20px;
+        border-radius: 20px;
+        background: rgba(255,255,255,0.03);
+        border: 2px solid rgba(255,255,255,0.08);
+        transition: transform 0.3s ease, border-color 0.3s, background 0.3s, box-shadow 0.3s;
+        width: clamp(140px, 26vw, 210px);
+        user-select: none;
+        -webkit-user-select: none;
+      }
+
+      /* ── Dimmed state (when another card is active) ── */
+      .ds-card.dimmed {
+        opacity: 0.4;
+        filter: grayscale(0.6) brightness(0.7);
+        transform: scale(0.92);
+      }
+
+      /* ── Active/highlighted state ── */
+      .ds-card.active {
+        background: rgba(255,255,255,0.08);
+        border-color: var(--ring-color, #39ff14);
+        transform: translateY(-12px) scale(1.06);
+        box-shadow:
+          0 0 30px color-mix(in srgb, var(--ring-color, #39ff14) 40%, transparent),
+          0 12px 40px rgba(0,0,0,0.4);
+      }
+
+      /* ── Avatar ring ── */
+      .ds-ring {
+        --ring-color: #39ff14;
+        width: clamp(100px, 18vw, 140px);
+        height: clamp(100px, 18vw, 140px);
+        border-radius: 50%;
+        border: 3px solid rgba(255,255,255,0.15);
+        background: rgba(0,0,0,0.3);
+        display: flex; align-items: center; justify-content: center;
+        overflow: hidden;
+        transition: border-color 0.3s, box-shadow 0.3s, transform 0.3s;
+        margin-bottom: 8px;
+      }
+      .ds-card.active .ds-ring {
+        border-color: var(--ring-color);
+        box-shadow: 0 0 20px color-mix(in srgb, var(--ring-color) 50%, transparent);
+        transform: scale(1.05);
+      }
+
+      /* ── Avatar image ── */
+      .ds-avatar {
+        width: 88%; height: 88%;
+        object-fit: contain;
+        filter: drop-shadow(0 2px 6px rgba(0,0,0,0.3));
+        transition: filter 0.3s, transform 0.3s;
+      }
+      .ds-card.active .ds-avatar {
+        transform: scale(1.05);
+        filter: drop-shadow(0 4px 12px rgba(0,0,0,0.4));
+      }
+      .ds-card.dimmed .ds-avatar {
+        filter: grayscale(0.5) drop-shadow(0 2px 4px rgba(0,0,0,0.2));
+      }
+
+      /* ── Info panel (hidden by default, revealed on active) ── */
+      .ds-info {
+        max-height: 0;
+        overflow: hidden;
+        opacity: 0;
+        transition: max-height 0.35s ease, opacity 0.3s ease, margin 0.3s;
+        margin-top: 0;
+      }
+      .ds-card.active .ds-info {
+        max-height: 120px;
+        opacity: 1;
+        margin-top: 8px;
+      }
+
+      .ds-name {
+        font-family: Impact, 'Arial Black', sans-serif;
+        font-size: clamp(1rem, 2.5vw, 1.25rem);
+        color: #fff;
+        letter-spacing: 1px;
+        margin-bottom: 3px;
+      }
+      .ds-tagline {
+        font-size: clamp(0.7rem, 1.5vw, 0.82rem);
+        color: rgba(255,255,255,0.5);
+        font-style: italic;
+        margin-bottom: 6px;
+        line-height: 1.3;
+      }
+      .ds-kart-color {
+        display: flex; align-items: center; justify-content: center;
+        gap: 5px;
+        font-size: 0.72rem;
+        color: rgba(255,255,255,0.4);
+        margin-bottom: 8px;
+      }
+      .ds-color-dot {
+        width: 10px; height: 10px; border-radius: 50%;
+        border: 1px solid rgba(255,255,255,0.2);
+      }
+
+      .ds-select-prompt {
+        font-family: Impact, 'Arial Black', sans-serif;
+        font-size: 0.75rem;
+        letter-spacing: 3px;
+        color: #39ff14;
+        text-shadow: 0 0 8px rgba(57,255,20,0.4);
+        animation: dsPulse 1.5s ease-in-out infinite;
+      }
+      @keyframes dsPulse {
+        0%, 100% { opacity: 1; }
+        50%      { opacity: 0.4; }
+      }
+
+      /* ── Hover (desktop) ── */
+      @media (hover: hover) {
+        .ds-card:hover:not(.active):not(.dimmed) {
+          border-color: rgba(255,255,255,0.25);
+          background: rgba(255,255,255,0.05);
+        }
+      }
+
+      /* ── Mobile: smaller cards ── */
+      @media (max-width: 500px) {
+        .ds-cards { gap: 8px; }
+        .ds-card { padding: 12px 8px 16px; border-radius: 14px; }
+        .ds-ring { border-width: 2px; }
+      }
     `;
     document.head.appendChild(style);
-    document.body.appendChild(this.el);
 
-    this.el.querySelectorAll('.driver-card').forEach(card => {
-      card.addEventListener('click', () => onSelect(parseInt(card.dataset.index)));
+    // --- Interaction ---
+    const cardEls = this.el.querySelectorAll('.ds-card');
+
+    const setActive = (index) => {
+      this.activeIndex = index;
+      cardEls.forEach((card, i) => {
+        card.classList.remove('active', 'dimmed');
+        // Pass the ring color as a CSS variable to the card
+        const d = DRIVER_TYPES[i];
+        card.style.setProperty('--ring-color', kartColor(d.kartBody));
+
+        if (index === -1) return; // no selection
+        if (i === index) {
+          card.classList.add('active');
+        } else {
+          card.classList.add('dimmed');
+        }
+      });
+    };
+
+    cardEls.forEach((card) => {
+      const idx = parseInt(card.dataset.index);
+
+      card.addEventListener('click', () => {
+        if (this.activeIndex === idx) {
+          // Second click on active card → select
+          onSelect(idx);
+        } else {
+          // First click → highlight
+          setActive(idx);
+        }
+      });
     });
   }
 
-  show() { this.el.style.display = 'flex'; }
+  show() {
+    this.activeIndex = -1;
+    // Reset all cards to neutral
+    this.el.querySelectorAll('.ds-card').forEach(c => {
+      c.classList.remove('active', 'dimmed');
+    });
+    this.el.style.display = 'flex';
+  }
+
   hide() { this.el.style.display = 'none'; }
 }
