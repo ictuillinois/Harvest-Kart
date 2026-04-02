@@ -253,24 +253,23 @@ export class Environment {
     // the sun disc. MeshBasicMaterial glow spheres were blowing out the
     // bloom post-processing pass with pure white.
 
-    // ── OCEAN — bright tropical water, close to road for visibility ──
-    const waterGeo = new THREE.PlaneGeometry(300, 600);
-    const waterNormals = new THREE.TextureLoader().load(asset('textures/waternormals.jpg'), (tex) => {
-      tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    // ── OCEAN — bright blue plane (Water shader reflects sky too much) ──
+    const oceanGeo = new THREE.PlaneGeometry(300, 600, 40, 40);
+    const oceanMat = new THREE.MeshStandardMaterial({
+      color: 0x0077cc,
+      emissive: 0x003366,
+      emissiveIntensity: 0.3,
+      roughness: 0.2,
+      metalness: 0.1,
+      transparent: true,
+      opacity: 0.92,
     });
-    this.water = new Water(waterGeo, {
-      textureWidth: 512, textureHeight: 512, waterNormals,
-      sunDirection: this.sunDirection.clone(),
-      sunColor: 0xffffee,
-      waterColor: 0x001e0f,
-      distortionScale: 5.0,     // strong visible waves
-      fog: this.scene.fog !== undefined,
-      alpha: 0.95,
-    });
+    this.water = new THREE.Mesh(oceanGeo, oceanMat);
     this.water.rotation.x = -Math.PI / 2;
-    this.water.position.set(ROAD_WIDTH / 2 + 8, -0.12, -100);
-    // Override to bright tropical turquoise — visible against sand
-    this.water.material.uniforms['waterColor'].value.set(0x006688);
+    this.water.position.set(ROAD_WIDTH / 2 + 8, -0.1, -100);
+    this.water.receiveShadow = true;
+    // Store vertices for wave animation
+    this.water.userData.basePositions = oceanGeo.attributes.position.array.slice();
     this.scene.add(this.water);
     this.themeObjects.push(this.water);
 
@@ -523,7 +522,19 @@ export class Environment {
   update(delta, speed) {
     if (this.sky) this.sky.material.uniforms['time'].value += delta;
     if (this.starField) this.starField.material.uniforms.time.value += delta;
-    if (this.water) this.water.material.uniforms['time'].value += delta * 0.5;
+    // Animate ocean waves (vertex displacement)
+    if (this.water && this.water.userData.basePositions) {
+      const pos = this.water.geometry.attributes.position;
+      const base = this.water.userData.basePositions;
+      const time = performance.now() * 0.001;
+      for (let i = 0; i < pos.count; i++) {
+        const bx = base[i * 3];
+        const by = base[i * 3 + 1];
+        // Gentle sine wave on Z axis (which is Y in world after rotation)
+        pos.array[i * 3 + 2] = base[i * 3 + 2] + Math.sin(time * 1.5 + bx * 0.3 + by * 0.2) * 0.15;
+      }
+      pos.needsUpdate = true;
+    }
 
     const move = speed * delta;
 
