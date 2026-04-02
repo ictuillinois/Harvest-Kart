@@ -7,12 +7,13 @@ export class GameState {
   }
 
   reset() {
-    this.state = 'menu'; // menu | characterSelect | playing | complete
-    this.currentLane = 1; // 0, 1, 2 (start center)
+    this.state = 'menu'; // menu | driverSelect | mapSelect | playing | complete
+    this.currentLane = 1;
     this.platesHit = 0;
     this.currentCharge = 0;
     this.lampPostsLit = 0;
-    this.selectedVariant = 0;
+    this.selectedDriver = 0;
+    this.selectedMap = 0;
     this.speed = 0;
     this.elapsed = 0;
   }

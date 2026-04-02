@@ -2,14 +2,15 @@ import * as THREE from 'three';
 import { update as updateTweens } from '@tweenjs/tween.js';
 
 import { Road } from './game/Road.js';
-import { Car } from './game/Car.js';
+import { Kart } from './game/Kart.js';
 import { Plate } from './game/Plate.js';
 import { LampPost } from './game/LampPost.js';
 import { Environment } from './game/Environment.js';
 import { GameState } from './game/GameState.js';
 
 import { StartScreen } from './ui/StartScreen.js';
-import { CharacterSelect } from './ui/CharacterSelect.js';
+import { DriverSelect } from './ui/DriverSelect.js';
+import { MapSelect } from './ui/MapSelect.js';
 import { HUD } from './ui/HUD.js';
 import { WinScreen } from './ui/WinScreen.js';
 
@@ -38,52 +39,74 @@ camera.lookAt(0, 1, -CAMERA_LOOK_AHEAD);
 // --- Game objects ---
 const gameState = new GameState();
 const road = new Road(scene);
-const car = new Car(scene);
+const kart = new Kart(scene);
 const plates = new Plate(scene);
 const lampPosts = new LampPost(scene);
 const environment = new Environment(scene);
 
+// Build a default environment so the 3D scene isn't empty on the menu
+environment.build(0);
+
 // --- UI ---
 const startScreen = new StartScreen(() => {
-  gameState.transition('characterSelect');
+  gameState.transition('driverSelect');
 });
 
-const characterSelect = new CharacterSelect((variantIndex) => {
-  gameState.selectedVariant = variantIndex;
-  car.setVariant(variantIndex);
+const driverSelect = new DriverSelect((driverIndex) => {
+  gameState.selectedDriver = driverIndex;
+  kart.setDriver(driverIndex);
+  gameState.transition('mapSelect');
+});
+
+const mapSelect = new MapSelect((mapIndex) => {
+  gameState.selectedMap = mapIndex;
+  environment.build(mapIndex);
   gameState.transition('playing');
 });
 
 const hud = new HUD();
 
 const winScreen = new WinScreen(() => {
-  // Reset everything
   gameState.reset();
   hud.reset();
   lampPosts.resetAll();
   gameState.transition('menu');
 });
 
+// --- Controls ---
+const controls = setupControls((direction) => {
+  if (gameState.state !== 'playing') return;
+  kart.switchLane(direction);
+  gameState.currentLane = kart.currentLane;
+});
+
 // --- State change handling ---
 gameState.on('stateChange', ({ from, to }) => {
   startScreen.hide();
-  characterSelect.hide();
+  driverSelect.hide();
+  mapSelect.hide();
   hud.hide();
   winScreen.hide();
+  controls.hideButtons();
 
   switch (to) {
     case 'menu':
       startScreen.show();
       break;
-    case 'characterSelect':
-      characterSelect.show();
+    case 'driverSelect':
+      driverSelect.show();
+      break;
+    case 'mapSelect':
+      mapSelect.show();
       break;
     case 'playing':
       hud.show();
+      controls.showButtons();
       gameState.speed = INITIAL_SPEED;
       gameState.elapsed = 0;
       break;
     case 'complete':
+      controls.hideButtons();
       winScreen.show(gameState.platesHit);
       break;
   }
@@ -99,13 +122,6 @@ gameState.on('lampLit', ({ lampPostsLit }) => {
   hud.updateCharge(0);
 });
 
-// --- Controls ---
-setupControls((direction) => {
-  if (gameState.state !== 'playing') return;
-  car.switchLane(direction);
-  gameState.currentLane = car.currentLane;
-});
-
 // --- Resize ---
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
@@ -118,31 +134,28 @@ const clock = new THREE.Clock();
 
 function animate() {
   requestAnimationFrame(animate);
-  const delta = Math.min(clock.getDelta(), 0.05); // clamp to avoid big jumps
+  const delta = Math.min(clock.getDelta(), 0.05);
 
   updateTweens();
 
   if (gameState.state === 'playing') {
-    // Accelerate
     gameState.speed = Math.min(gameState.speed + ACCELERATION * delta, MAX_SPEED);
     gameState.elapsed += delta;
 
     const speed = gameState.speed;
 
-    // Update game objects
     road.update(delta, speed);
-    car.update(delta, speed);
+    kart.update(delta, speed);
     plates.update(delta, speed);
     lampPosts.update(delta, speed);
     environment.update(delta, speed);
 
-    // Check collisions
     if (plates.checkCollision(gameState.currentLane)) {
       gameState.hitPlate();
     }
 
-    // Camera follows car
-    camera.position.x = car.group.position.x * 0.3;
+    // Camera follows kart laterally
+    camera.position.x += (kart.group.position.x * 0.3 - camera.position.x) * 0.1;
   }
 
   renderer.render(scene, camera);
