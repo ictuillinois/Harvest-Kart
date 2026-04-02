@@ -18,21 +18,25 @@ export class StartScreen {
         animation: ssIn 0.8s ease-out;
 
         /*
-         * Layer 1 (top): the artwork, centered, never cropped
-         * Layer 2 (bottom): gradient that matches the image edges
-         *   - top  = sky blue  sampled from the PNG top edge
-         *   - bottom = dark asphalt sampled from the PNG bottom edge
+         * Layer 1: the artwork — cover so it always fills the viewport
+         * Layer 2: radial vignette for depth + text readability
+         * Layer 3: fallback gradient matching image edges
+         *          (sky blue top, wheat gold sides, dark road bottom)
          */
         background:
-          url('/Start_Screen.png') center center / contain no-repeat,
+          url('/Start_Screen.png') center center / cover no-repeat,
+          radial-gradient(
+            ellipse at center 60%,
+            rgba(0,0,0,0) 40%,
+            rgba(0,0,0,0.4) 100%
+          ),
           linear-gradient(
             180deg,
-            #6ec1e8  0%,
-            #6ec1e8 15%,
-            #4a8ab5 35%,
-            #3a3a3a 65%,
-            #222222 85%,
-            #1a1a1a 100%
+            #47b0e8  0%,
+            #7cc4e0 20%,
+            #c8a848 50%,
+            #5a6a40 75%,
+            #2a3020 100%
           );
       }
 
