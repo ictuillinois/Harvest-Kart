@@ -24,7 +24,8 @@ import {
   PEDAL_ACCELERATION, COAST_DECELERATION,
   MIN_SPEED_MPH, MAX_SPEED_MPH,
   PLATE_SPAWN_INTERVAL,
-  CAMERA_OFFSET, CAMERA_LOOK_AHEAD
+  CAMERA_OFFSET, CAMERA_LOOK_AHEAD,
+  CAMERA_FOV_MIN, CAMERA_FOV_MAX, CAMERA_SHAKE_THRESHOLD
 } from './utils/constants.js';
 
 // --- Renderer ---
@@ -41,9 +42,9 @@ document.body.appendChild(renderer.domElement);
 const scene = new THREE.Scene();
 scene.fog = new THREE.FogExp2(0x1a0533, 0.006);
 
-const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+const camera = new THREE.PerspectiveCamera(CAMERA_FOV_MIN, window.innerWidth / window.innerHeight, 0.1, 1000);
 camera.position.set(CAMERA_OFFSET.x, CAMERA_OFFSET.y, CAMERA_OFFSET.z);
-camera.lookAt(0, 1, -CAMERA_LOOK_AHEAD);
+camera.lookAt(0, 0.5, -CAMERA_LOOK_AHEAD);
 
 // --- Post-processing ---
 const composer = new EffectComposer(renderer);
@@ -282,7 +283,24 @@ function animate() {
       gameState.missPlate();
     }
 
-    camera.position.x += (kart.group.position.x * 0.3 - camera.position.x) * 0.1;
+    // Smooth camera follow (lerp toward kart lane position)
+    const targetCamX = kart.group.position.x * 0.25;
+    camera.position.x += (targetCamX - camera.position.x) * 0.08;
+
+    // Dynamic FOV: widens with speed for visceral feel
+    const speedFraction = (speed - MIN_SPEED) / (MAX_SPEED - MIN_SPEED);
+    const targetFOV = CAMERA_FOV_MIN + speedFraction * (CAMERA_FOV_MAX - CAMERA_FOV_MIN);
+    camera.fov += (targetFOV - camera.fov) * 0.05;
+    camera.updateProjectionMatrix();
+
+    // Camera shake at high speed
+    if (speedFraction > CAMERA_SHAKE_THRESHOLD) {
+      const intensity = (speedFraction - CAMERA_SHAKE_THRESHOLD) * 0.08;
+      camera.position.x += (Math.random() - 0.5) * intensity;
+      camera.position.y = CAMERA_OFFSET.y + (Math.random() - 0.5) * intensity * 0.5;
+    } else {
+      camera.position.y += (CAMERA_OFFSET.y - camera.position.y) * 0.1;
+    }
   }
 
   composer.render();

@@ -186,5 +186,8 @@ export const MAP_THEMES = [
 ];
 
 // Camera
-export const CAMERA_OFFSET = { x: 0, y: 5, z: 8 };
-export const CAMERA_LOOK_AHEAD = 10;
+export const CAMERA_OFFSET = { x: 0, y: 6, z: 10 };
+export const CAMERA_LOOK_AHEAD = 15;
+export const CAMERA_FOV_MIN = 55;
+export const CAMERA_FOV_MAX = 68;
+export const CAMERA_SHAKE_THRESHOLD = 0.8; // speed fraction above which shake starts
