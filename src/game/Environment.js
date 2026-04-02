@@ -139,11 +139,12 @@ export class Environment {
     }
   }
 
-  // --- Helper: place a loaded model ---
-  _placeModel(url, x, y, z, scale = 1, rotY = 0) {
+  // --- Helper: place a loaded model (auto-normalized by registry) ---
+  // sizeVariation: multiplier on registry height (1.0 = exact, 0.8-1.2 = ±20%)
+  _placeModel(url, x, y, z, rotY = 0, sizeVariation = 1) {
     const model = getModel(url);
     model.position.set(x, y, z);
-    model.scale.setScalar(scale);
+    if (sizeVariation !== 1) model.scale.multiplyScalar(sizeVariation);
     model.rotation.y = rotY;
     this.scene.add(model);
     this.themeObjects.push(model);
@@ -151,26 +152,26 @@ export class Environment {
     return model;
   }
 
-  // --- Helper: place model without scrolling (static sky objects) ---
-  _placeStatic(url, x, y, z, scale = 1, rotY = 0) {
+  // --- Helper: place static model (doesn't scroll) ---
+  _placeStatic(url, x, y, z, rotY = 0, sizeVariation = 1) {
     const model = getModel(url);
     model.position.set(x, y, z);
-    model.scale.setScalar(scale);
+    if (sizeVariation !== 1) model.scale.multiplyScalar(sizeVariation);
     model.rotation.y = rotY;
     this.scene.add(model);
     this.themeObjects.push(model);
     return model;
   }
 
-  // --- Helper: scatter roadside props ---
-  _scatterProps(propUrls, count, xRange, zSpacing, scale = 1) {
+  // --- Helper: scatter props along both sides of road ---
+  _scatterProps(propUrls, count, xRange, zSpacing) {
     for (let i = 0; i < count; i++) {
       const side = i % 2 === 0 ? -1 : 1;
       const url = propUrls[Math.floor(Math.random() * propUrls.length)];
       const x = side * (ROAD_WIDTH / 2 + xRange[0] + Math.random() * (xRange[1] - xRange[0]));
       const z = -i * zSpacing - Math.random() * zSpacing * 0.5;
-      const s = scale * (0.8 + Math.random() * 0.4);
-      this._placeModel(url, x, 0, z, s, Math.random() * Math.PI * 2);
+      const variation = 0.85 + Math.random() * 0.3; // ±15% size variety
+      this._placeModel(url, x, 0, z, Math.random() * Math.PI * 2, variation);
     }
   }
 
@@ -277,38 +278,36 @@ export class Environment {
     //  LEFT — Buildings (back) → Palms (mid) → Bushes (road edge)
     // ══════════════════════════════════════════
 
-    // Buildings: scale 1.0-1.4 → 8-11 units tall. Prominent skyline.
+    // Buildings (auto-normalized to 5-10 units via registry)
     const bldgs = [MODEL_URLS.buildingA, MODEL_URLS.buildingB, MODEL_URLS.buildingC, MODEL_URLS.buildingD];
     for (let i = 0; i < 12; i++) {
       const url = bldgs[Math.floor(Math.random() * bldgs.length)];
       const x = -(ROAD_WIDTH / 2 + 6 + Math.random() * 8);
-      this._placeModel(url, x, 0, -i * 25 - Math.random() * 10, 1.0 + Math.random() * 0.4, Math.random() * Math.PI);
+      this._placeModel(url, x, 0, -i * 25 - Math.random() * 10, Math.random() * Math.PI, 0.8 + Math.random() * 0.4);
     }
 
-    // Palms: scale 0.8-1.0 → 6-8 units tall. Clearly visible tropical trees.
+    // Palm trees (auto-normalized to 6 units via registry)
     for (let i = 0; i < 12; i++) {
       const x = -(ROAD_WIDTH / 2 + 1.5 + Math.random() * 3);
-      this._placeModel(MODEL_URLS.palmTree, x, 0, -i * 24 - Math.random() * 10, 0.8 + Math.random() * 0.2, Math.random() * Math.PI * 2);
+      this._placeModel(MODEL_URLS.palmTree, x, 0, -i * 24 - Math.random() * 10, Math.random() * Math.PI * 2, 0.8 + Math.random() * 0.4);
     }
 
-    // Bushes: close to road edge, low ground cover
+    // Bushes (auto-normalized to 0.8 units via registry)
     for (let i = 0; i < 10; i++) {
-      this._placeModel(MODEL_URLS.bush, -(ROAD_WIDTH / 2 + 0.8 + Math.random() * 1.5), 0, -i * 28 - Math.random() * 12, 0.6, Math.random() * Math.PI * 2);
+      this._placeModel(MODEL_URLS.bush, -(ROAD_WIDTH / 2 + 0.8 + Math.random() * 1.5), 0, -i * 28 - Math.random() * 12, Math.random() * Math.PI * 2);
     }
 
-    // ══════════════════════════════════════════
-    //  RIGHT — Bushes (road edge) → Palms → Sand → Ocean
-    // ══════════════════════════════════════════
+    // ── RIGHT — Palms → Bushes → Sand → Ocean ──
 
-    // Palms along beach
+    // Palm trees along beach
     for (let i = 0; i < 12; i++) {
       const x = ROAD_WIDTH / 2 + 1.5 + Math.random() * 4;
-      this._placeModel(MODEL_URLS.palmTree, x, 0, -i * 24 - Math.random() * 10, 0.8 + Math.random() * 0.2, Math.random() * Math.PI * 2);
+      this._placeModel(MODEL_URLS.palmTree, x, 0, -i * 24 - Math.random() * 10, Math.random() * Math.PI * 2, 0.8 + Math.random() * 0.4);
     }
 
     // Bushes beach side
     for (let i = 0; i < 8; i++) {
-      this._placeModel(MODEL_URLS.bush, ROAD_WIDTH / 2 + 0.8 + Math.random() * 2, 0, -i * 32 - Math.random() * 12, 0.6, Math.random() * Math.PI * 2);
+      this._placeModel(MODEL_URLS.bush, ROAD_WIDTH / 2 + 0.8 + Math.random() * 2, 0, -i * 32 - Math.random() * 12, Math.random() * Math.PI * 2);
     }
   }
 
@@ -334,13 +333,14 @@ export class Environment {
     const usaBuildings = [MODEL_URLS.buildingE, MODEL_URLS.buildingF, MODEL_URLS.buildingG, MODEL_URLS.buildingH, MODEL_URLS.buildingC, MODEL_URLS.buildingD];
 
     if (this.modelsReady) {
+      // Buildings (auto-normalized via registry — no manual scale)
       for (const side of [-1, 1]) {
         for (let i = 0; i < 12; i++) {
           const url = usaBuildings[Math.floor(Math.random() * usaBuildings.length)];
           const x = side * (ROAD_WIDTH / 2 + 8 + Math.random() * 10);
           const z = -i * 25 - Math.random() * 10;
-          const s = 1.2 + Math.random() * 1.5;
-          const model = this._placeModel(url, x, 0, z, s, side > 0 ? Math.PI : 0);
+          const model = this._placeModel(url, x, 0, z, side > 0 ? Math.PI : 0, 0.8 + Math.random() * 0.4);
+          // Darken for nighttime
           model.traverse((child) => {
             if (child.isMesh && child.material) {
               child.material = child.material.clone();
@@ -350,20 +350,14 @@ export class Environment {
         }
       }
 
-      // Roadside props (smaller scales, further from road)
+      // Roadside props (all auto-normalized)
       this._scatterProps(
         [MODEL_URLS.dumpster, MODEL_URLS.trafficLight, MODEL_URLS.bench, MODEL_URLS.firehydrant, MODEL_URLS.trashcan, MODEL_URLS.mailbox],
-        12, [2, 5], 28, 0.5
+        12, [2, 5], 28
       );
-
-      // Traffic cones
-      this._scatterProps([MODEL_URLS.trafficCone], 8, [1.5, 2.5], 35, 0.4);
-
-      // Tire stacks and barriers
-      this._scatterProps([MODEL_URLS.tires, MODEL_URLS.raceBarrier], 4, [2.5, 5], 65, 0.4);
-
-      // Parked cars
-      this._scatterProps([MODEL_URLS.carSedan, MODEL_URLS.carTaxi, MODEL_URLS.carHatchback], 6, [2, 4], 50, 0.5);
+      this._scatterProps([MODEL_URLS.trafficCone], 8, [1.5, 2.5], 35);
+      this._scatterProps([MODEL_URLS.tires, MODEL_URLS.raceBarrier], 4, [2.5, 5], 65);
+      this._scatterProps([MODEL_URLS.carSedan, MODEL_URLS.carTaxi, MODEL_URLS.carHatchback], 6, [2, 4], 50);
     }
 
     // Neon signs (attached to building height, pushed back)
@@ -463,28 +457,20 @@ export class Environment {
       }
     }
 
-    // Loaded models
+    // Loaded models (all auto-normalized via registry)
     if (this.modelsReady) {
-      // Bushes (small, spread out)
-      this._scatterProps([MODEL_URLS.bush], 10, [3, 8], 28, 0.5);
+      this._scatterProps([MODEL_URLS.bush], 10, [3, 8], 28);
+      this._scatterProps([MODEL_URLS.flowers], 8, [3, 10], 32);
+      this._scatterProps([MODEL_URLS.llama], 5, [4, 10], 55);
+      this._scatterProps([MODEL_URLS.stoneWall], 4, [3, 7], 70);
 
-      // Flowers
-      this._scatterProps([MODEL_URLS.flowers], 8, [3, 10], 32, 0.3);
-
-      // Llamas (alongside road, moderate distance)
-      this._scatterProps([MODEL_URLS.llama], 5, [4, 10], 55, 0.25);
-
-      // Stone walls
-      this._scatterProps([MODEL_URLS.stoneWall], 4, [3, 7], 70, 0.5);
-
-      // Andean huts (well back from road)
+      // Andean huts
       for (let i = 0; i < 3; i++) {
         const side = i % 2 === 0 ? -1 : 1;
-        this._placeModel(MODEL_URLS.hut, side * (ROAD_WIDTH / 2 + 12 + Math.random() * 5), 0, -i * 90 - 40, 0.5, Math.random() * Math.PI * 2);
+        this._placeModel(MODEL_URLS.hut, side * (ROAD_WIDTH / 2 + 12 + Math.random() * 5), 0, -i * 90 - 40, Math.random() * Math.PI * 2);
       }
 
-      // Race barriers
-      this._scatterProps([MODEL_URLS.tires, MODEL_URLS.raceBarrier], 4, [1.5, 3], 70, 0.35);
+      this._scatterProps([MODEL_URLS.tires, MODEL_URLS.raceBarrier], 4, [1.5, 3], 70);
     }
 
     // Inca terraces (procedural, pushed further back)
