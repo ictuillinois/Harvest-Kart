@@ -9,7 +9,10 @@ export class Environment {
   constructor(scene, renderer) {
     this.scene = scene;
     this.renderer = renderer;
-    this.decorations = [];
+    // Parallax depth layers — different scroll speeds
+    this.foreground = [];  // 100% speed (bushes, props near road)
+    this.midground = [];   // 60% speed (buildings, palms)
+    this.background = [];  // 20% speed (mountains, distant objects)
     this.themeObjects = [];
     this.sky = null;
     this.sunDirection = new THREE.Vector3();
@@ -37,7 +40,9 @@ export class Environment {
       this.scene.remove(obj);
     }
     this.themeObjects = [];
-    this.decorations = [];
+    this.foreground = [];
+    this.midground = [];
+    this.background = [];
 
     if (this.sky) this.scene.remove(this.sky);
     if (this.ambientLight) this.scene.remove(this.ambientLight);
@@ -125,7 +130,7 @@ export class Environment {
         barrier.position.set(side * (ROAD_WIDTH / 2 + 0.5), 0.4, -i * ROAD_SEGMENT_LENGTH * 0.9);
         this.scene.add(barrier);
         this.themeObjects.push(barrier);
-        this.decorations.push(barrier);
+        this.foreground.push(barrier);
       }
     }
 
@@ -139,20 +144,22 @@ export class Environment {
     }
   }
 
-  // --- Helper: place a loaded model (auto-normalized by registry) ---
-  // sizeVariation: multiplier on registry height (1.0 = exact, 0.8-1.2 = ±20%)
-  _placeModel(url, x, y, z, rotY = 0, sizeVariation = 1) {
+  // --- Helper: place a loaded model into a depth layer ---
+  // layer: 'fg' (foreground, 100% speed), 'mg' (midground, 60%), 'bg' (background, 20%)
+  _placeModel(url, x, y, z, rotY = 0, sizeVariation = 1, layer = 'fg') {
     const model = getModel(url);
     model.position.set(x, y, z);
     if (sizeVariation !== 1) model.scale.multiplyScalar(sizeVariation);
     model.rotation.y = rotY;
     this.scene.add(model);
     this.themeObjects.push(model);
-    this.decorations.push(model);
+    if (layer === 'bg') this.background.push(model);
+    else if (layer === 'mg') this.midground.push(model);
+    else this.foreground.push(model);
     return model;
   }
 
-  // --- Helper: place static model (doesn't scroll) ---
+  // --- Helper: place static model (doesn't scroll at all) ---
   _placeStatic(url, x, y, z, rotY = 0, sizeVariation = 1) {
     const model = getModel(url);
     model.position.set(x, y, z);
@@ -164,14 +171,14 @@ export class Environment {
   }
 
   // --- Helper: scatter props along both sides of road ---
-  _scatterProps(propUrls, count, xRange, zSpacing) {
+  _scatterProps(propUrls, count, xRange, zSpacing, layer = 'fg') {
     for (let i = 0; i < count; i++) {
       const side = i % 2 === 0 ? -1 : 1;
       const url = propUrls[Math.floor(Math.random() * propUrls.length)];
       const x = side * (ROAD_WIDTH / 2 + xRange[0] + Math.random() * (xRange[1] - xRange[0]));
       const z = -i * zSpacing - Math.random() * zSpacing * 0.5;
-      const variation = 0.85 + Math.random() * 0.3; // ±15% size variety
-      this._placeModel(url, x, 0, z, Math.random() * Math.PI * 2, variation);
+      const variation = 0.85 + Math.random() * 0.3;
+      this._placeModel(url, x, 0, z, Math.random() * Math.PI * 2, variation, layer);
     }
   }
 
@@ -278,36 +285,36 @@ export class Environment {
     //  LEFT — Buildings (back) → Palms (mid) → Bushes (road edge)
     // ══════════════════════════════════════════
 
-    // Buildings (auto-normalized to 5-10 units via registry)
+    // Buildings → midground (60% scroll speed — parallax depth)
     const bldgs = [MODEL_URLS.buildingA, MODEL_URLS.buildingB, MODEL_URLS.buildingC, MODEL_URLS.buildingD];
     for (let i = 0; i < 12; i++) {
       const url = bldgs[Math.floor(Math.random() * bldgs.length)];
       const x = -(ROAD_WIDTH / 2 + 6 + Math.random() * 8);
-      this._placeModel(url, x, 0, -i * 25 - Math.random() * 10, Math.random() * Math.PI, 0.8 + Math.random() * 0.4);
+      this._placeModel(url, x, 0, -i * 25 - Math.random() * 10, Math.random() * Math.PI, 0.8 + Math.random() * 0.4, 'mg');
     }
 
-    // Palm trees (auto-normalized to 6 units via registry)
+    // Palms → midground
     for (let i = 0; i < 12; i++) {
       const x = -(ROAD_WIDTH / 2 + 1.5 + Math.random() * 3);
-      this._placeModel(MODEL_URLS.palmTree, x, 0, -i * 24 - Math.random() * 10, Math.random() * Math.PI * 2, 0.8 + Math.random() * 0.4);
+      this._placeModel(MODEL_URLS.palmTree, x, 0, -i * 24 - Math.random() * 10, Math.random() * Math.PI * 2, 0.8 + Math.random() * 0.4, 'mg');
     }
 
-    // Bushes (auto-normalized to 0.8 units via registry)
+    // Bushes → foreground (100% scroll — near road)
     for (let i = 0; i < 10; i++) {
-      this._placeModel(MODEL_URLS.bush, -(ROAD_WIDTH / 2 + 0.8 + Math.random() * 1.5), 0, -i * 28 - Math.random() * 12, Math.random() * Math.PI * 2);
+      this._placeModel(MODEL_URLS.bush, -(ROAD_WIDTH / 2 + 0.8 + Math.random() * 1.5), 0, -i * 28 - Math.random() * 12, Math.random() * Math.PI * 2, 1, 'fg');
     }
 
     // ── RIGHT — Palms → Bushes → Sand → Ocean ──
 
-    // Palm trees along beach
+    // Palms → midground
     for (let i = 0; i < 12; i++) {
       const x = ROAD_WIDTH / 2 + 1.5 + Math.random() * 4;
-      this._placeModel(MODEL_URLS.palmTree, x, 0, -i * 24 - Math.random() * 10, Math.random() * Math.PI * 2, 0.8 + Math.random() * 0.4);
+      this._placeModel(MODEL_URLS.palmTree, x, 0, -i * 24 - Math.random() * 10, Math.random() * Math.PI * 2, 0.8 + Math.random() * 0.4, 'mg');
     }
 
-    // Bushes beach side
+    // Bushes → foreground
     for (let i = 0; i < 8; i++) {
-      this._placeModel(MODEL_URLS.bush, ROAD_WIDTH / 2 + 0.8 + Math.random() * 2, 0, -i * 32 - Math.random() * 12, Math.random() * Math.PI * 2);
+      this._placeModel(MODEL_URLS.bush, ROAD_WIDTH / 2 + 0.8 + Math.random() * 2, 0, -i * 32 - Math.random() * 12, Math.random() * Math.PI * 2, 1, 'fg');
     }
   }
 
@@ -333,14 +340,13 @@ export class Environment {
     const usaBuildings = [MODEL_URLS.buildingE, MODEL_URLS.buildingF, MODEL_URLS.buildingG, MODEL_URLS.buildingH, MODEL_URLS.buildingC, MODEL_URLS.buildingD];
 
     if (this.modelsReady) {
-      // Buildings (auto-normalized via registry — no manual scale)
+      // Buildings → midground
       for (const side of [-1, 1]) {
         for (let i = 0; i < 12; i++) {
           const url = usaBuildings[Math.floor(Math.random() * usaBuildings.length)];
           const x = side * (ROAD_WIDTH / 2 + 8 + Math.random() * 10);
           const z = -i * 25 - Math.random() * 10;
-          const model = this._placeModel(url, x, 0, z, side > 0 ? Math.PI : 0, 0.8 + Math.random() * 0.4);
-          // Darken for nighttime
+          const model = this._placeModel(url, x, 0, z, side > 0 ? Math.PI : 0, 0.8 + Math.random() * 0.4, 'mg');
           model.traverse((child) => {
             if (child.isMesh && child.material) {
               child.material = child.material.clone();
@@ -350,14 +356,14 @@ export class Environment {
         }
       }
 
-      // Roadside props (all auto-normalized)
+      // Roadside props → foreground
       this._scatterProps(
         [MODEL_URLS.dumpster, MODEL_URLS.trafficLight, MODEL_URLS.bench, MODEL_URLS.firehydrant, MODEL_URLS.trashcan, MODEL_URLS.mailbox],
-        12, [2, 5], 28
+        12, [2, 5], 28, 'fg'
       );
-      this._scatterProps([MODEL_URLS.trafficCone], 8, [1.5, 2.5], 35);
-      this._scatterProps([MODEL_URLS.tires, MODEL_URLS.raceBarrier], 4, [2.5, 5], 65);
-      this._scatterProps([MODEL_URLS.carSedan, MODEL_URLS.carTaxi, MODEL_URLS.carHatchback], 6, [2, 4], 50);
+      this._scatterProps([MODEL_URLS.trafficCone], 8, [1.5, 2.5], 35, 'fg');
+      this._scatterProps([MODEL_URLS.tires, MODEL_URLS.raceBarrier], 4, [2.5, 5], 65, 'fg');
+      this._scatterProps([MODEL_URLS.carSedan, MODEL_URLS.carTaxi, MODEL_URLS.carHatchback], 6, [2, 4], 50, 'fg');
     }
 
     // Neon signs (attached to building height, pushed back)
@@ -395,6 +401,7 @@ export class Environment {
         );
         this.scene.add(mountain);
         this.themeObjects.push(mountain);
+        this.background.push(mountain); // slow parallax scroll
 
         if (height > 40) {
           const snowGeo = new THREE.ConeGeometry(radius * 0.2, height * 0.12, 6);
@@ -421,7 +428,7 @@ export class Environment {
         );
         this.scene.add(hill);
         this.themeObjects.push(hill);
-        this.decorations.push(hill);
+        this.midground.push(hill);
       }
     }
 
@@ -453,24 +460,24 @@ export class Environment {
         );
         this.scene.add(treeGroup);
         this.themeObjects.push(treeGroup);
-        this.decorations.push(treeGroup);
+        this.foreground.push(treeGroup);
       }
     }
 
-    // Loaded models (all auto-normalized via registry)
+    // Loaded models with parallax layers
     if (this.modelsReady) {
-      this._scatterProps([MODEL_URLS.bush], 10, [3, 8], 28);
-      this._scatterProps([MODEL_URLS.flowers], 8, [3, 10], 32);
-      this._scatterProps([MODEL_URLS.llama], 5, [4, 10], 55);
-      this._scatterProps([MODEL_URLS.stoneWall], 4, [3, 7], 70);
+      this._scatterProps([MODEL_URLS.bush], 10, [3, 8], 28, 'fg');
+      this._scatterProps([MODEL_URLS.flowers], 8, [3, 10], 32, 'fg');
+      this._scatterProps([MODEL_URLS.llama], 5, [4, 10], 55, 'mg');
+      this._scatterProps([MODEL_URLS.stoneWall], 4, [3, 7], 70, 'mg');
 
-      // Andean huts
+      // Andean huts → midground
       for (let i = 0; i < 3; i++) {
         const side = i % 2 === 0 ? -1 : 1;
-        this._placeModel(MODEL_URLS.hut, side * (ROAD_WIDTH / 2 + 12 + Math.random() * 5), 0, -i * 90 - 40, Math.random() * Math.PI * 2);
+        this._placeModel(MODEL_URLS.hut, side * (ROAD_WIDTH / 2 + 12 + Math.random() * 5), 0, -i * 90 - 40, Math.random() * Math.PI * 2, 1, 'mg');
       }
 
-      this._scatterProps([MODEL_URLS.tires, MODEL_URLS.raceBarrier], 4, [1.5, 3], 70);
+      this._scatterProps([MODEL_URLS.tires, MODEL_URLS.raceBarrier], 4, [1.5, 3], 70, 'fg');
     }
 
     // Inca terraces (procedural, pushed further back)
@@ -490,7 +497,7 @@ export class Environment {
       );
       this.scene.add(terrGroup);
       this.themeObjects.push(terrGroup);
-      this.decorations.push(terrGroup);
+      this.midground.push(terrGroup);
     }
   }
 
@@ -503,10 +510,21 @@ export class Environment {
     if (this.water) this.water.material.uniforms['time'].value += delta * 0.5;
 
     const move = speed * delta;
-    for (const deco of this.decorations) {
-      deco.position.z += move;
-      if (deco.position.z > 60) {
-        deco.position.z -= 400;
+
+    // Parallax: 3 layers at different scroll speeds
+    const layers = [
+      [this.foreground, 1.0],   // 100% — bushes, props near road
+      [this.midground, 0.6],    // 60%  — buildings, palms
+      [this.background, 0.2],   // 20%  — mountains, distant
+    ];
+
+    for (const [layer, factor] of layers) {
+      const layerMove = move * factor;
+      for (const obj of layer) {
+        obj.position.z += layerMove;
+        if (obj.position.z > 60) {
+          obj.position.z -= 400;
+        }
       }
     }
   }
