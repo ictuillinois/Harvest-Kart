@@ -12,6 +12,7 @@ export class Plate {
     this.plates = [];
     this.particles = [];
     this.timeSinceSpawn = 0;
+    this.spawnInterval = PLATE_SPAWN_INTERVAL;
 
     const plateGeo = new THREE.CylinderGeometry(0.8, 0.8, 0.08, 16);
 
@@ -121,7 +122,7 @@ export class Plate {
     this.timeSinceSpawn += delta;
 
     // Spawn new plates
-    if (this.timeSinceSpawn >= PLATE_SPAWN_INTERVAL) {
+    if (this.timeSinceSpawn >= this.spawnInterval) {
       this.timeSinceSpawn = 0;
       // Spawn 1-2 plates ahead
       const spawnZ = -(ROAD_SEGMENT_LENGTH * 0.8 + Math.random() * 40);
@@ -163,5 +164,13 @@ export class Plate {
       p.material.opacity = p.userData.life;
       p.scale.setScalar(p.userData.life);
     }
+  }
+
+  setSpawnRate(interval) {
+    this.spawnInterval = interval;
+  }
+
+  resetSpawnRate() {
+    this.spawnInterval = PLATE_SPAWN_INTERVAL;
   }
 }

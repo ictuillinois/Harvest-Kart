@@ -7,7 +7,7 @@ export class GameState {
   }
 
   reset() {
-    this.state = 'menu'; // menu | driverSelect | mapSelect | playing | complete
+    this.state = 'menu'; // menu | driverSelect | mapSelect | playing | paused | complete
     this.currentLane = 1;
     this.platesHit = 0;
     this.currentCharge = 0;

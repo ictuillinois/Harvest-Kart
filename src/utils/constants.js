@@ -10,8 +10,8 @@ export const ROAD_SEGMENT_COUNT = 3;
 // Speeds (internal units — mapped to 20-70 mph for display)
 export const MIN_SPEED = 15;          // idle / coast speed
 export const MAX_SPEED = 45;          // full pedal speed
-export const PEDAL_ACCELERATION = 25; // units/sec when pedal held
-export const COAST_DECELERATION = 12; // units/sec when pedal released
+export const PEDAL_ACCELERATION = 35; // units/sec when pedal held (snappy 0.85s)
+export const COAST_DECELERATION = 14; // units/sec when pedal released
 export const MIN_SPEED_MPH = 20;
 export const MAX_SPEED_MPH = 70;
 

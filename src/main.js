@@ -19,6 +19,7 @@ import {
   MIN_SPEED, MAX_SPEED,
   PEDAL_ACCELERATION, COAST_DECELERATION,
   MIN_SPEED_MPH, MAX_SPEED_MPH,
+  PLATE_SPAWN_INTERVAL,
   CAMERA_OFFSET, CAMERA_LOOK_AHEAD
 } from './utils/constants.js';
 
@@ -54,7 +55,17 @@ function goHome() {
   kart.currentLane = 1;
   kart.isSwitching = false;
   kart.group.position.x = 0;
+  plates.resetSpawnRate();
   gameState.transition('menu');
+}
+
+// --- Pause toggle ---
+function togglePause() {
+  if (gameState.state === 'playing') {
+    gameState.transition('paused');
+  } else if (gameState.state === 'paused') {
+    gameState.transition('playing');
+  }
 }
 
 // --- UI ---
@@ -68,7 +79,7 @@ const driverSelect = new DriverSelect(
     kart.setDriver(driverIndex);
     gameState.transition('mapSelect');
   },
-  () => gameState.transition('menu') // back
+  () => gameState.transition('menu')
 );
 
 const mapSelect = new MapSelect(
@@ -77,10 +88,10 @@ const mapSelect = new MapSelect(
     await environment.build(mapIndex);
     gameState.transition('playing');
   },
-  () => gameState.transition('driverSelect') // back
+  () => gameState.transition('driverSelect')
 );
 
-const hud = new HUD(() => goHome());
+const hud = new HUD(() => goHome(), () => togglePause());
 
 const winScreen = new WinScreen(() => goHome());
 
@@ -93,6 +104,7 @@ const controls = setupControls((direction) => {
 
 // --- State change handling ---
 gameState.on('stateChange', ({ from, to }) => {
+  // Hide everything first
   startScreen.hide();
   driverSelect.hide();
   mapSelect.hide();
@@ -112,10 +124,20 @@ gameState.on('stateChange', ({ from, to }) => {
       break;
     case 'playing':
       hud.show();
+      hud.hidePause();
       controls.showButtons();
-      gameState.speed = MIN_SPEED;
-      gameState.elapsed = 0;
-      hud.updateSpeed(MIN_SPEED_MPH);
+      if (from !== 'paused') {
+        // Fresh game start
+        gameState.speed = MIN_SPEED;
+        gameState.elapsed = 0;
+        hud.updateSpeed(MIN_SPEED_MPH);
+        plates.resetSpawnRate();
+      }
+      break;
+    case 'paused':
+      hud.show();
+      hud.showPause();
+      controls.hideButtons();
       break;
     case 'complete':
       controls.hideButtons();
@@ -124,14 +146,20 @@ gameState.on('stateChange', ({ from, to }) => {
   }
 });
 
-// --- Escape key: go back one screen or home ---
+// --- Escape / P key ---
 window.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
     switch (gameState.state) {
       case 'driverSelect': gameState.transition('menu'); break;
       case 'mapSelect': gameState.transition('driverSelect'); break;
-      case 'playing': goHome(); break;
+      case 'playing': togglePause(); break;
+      case 'paused': togglePause(); break;
       case 'complete': goHome(); break;
+    }
+  }
+  if ((e.key === 'p' || e.key === 'P') && !e.repeat) {
+    if (gameState.state === 'playing' || gameState.state === 'paused') {
+      togglePause();
     }
   }
 });
@@ -141,9 +169,16 @@ gameState.on('plateHit', ({ currentCharge }) => {
 });
 
 gameState.on('lampLit', ({ lampPostsLit }) => {
-  hud.updateLamps(lampPostsLit);
-  lampPosts.lightNext();
-  hud.updateCharge(0);
+  // Celebrate the full bar before resetting
+  hud.celebrateCharge();
+  setTimeout(() => {
+    hud.updateLamps(lampPostsLit);
+    lampPosts.lightNext();
+    hud.updateCharge(0);
+    // Increase difficulty: spawn plates faster after each lamp
+    const newRate = PLATE_SPAWN_INTERVAL - lampPostsLit * 0.08;
+    plates.setSpawnRate(Math.max(newRate, 0.5));
+  }, 500);
 });
 
 // --- Helper: map internal speed to display MPH ---
@@ -174,27 +209,16 @@ function animate() {
   if (gameState.state === 'playing') {
     gameState.elapsed += delta;
 
-    // --- Pedal-driven speed ---
+    // Pedal-driven speed
     if (controls.isPedalDown()) {
-      // Accelerate toward max
-      gameState.speed = Math.min(
-        gameState.speed + PEDAL_ACCELERATION * delta,
-        MAX_SPEED
-      );
+      gameState.speed = Math.min(gameState.speed + PEDAL_ACCELERATION * delta, MAX_SPEED);
     } else {
-      // Decelerate toward idle
-      gameState.speed = Math.max(
-        gameState.speed - COAST_DECELERATION * delta,
-        MIN_SPEED
-      );
+      gameState.speed = Math.max(gameState.speed - COAST_DECELERATION * delta, MIN_SPEED);
     }
 
     const speed = gameState.speed;
-
-    // Update HUD speedometer
     hud.updateSpeed(speedToMph(speed));
 
-    // Update game objects
     road.update(delta, speed);
     kart.update(delta, speed);
     plates.update(delta, speed);
@@ -204,7 +228,6 @@ function animate() {
       gameState.hitPlate();
     }
 
-    // Camera follows kart laterally
     camera.position.x += (kart.group.position.x * 0.3 - camera.position.x) * 0.1;
   }
 
@@ -212,8 +235,6 @@ function animate() {
 }
 
 // --- Bootstrap ---
-// Show start screen immediately (solid, covers the black canvas).
-// Load models behind it so nothing leaks through.
 startScreen.show();
 animate();
 
