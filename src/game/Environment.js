@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { Sky } from 'three/addons/objects/Sky.js';
+import { Water } from 'three/addons/objects/Water.js';
 import { ROAD_WIDTH, ROAD_SEGMENT_LENGTH, MAP_THEMES } from '../utils/constants.js';
 import { getModel, preloadAll, MODEL_URLS } from '../utils/assetLoader.js';
 
@@ -18,6 +19,7 @@ export class Environment {
     this.starField = null;
     this.currentTheme = null;
     this.modelsReady = false;
+    this.water = null;
   }
 
   /**
@@ -42,6 +44,7 @@ export class Environment {
     if (this.hemiLight) this.scene.remove(this.hemiLight);
     if (this.ground) this.scene.remove(this.ground);
     if (this.starField) { this.scene.remove(this.starField); this.starField = null; }
+    if (this.water) { this.scene.remove(this.water); this.water = null; }
 
     const theme = MAP_THEMES[themeIndex] || MAP_THEMES[0];
     this.currentTheme = theme;
@@ -216,7 +219,7 @@ export class Environment {
   }
 
   // =====================================================================
-  //  BRAZIL — tropical vibes
+  //  BRAZIL — coastal highway with beach & ocean
   // =====================================================================
   _buildBrazil() {
     // --- Sun glow ---
@@ -232,65 +235,127 @@ export class Environment {
       this.themeObjects.push(mesh);
     }
 
-    // --- Palm trees (procedural — no palm GLB available) ---
-    const trunkMat = new THREE.MeshStandardMaterial({ color: 0x8B6914, roughness: 0.9 });
-    const leafMat = new THREE.MeshStandardMaterial({ color: 0x228B22, roughness: 0.7 });
+    // =================================================================
+    //  ANIMATED OCEAN (right side of road)
+    // =================================================================
+    const waterGeo = new THREE.PlaneGeometry(400, 400);
+    const waterNormals = new THREE.TextureLoader().load('/textures/waternormals.jpg', (tex) => {
+      tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    });
+    this.water = new Water(waterGeo, {
+      textureWidth: 512,
+      textureHeight: 512,
+      waterNormals,
+      sunDirection: this.sunDirection.clone(),
+      sunColor: 0xffffff,
+      waterColor: 0x001e0f,
+      distortionScale: 3.7,
+      fog: this.scene.fog !== undefined,
+      alpha: 0.9,
+    });
+    this.water.rotation.x = -Math.PI / 2;
+    this.water.position.set(ROAD_WIDTH / 2 + 60, -0.4, -150);
+    this.scene.add(this.water);
+    this.themeObjects.push(this.water);
 
-    for (const side of [-1, 1]) {
-      for (let i = 0; i < 12; i++) {
-        const palmGroup = new THREE.Group();
-        const height = 5 + Math.random() * 4;
-        for (let s = 0; s < 5; s++) {
-          const segGeo = new THREE.CylinderGeometry(0.15 - s * 0.02, 0.18 - s * 0.02, height / 5, 6);
-          const seg = new THREE.Mesh(segGeo, trunkMat);
-          seg.position.y = (s + 0.5) * height / 5;
-          seg.position.x = Math.sin(s * 0.15) * 0.3;
-          palmGroup.add(seg);
-        }
-        for (let f = 0; f < 7; f++) {
-          const leafGeo = new THREE.BoxGeometry(0.3, 0.05, 2.5 + Math.random());
-          const leaf = new THREE.Mesh(leafGeo, leafMat);
-          leaf.position.set(0, height + 0.2, 0);
-          leaf.rotation.y = (f / 7) * Math.PI * 2;
-          leaf.rotation.x = 0.4 + Math.random() * 0.3;
-          palmGroup.add(leaf);
-        }
-        palmGroup.position.set(
-          side * (ROAD_WIDTH / 2 + 2 + Math.random() * 5), 0,
-          -i * 28 - Math.random() * 10
-        );
-        this.scene.add(palmGroup);
-        this.themeObjects.push(palmGroup);
-        this.decorations.push(palmGroup);
-      }
-    }
-
-    // --- Buildings (loaded KayKit models) ---
-    const brazilBuildings = [MODEL_URLS.buildingA, MODEL_URLS.buildingB, MODEL_URLS.buildingC, MODEL_URLS.buildingD];
-    if (this.modelsReady) {
-      for (const side of [-1, 1]) {
-        for (let i = 0; i < 10; i++) {
-          const url = brazilBuildings[Math.floor(Math.random() * brazilBuildings.length)];
-          const x = side * (ROAD_WIDTH / 2 + 6 + Math.random() * 6);
-          const z = -i * 30 - Math.random() * 15;
-          const s = 1.8 + Math.random() * 1.5;
-          this._placeModel(url, x, 0, z, s, side > 0 ? Math.PI : 0);
-        }
-      }
-
-      // --- Roadside props: bushes, benches, fire hydrants ---
-      this._scatterProps([MODEL_URLS.bush], 16, [1.5, 4], 22, 1.5);
-      this._scatterProps([MODEL_URLS.bench, MODEL_URLS.firehydrant], 8, [1.2, 2], 40, 1.2);
-    }
-
-    // Beach sand
-    const sandGeo = new THREE.PlaneGeometry(200, 30);
+    // =================================================================
+    //  SAND STRIP (between road and ocean, right side)
+    // =================================================================
+    const sandGeo = new THREE.PlaneGeometry(30, 500);
     const sandMat = new THREE.MeshStandardMaterial({ color: 0xf4d99a, roughness: 1 });
     const sand = new THREE.Mesh(sandGeo, sandMat);
     sand.rotation.x = -Math.PI / 2;
-    sand.position.set(60, -0.05, -150);
+    sand.position.set(ROAD_WIDTH / 2 + 15, -0.08, -150);
     this.scene.add(sand);
     this.themeObjects.push(sand);
+
+    // =================================================================
+    //  LEFT SIDE — City buildings + palm trees
+    // =================================================================
+    const brazilBuildings = [MODEL_URLS.buildingA, MODEL_URLS.buildingB, MODEL_URLS.buildingC, MODEL_URLS.buildingD];
+    if (this.modelsReady) {
+      // City buildings on left
+      for (let i = 0; i < 10; i++) {
+        const url = brazilBuildings[Math.floor(Math.random() * brazilBuildings.length)];
+        const x = -(ROAD_WIDTH / 2 + 6 + Math.random() * 6);
+        const z = -i * 30 - Math.random() * 15;
+        this._placeModel(url, x, 0, z, 1.8 + Math.random() * 1.5, 0);
+      }
+
+      // Bushes on left side
+      for (let i = 0; i < 10; i++) {
+        const x = -(ROAD_WIDTH / 2 + 1.5 + Math.random() * 2.5);
+        this._placeModel(MODEL_URLS.bush, x, 0, -i * 32 - Math.random() * 10, 1.5, Math.random() * Math.PI * 2);
+      }
+
+      // Palm trees on left (city side) — loaded model
+      for (let i = 0; i < 10; i++) {
+        const x = -(ROAD_WIDTH / 2 + 2 + Math.random() * 4);
+        this._placeModel(MODEL_URLS.palmTree, x, 0, -i * 30 - Math.random() * 10, 1.2 + Math.random() * 0.6, Math.random() * Math.PI * 2);
+      }
+
+      // =================================================================
+      //  RIGHT SIDE — Beach with props, palm trees, ocean
+      // =================================================================
+
+      // Palm trees along the beach
+      for (let i = 0; i < 12; i++) {
+        const x = ROAD_WIDTH / 2 + 2 + Math.random() * 8;
+        this._placeModel(MODEL_URLS.palmTree, x, 0, -i * 26 - Math.random() * 10, 1.0 + Math.random() * 0.8, Math.random() * Math.PI * 2);
+      }
+
+      // Beach umbrellas + chairs (placed in pairs)
+      for (let i = 0; i < 8; i++) {
+        const x = ROAD_WIDTH / 2 + 10 + Math.random() * 12;
+        const z = -i * 38 - Math.random() * 15;
+        this._placeModel(MODEL_URLS.beachUmbrella, x, 0, z, 1.0 + Math.random() * 0.3, Math.random() * Math.PI * 2);
+        // Chair next to umbrella
+        this._placeModel(MODEL_URLS.beachChair, x + 1.5 + Math.random(), 0, z + (Math.random() - 0.5) * 2, 1.0, Math.random() * Math.PI);
+      }
+
+      // Surfboards stuck in sand
+      for (let i = 0; i < 6; i++) {
+        const x = ROAD_WIDTH / 2 + 8 + Math.random() * 10;
+        const z = -i * 50 - Math.random() * 20;
+        this._placeModel(MODEL_URLS.surfboard, x, 0.3, z, 0.8 + Math.random() * 0.4, Math.random() * Math.PI * 2);
+      }
+
+      // Beach balls scattered
+      for (let i = 0; i < 6; i++) {
+        const x = ROAD_WIDTH / 2 + 6 + Math.random() * 15;
+        const z = -i * 45 - Math.random() * 20;
+        this._placeModel(MODEL_URLS.beachBall, x, 0.3, z, 0.6 + Math.random() * 0.4, Math.random() * Math.PI * 2);
+      }
+
+      // Crabs on the sand
+      for (let i = 0; i < 8; i++) {
+        const x = ROAD_WIDTH / 2 + 5 + Math.random() * 18;
+        const z = -i * 36 - Math.random() * 15;
+        this._placeModel(MODEL_URLS.crab, x, 0, z, 0.4 + Math.random() * 0.3, Math.random() * Math.PI * 2);
+      }
+
+      // Lifeguard towers (2-3 along the beach)
+      for (let i = 0; i < 3; i++) {
+        const x = ROAD_WIDTH / 2 + 14 + Math.random() * 4;
+        const z = -i * 100 - 30;
+        this._placeModel(MODEL_URLS.lifeguardTower, x, 0, z, 1.2, Math.PI * 0.5);
+      }
+
+      // Sailboats on the ocean (static, further out)
+      for (let i = 0; i < 4; i++) {
+        const x = ROAD_WIDTH / 2 + 40 + Math.random() * 30;
+        const z = -i * 80 - 40 - Math.random() * 30;
+        const boat = this._placeStatic(MODEL_URLS.sailboat, x, -0.2, z, 1.5 + Math.random() * 0.5, Math.random() * Math.PI * 2);
+      }
+
+      // Seagulls hovering above the beach
+      for (let i = 0; i < 6; i++) {
+        const x = ROAD_WIDTH / 2 + 8 + Math.random() * 25;
+        const z = -i * 50 - Math.random() * 20;
+        const y = 4 + Math.random() * 6;
+        this._placeStatic(MODEL_URLS.seagull, x, y, z, 0.8 + Math.random() * 0.5, Math.random() * Math.PI * 2);
+      }
+    }
   }
 
   // =====================================================================
@@ -508,6 +573,7 @@ export class Environment {
   update(delta, speed) {
     if (this.sky) this.sky.material.uniforms['time'].value += delta;
     if (this.starField) this.starField.material.uniforms.time.value += delta;
+    if (this.water) this.water.material.uniforms['time'].value += delta * 0.5;
 
     const move = speed * delta;
     for (const deco of this.decorations) {

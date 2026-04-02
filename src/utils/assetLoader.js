@@ -64,4 +64,14 @@ export const MODEL_URLS = {
   carSedan: '/models/props/car_sedan.gltf',
   carTaxi: '/models/props/car_taxi.gltf',
   carHatchback: '/models/props/car_hatchback.gltf',
+  // Beach (Brazil)
+  beachBall: '/models/beach/beach_ball.glb',
+  beachUmbrella: '/models/beach/umbrella.glb',
+  surfboard: '/models/beach/surfboard.glb',
+  crab: '/models/beach/crab.glb',
+  beachChair: '/models/beach/chair.glb',
+  lifeguardTower: '/models/beach/lifeguard.glb',
+  sailboat: '/models/beach/sailboat.glb',
+  seagull: '/models/beach/seagull.glb',
+  palmTree: '/models/beach/palm.glb',
 };
