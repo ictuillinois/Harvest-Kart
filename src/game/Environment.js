@@ -596,8 +596,8 @@ export class Environment {
     const move = speed * delta;
     for (const deco of this.decorations) {
       deco.position.z += move;
-      if (deco.position.z > 80) {
-        deco.position.z -= 350;
+      if (deco.position.z > 60) {
+        deco.position.z -= 400;
       }
     }
   }

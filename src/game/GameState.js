@@ -16,6 +16,9 @@ export class GameState {
     this.selectedMap = 0;
     this.speed = 0;
     this.elapsed = 0;
+    this.combo = 0;
+    this.maxCombo = 0;
+    this.score = 0;
   }
 
   on(event, callback) {
@@ -38,16 +41,36 @@ export class GameState {
   hitPlate() {
     this.platesHit++;
     this.currentCharge++;
-    this.emit('plateHit', { platesHit: this.platesHit, currentCharge: this.currentCharge });
+    this.combo++;
+    if (this.combo > this.maxCombo) this.maxCombo = this.combo;
+
+    // Score: base 100 + combo bonus
+    const comboMultiplier = Math.min(this.combo, 10);
+    this.score += 100 + (comboMultiplier - 1) * 25;
+
+    this.emit('plateHit', {
+      platesHit: this.platesHit,
+      currentCharge: this.currentCharge,
+      combo: this.combo,
+      score: this.score,
+    });
 
     if (this.isBarFull()) {
       this.currentCharge = 0;
       this.lampPostsLit++;
-      this.emit('lampLit', { lampPostsLit: this.lampPostsLit });
+      this.score += 500; // lamp bonus
+      this.emit('lampLit', { lampPostsLit: this.lampPostsLit, score: this.score });
 
       if (this.isComplete()) {
         this.transition('complete');
       }
+    }
+  }
+
+  missPlate() {
+    if (this.combo > 0) {
+      this.combo = 0;
+      this.emit('comboBreak', { combo: 0 });
     }
   }
 

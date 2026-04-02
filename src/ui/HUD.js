@@ -21,6 +21,10 @@ export class HUD {
           <span class="hud-lamp-icon">&#128161;</span>
           <span class="hud-lamp-count" id="hud-lamp-count" aria-live="polite">0 / ${TOTAL_LAMP_POSTS}</span>
         </div>
+        <div class="hud-score-row">
+          <span class="hud-score" id="hud-score">0</span>
+          <span class="hud-combo" id="hud-combo"></span>
+        </div>
       </div>
 
       <div class="hud-right">
@@ -104,6 +108,29 @@ export class HUD {
         text-shadow: 0 1px 3px rgba(0,0,0,0.5);
       }
       .hud-lamp-icon { font-size: 1.1rem; }
+
+      /* Score + combo */
+      .hud-score-row {
+        display: flex; align-items: center; gap: 10px;
+        margin-top: 2px;
+      }
+      .hud-score {
+        font-family: 'Courier New', monospace;
+        font-size: 0.9rem; font-weight: 900;
+        color: rgba(255,255,255,0.8);
+        letter-spacing: 1px;
+      }
+      .hud-combo {
+        font-family: Impact, 'Arial Black', sans-serif;
+        font-size: 0.85rem; font-weight: 700;
+        color: #ffaa00;
+        text-shadow: 0 0 6px rgba(255,170,0,0.5);
+        letter-spacing: 1px;
+        transition: transform 0.15s, opacity 0.15s;
+      }
+      .hud-combo.pop {
+        transform: scale(1.4);
+      }
 
       /* ── Right side ── */
       .hud-right { display: flex; align-items: flex-start; gap: 10px; }
@@ -248,6 +275,8 @@ export class HUD {
     this.lampCount = this.el.querySelector('#hud-lamp-count');
     this.speedoValue = this.el.querySelector('#speedo-value');
     this.speedoFill = this.el.querySelector('#speedo-fill');
+    this.scoreEl = this.el.querySelector('#hud-score');
+    this.comboEl = this.el.querySelector('#hud-combo');
   }
 
   updateCharge(charge) {
@@ -283,6 +312,20 @@ export class HUD {
     }
   }
 
+  updateScore(score) {
+    this.scoreEl.textContent = score.toLocaleString();
+  }
+
+  updateCombo(combo) {
+    if (combo >= 2) {
+      this.comboEl.textContent = `x${combo}`;
+      this.comboEl.classList.add('pop');
+      setTimeout(() => this.comboEl.classList.remove('pop'), 150);
+    } else {
+      this.comboEl.textContent = '';
+    }
+  }
+
   showPause() { this.pauseOverlay.style.display = 'flex'; }
   hidePause() { this.pauseOverlay.style.display = 'none'; }
 
@@ -290,6 +333,8 @@ export class HUD {
     this.updateCharge(0);
     this.updateLamps(0);
     this.updateSpeed(20);
+    this.updateScore(0);
+    this.updateCombo(0);
     this.hidePause();
   }
 

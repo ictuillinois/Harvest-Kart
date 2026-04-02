@@ -142,8 +142,11 @@ export class Plate {
         plate.material.emissiveIntensity = 0.5 + Math.sin(performance.now() * 0.005) * 0.3;
       }
 
-      // Deactivate plates that passed behind
+      // Deactivate plates that passed behind — track misses
       if (plate.position.z > 10) {
+        if (!plate.userData.hit) {
+          plate.userData.missed = true;
+        }
         plate.visible = false;
         plate.userData.active = false;
       }
@@ -164,6 +167,17 @@ export class Plate {
       p.material.opacity = p.userData.life;
       p.scale.setScalar(p.userData.life);
     }
+  }
+
+  checkMisses() {
+    let missed = false;
+    for (const plate of this.plates) {
+      if (plate.userData.missed) {
+        plate.userData.missed = false;
+        missed = true;
+      }
+    }
+    return missed;
   }
 
   setSpawnRate(interval) {

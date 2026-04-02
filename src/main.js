@@ -141,7 +141,7 @@ gameState.on('stateChange', ({ from, to }) => {
       break;
     case 'complete':
       controls.hideButtons();
-      winScreen.show(gameState.platesHit);
+      winScreen.show(gameState.platesHit, gameState.score, gameState.maxCombo);
       break;
   }
 });
@@ -164,8 +164,14 @@ window.addEventListener('keydown', (e) => {
   }
 });
 
-gameState.on('plateHit', ({ currentCharge }) => {
+gameState.on('plateHit', ({ currentCharge, combo, score }) => {
   hud.updateCharge(currentCharge);
+  hud.updateCombo(combo);
+  hud.updateScore(score);
+});
+
+gameState.on('comboBreak', () => {
+  hud.updateCombo(0);
 });
 
 gameState.on('lampLit', ({ lampPostsLit }) => {
@@ -226,6 +232,9 @@ function animate() {
 
     if (plates.checkCollision(gameState.currentLane)) {
       gameState.hitPlate();
+    }
+    if (plates.checkMisses()) {
+      gameState.missPlate();
     }
 
     camera.position.x += (kart.group.position.x * 0.3 - camera.position.x) * 0.1;

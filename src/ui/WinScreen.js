@@ -11,7 +11,17 @@ export class WinScreen {
           <div class="win-stat">
             <span class="win-stat-icon">&#9889;</span>
             <span class="win-stat-value" id="win-plates">0</span>
-            <span class="win-stat-label">Plates Hit</span>
+            <span class="win-stat-label">Plates</span>
+          </div>
+          <div class="win-stat">
+            <span class="win-stat-icon">&#9733;</span>
+            <span class="win-stat-value" id="win-score">0</span>
+            <span class="win-stat-label">Score</span>
+          </div>
+          <div class="win-stat">
+            <span class="win-stat-icon">&#128293;</span>
+            <span class="win-stat-value" id="win-combo">0</span>
+            <span class="win-stat-label">Best Combo</span>
           </div>
         </div>
         <button class="win-btn" id="win-btn">PLAY AGAIN</button>
@@ -104,8 +114,10 @@ export class WinScreen {
     this.el.querySelector('#win-btn').addEventListener('click', () => onPlayAgain());
   }
 
-  show(platesHit) {
+  show(platesHit, score = 0, maxCombo = 0) {
     this.el.querySelector('#win-plates').textContent = platesHit;
+    this.el.querySelector('#win-score').textContent = score.toLocaleString();
+    this.el.querySelector('#win-combo').textContent = 'x' + maxCombo;
     this.el.style.display = 'flex';
   }
 
