@@ -42,7 +42,7 @@ const road = new Road(scene);
 const kart = new Kart(scene);
 const plates = new Plate(scene);
 const lampPosts = new LampPost(scene);
-const environment = new Environment(scene);
+const environment = new Environment(scene, renderer);
 
 // Build a default environment so the 3D scene isn't empty on the menu
 environment.build(0);
@@ -138,6 +138,9 @@ function animate() {
 
   updateTweens();
 
+  // Always animate sky (clouds, stars) even on menus
+  environment.update(delta, gameState.state === 'playing' ? gameState.speed : 0);
+
   if (gameState.state === 'playing') {
     gameState.speed = Math.min(gameState.speed + ACCELERATION * delta, MAX_SPEED);
     gameState.elapsed += delta;
@@ -148,7 +151,6 @@ function animate() {
     kart.update(delta, speed);
     plates.update(delta, speed);
     lampPosts.update(delta, speed);
-    environment.update(delta, speed);
 
     if (plates.checkCollision(gameState.currentLane)) {
       gameState.hitPlate();
