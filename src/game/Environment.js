@@ -253,32 +253,47 @@ export class Environment {
     // the sun disc. MeshBasicMaterial glow spheres were blowing out the
     // bloom post-processing pass with pure white.
 
-    // ── OCEAN — right side, close enough to be visible ──
-    // Water plane starts at x=16 (just past the sand), extends far right
-    const waterGeo = new THREE.PlaneGeometry(200, 500);
+    // ── OCEAN — bright tropical water, close to road for visibility ──
+    const waterGeo = new THREE.PlaneGeometry(300, 600);
     const waterNormals = new THREE.TextureLoader().load(asset('textures/waternormals.jpg'), (tex) => {
       tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
     });
     this.water = new Water(waterGeo, {
       textureWidth: 512, textureHeight: 512, waterNormals,
-      sunDirection: this.sunDirection.clone(), sunColor: 0xffffff,
-      waterColor: 0x006994, distortionScale: 2.5,
-      fog: this.scene.fog !== undefined, alpha: 0.9,
+      sunDirection: this.sunDirection.clone(),
+      sunColor: 0xffffee,
+      waterColor: 0x001e0f,
+      distortionScale: 5.0,     // strong visible waves
+      fog: this.scene.fog !== undefined,
+      alpha: 0.95,
     });
     this.water.rotation.x = -Math.PI / 2;
-    this.water.position.set(ROAD_WIDTH / 2 + 22, -0.2, -100);
+    this.water.position.set(ROAD_WIDTH / 2 + 8, -0.12, -100);
+    // Override to bright tropical turquoise — visible against sand
+    this.water.material.uniforms['waterColor'].value.set(0x006688);
     this.scene.add(this.water);
     this.themeObjects.push(this.water);
 
-    // ── SAND — narrow strip between road edge and ocean ──
+    // ── SAND — bright beach strip right at road edge ──
     const sand = new THREE.Mesh(
-      new THREE.PlaneGeometry(12, 500),
-      new THREE.MeshStandardMaterial({ color: 0xf4d99a, roughness: 1 })
+      new THREE.PlaneGeometry(8, 600),
+      new THREE.MeshStandardMaterial({ color: 0xf5deb3, roughness: 0.95 })
     );
     sand.rotation.x = -Math.PI / 2;
-    sand.position.set(ROAD_WIDTH / 2 + 8, -0.05, -150);
+    sand.position.set(ROAD_WIDTH / 2 + 2, -0.02, -150);
+    sand.receiveShadow = true;
     this.scene.add(sand);
     this.themeObjects.push(sand);
+
+    // ── FOAM LINE — white strip where sand meets water ──
+    const foam = new THREE.Mesh(
+      new THREE.PlaneGeometry(1.0, 600),
+      new THREE.MeshBasicMaterial({ color: 0xeeffff, transparent: true, opacity: 0.5 })
+    );
+    foam.rotation.x = -Math.PI / 2;
+    foam.position.set(ROAD_WIDTH / 2 + 6, 0.0, -150);
+    this.scene.add(foam);
+    this.themeObjects.push(foam);
 
     if (!this.modelsReady) return;
 
