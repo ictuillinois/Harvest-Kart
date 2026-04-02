@@ -221,140 +221,98 @@ export class Environment {
 
   // =====================================================================
   //  BRAZIL — coastal highway with beach & ocean
+  //  Layout: [City LEFT] | ROAD | [Sand + Beach RIGHT] [Ocean]
   // =====================================================================
   _buildBrazil() {
-    // --- Sun glow ---
+    // Sun glow
     const sunPos = this.sunDirection.clone().multiplyScalar(300);
     for (const [size, color, opacity] of [[30, 0xffaa33, 0.12], [18, 0xffdd66, 0.2], [8, 0xffee88, 1.0]]) {
       const geo = new THREE.SphereGeometry(size, 32, 32);
-      const mat = new THREE.MeshBasicMaterial({
-        color, transparent: opacity < 1, opacity, depthWrite: false
-      });
+      const mat = new THREE.MeshBasicMaterial({ color, transparent: opacity < 1, opacity, depthWrite: false });
       const mesh = new THREE.Mesh(geo, mat);
       mesh.position.copy(sunPos);
       this.scene.add(mesh);
       this.themeObjects.push(mesh);
     }
 
-    // =================================================================
-    //  ANIMATED OCEAN (right side of road)
-    // =================================================================
+    // Ocean
     const waterGeo = new THREE.PlaneGeometry(400, 400);
     const waterNormals = new THREE.TextureLoader().load(asset('textures/waternormals.jpg'), (tex) => {
       tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
     });
     this.water = new Water(waterGeo, {
-      textureWidth: 512,
-      textureHeight: 512,
-      waterNormals,
-      sunDirection: this.sunDirection.clone(),
-      sunColor: 0xffffff,
-      waterColor: 0x001e0f,
-      distortionScale: 3.7,
-      fog: this.scene.fog !== undefined,
-      alpha: 0.9,
+      textureWidth: 512, textureHeight: 512, waterNormals,
+      sunDirection: this.sunDirection.clone(), sunColor: 0xffffff,
+      waterColor: 0x001e0f, distortionScale: 3.7,
+      fog: this.scene.fog !== undefined, alpha: 0.9,
     });
     this.water.rotation.x = -Math.PI / 2;
     this.water.position.set(ROAD_WIDTH / 2 + 60, -0.4, -150);
     this.scene.add(this.water);
     this.themeObjects.push(this.water);
 
-    // =================================================================
-    //  SAND STRIP (between road and ocean, right side)
-    // =================================================================
+    // Sand strip
     const sandGeo = new THREE.PlaneGeometry(30, 500);
     const sandMat = new THREE.MeshStandardMaterial({ color: 0xf4d99a, roughness: 1 });
     const sand = new THREE.Mesh(sandGeo, sandMat);
     sand.rotation.x = -Math.PI / 2;
-    sand.position.set(ROAD_WIDTH / 2 + 15, -0.08, -150);
+    sand.position.set(ROAD_WIDTH / 2 + 18, -0.08, -150);
     this.scene.add(sand);
     this.themeObjects.push(sand);
 
-    // =================================================================
-    //  LEFT SIDE — City buildings + palm trees
-    // =================================================================
-    const brazilBuildings = [MODEL_URLS.buildingA, MODEL_URLS.buildingB, MODEL_URLS.buildingC, MODEL_URLS.buildingD];
     if (this.modelsReady) {
-      // City buildings on left
-      for (let i = 0; i < 10; i++) {
-        const url = brazilBuildings[Math.floor(Math.random() * brazilBuildings.length)];
-        const x = -(ROAD_WIDTH / 2 + 6 + Math.random() * 6);
-        const z = -i * 30 - Math.random() * 15;
-        this._placeModel(url, x, 0, z, 1.8 + Math.random() * 1.5, 0);
-      }
-
-      // Bushes on left side
-      for (let i = 0; i < 10; i++) {
-        const x = -(ROAD_WIDTH / 2 + 1.5 + Math.random() * 2.5);
-        this._placeModel(MODEL_URLS.bush, x, 0, -i * 32 - Math.random() * 10, 1.5, Math.random() * Math.PI * 2);
-      }
-
-      // Palm trees on left (city side) — loaded model
-      for (let i = 0; i < 10; i++) {
-        const x = -(ROAD_WIDTH / 2 + 2 + Math.random() * 4);
-        this._placeModel(MODEL_URLS.palmTree, x, 0, -i * 30 - Math.random() * 10, 1.2 + Math.random() * 0.6, Math.random() * Math.PI * 2);
-      }
-
-      // =================================================================
-      //  RIGHT SIDE — Beach with props, palm trees, ocean
-      // =================================================================
-
-      // Palm trees along the beach
-      for (let i = 0; i < 12; i++) {
-        const x = ROAD_WIDTH / 2 + 2 + Math.random() * 8;
-        this._placeModel(MODEL_URLS.palmTree, x, 0, -i * 26 - Math.random() * 10, 1.0 + Math.random() * 0.8, Math.random() * Math.PI * 2);
-      }
-
-      // Beach umbrellas + chairs (placed in pairs)
+      // LEFT: City buildings (pushed far from road, small scale)
+      const bldgs = [MODEL_URLS.buildingA, MODEL_URLS.buildingB, MODEL_URLS.buildingC, MODEL_URLS.buildingD];
       for (let i = 0; i < 8; i++) {
-        const x = ROAD_WIDTH / 2 + 10 + Math.random() * 12;
-        const z = -i * 38 - Math.random() * 15;
-        this._placeModel(MODEL_URLS.beachUmbrella, x, 0, z, 1.0 + Math.random() * 0.3, Math.random() * Math.PI * 2);
-        // Chair next to umbrella
-        this._placeModel(MODEL_URLS.beachChair, x + 1.5 + Math.random(), 0, z + (Math.random() - 0.5) * 2, 1.0, Math.random() * Math.PI);
+        const url = bldgs[Math.floor(Math.random() * bldgs.length)];
+        this._placeModel(url, -(ROAD_WIDTH / 2 + 10 + Math.random() * 8), 0, -i * 35 - Math.random() * 15, 0.7 + Math.random() * 0.5, Math.random() * Math.PI);
       }
 
-      // Surfboards stuck in sand
-      for (let i = 0; i < 6; i++) {
-        const x = ROAD_WIDTH / 2 + 8 + Math.random() * 10;
-        const z = -i * 50 - Math.random() * 20;
-        this._placeModel(MODEL_URLS.surfboard, x, 0.3, z, 0.8 + Math.random() * 0.4, Math.random() * Math.PI * 2);
-      }
-
-      // Beach balls scattered
-      for (let i = 0; i < 6; i++) {
-        const x = ROAD_WIDTH / 2 + 6 + Math.random() * 15;
-        const z = -i * 45 - Math.random() * 20;
-        this._placeModel(MODEL_URLS.beachBall, x, 0.3, z, 0.6 + Math.random() * 0.4, Math.random() * Math.PI * 2);
-      }
-
-      // Crabs on the sand
+      // LEFT: Palm trees along city side
       for (let i = 0; i < 8; i++) {
-        const x = ROAD_WIDTH / 2 + 5 + Math.random() * 18;
-        const z = -i * 36 - Math.random() * 15;
-        this._placeModel(MODEL_URLS.crab, x, 0, z, 0.4 + Math.random() * 0.3, Math.random() * Math.PI * 2);
+        this._placeModel(MODEL_URLS.palmTree, -(ROAD_WIDTH / 2 + 3 + Math.random() * 4), 0, -i * 35 - Math.random() * 10, 0.5 + Math.random() * 0.3, Math.random() * Math.PI * 2);
       }
 
-      // Lifeguard towers (2-3 along the beach)
-      for (let i = 0; i < 3; i++) {
-        const x = ROAD_WIDTH / 2 + 14 + Math.random() * 4;
-        const z = -i * 100 - 30;
-        this._placeModel(MODEL_URLS.lifeguardTower, x, 0, z, 1.2, Math.PI * 0.5);
+      // LEFT: Bushes
+      for (let i = 0; i < 6; i++) {
+        this._placeModel(MODEL_URLS.bush, -(ROAD_WIDTH / 2 + 2 + Math.random() * 3), 0, -i * 40 - Math.random() * 15, 0.5, Math.random() * Math.PI * 2);
       }
 
-      // Sailboats on the ocean (static, further out)
+      // RIGHT: Palm trees along beach
+      for (let i = 0; i < 10; i++) {
+        this._placeModel(MODEL_URLS.palmTree, ROAD_WIDTH / 2 + 3 + Math.random() * 6, 0, -i * 30 - Math.random() * 10, 0.5 + Math.random() * 0.3, Math.random() * Math.PI * 2);
+      }
+
+      // RIGHT: Beach umbrellas + chairs
+      for (let i = 0; i < 6; i++) {
+        const x = ROAD_WIDTH / 2 + 12 + Math.random() * 10;
+        const z = -i * 45 - Math.random() * 15;
+        this._placeModel(MODEL_URLS.beachUmbrella, x, 0, z, 0.4, Math.random() * Math.PI * 2);
+        this._placeModel(MODEL_URLS.beachChair, x + 1.5, 0, z + 1, 0.4, Math.random() * Math.PI);
+      }
+
+      // RIGHT: Surfboards, beach balls, crabs (small props)
       for (let i = 0; i < 4; i++) {
-        const x = ROAD_WIDTH / 2 + 40 + Math.random() * 30;
-        const z = -i * 80 - 40 - Math.random() * 30;
-        const boat = this._placeStatic(MODEL_URLS.sailboat, x, -0.2, z, 1.5 + Math.random() * 0.5, Math.random() * Math.PI * 2);
+        this._placeModel(MODEL_URLS.surfboard, ROAD_WIDTH / 2 + 10 + Math.random() * 8, 0.2, -i * 60 - Math.random() * 20, 0.3, Math.random() * Math.PI * 2);
+        this._placeModel(MODEL_URLS.beachBall, ROAD_WIDTH / 2 + 8 + Math.random() * 12, 0.2, -i * 55 - 10 - Math.random() * 20, 0.2, 0);
+      }
+      for (let i = 0; i < 5; i++) {
+        this._placeModel(MODEL_URLS.crab, ROAD_WIDTH / 2 + 6 + Math.random() * 15, 0, -i * 50 - Math.random() * 15, 0.15, Math.random() * Math.PI * 2);
       }
 
-      // Seagulls hovering above the beach
-      for (let i = 0; i < 6; i++) {
-        const x = ROAD_WIDTH / 2 + 8 + Math.random() * 25;
-        const z = -i * 50 - Math.random() * 20;
-        const y = 4 + Math.random() * 6;
-        this._placeStatic(MODEL_URLS.seagull, x, y, z, 0.8 + Math.random() * 0.5, Math.random() * Math.PI * 2);
+      // RIGHT: Lifeguard towers
+      for (let i = 0; i < 2; i++) {
+        this._placeModel(MODEL_URLS.lifeguardTower, ROAD_WIDTH / 2 + 16 + Math.random() * 4, 0, -i * 120 - 40, 0.5, Math.PI * 0.5);
+      }
+
+      // Ocean: sailboats (static, far out)
+      for (let i = 0; i < 3; i++) {
+        this._placeStatic(MODEL_URLS.sailboat, ROAD_WIDTH / 2 + 45 + Math.random() * 25, -0.3, -i * 90 - 40, 0.6, Math.random() * Math.PI * 2);
+      }
+
+      // Seagulls (static, hovering)
+      for (let i = 0; i < 4; i++) {
+        this._placeStatic(MODEL_URLS.seagull, ROAD_WIDTH / 2 + 10 + Math.random() * 20, 5 + Math.random() * 4, -i * 70 - Math.random() * 20, 0.3, Math.random() * Math.PI * 2);
       }
     }
   }
@@ -363,25 +321,11 @@ export class Environment {
   //  USA — night city
   // =====================================================================
   _buildUSA() {
-    // --- Moon ---
+    // Moon
     const moonGroup = new THREE.Group();
-    const moonGeo = new THREE.SphereGeometry(10, 32, 32);
-    const moonMat = new THREE.MeshBasicMaterial({ color: 0xeeeeff });
-    moonGroup.add(new THREE.Mesh(moonGeo, moonMat));
-
-    const craterMat = new THREE.MeshBasicMaterial({ color: 0xccccdd });
-    for (let i = 0; i < 5; i++) {
-      const cGeo = new THREE.CircleGeometry(1 + Math.random() * 2, 12);
-      const crater = new THREE.Mesh(cGeo, craterMat);
-      const a1 = Math.random() * 0.6 - 0.3, a2 = Math.random() * 0.6 - 0.3;
-      crater.position.set(Math.sin(a1) * 9, Math.sin(a2) * 9, -Math.cos(a1) * Math.cos(a2) * 10 - 0.5);
-      crater.lookAt(0, 0, 0);
-      moonGroup.add(crater);
-    }
-
-    const moonGlowGeo = new THREE.SphereGeometry(18, 32, 32);
+    moonGroup.add(new THREE.Mesh(new THREE.SphereGeometry(10, 32, 32), new THREE.MeshBasicMaterial({ color: 0xeeeeff })));
     const moonGlowMat = new THREE.MeshBasicMaterial({ color: 0x8888cc, transparent: true, opacity: 0.08, depthWrite: false });
-    moonGroup.add(new THREE.Mesh(moonGlowGeo, moonGlowMat));
+    moonGroup.add(new THREE.Mesh(new THREE.SphereGeometry(18, 32, 32), moonGlowMat));
     moonGroup.position.set(-60, 130, -280);
     this.scene.add(moonGroup);
     this.themeObjects.push(moonGroup);
@@ -391,60 +335,50 @@ export class Environment {
     this.scene.add(moonLight);
     this.themeObjects.push(moonLight);
 
-    // --- Tall buildings (loaded KayKit models, scaled up) ---
-    const usaBuildings = [
-      MODEL_URLS.buildingE, MODEL_URLS.buildingF, MODEL_URLS.buildingG, MODEL_URLS.buildingH,
-      MODEL_URLS.buildingC, MODEL_URLS.buildingD,
-    ];
+    // Buildings (scaled reasonably, pushed back from road)
+    const usaBuildings = [MODEL_URLS.buildingE, MODEL_URLS.buildingF, MODEL_URLS.buildingG, MODEL_URLS.buildingH, MODEL_URLS.buildingC, MODEL_URLS.buildingD];
 
     if (this.modelsReady) {
       for (const side of [-1, 1]) {
-        for (let i = 0; i < 16; i++) {
+        for (let i = 0; i < 12; i++) {
           const url = usaBuildings[Math.floor(Math.random() * usaBuildings.length)];
-          const x = side * (ROAD_WIDTH / 2 + 4 + Math.random() * 10);
-          const z = -i * 22 - Math.random() * 10;
-          const s = 3.0 + Math.random() * 4.0; // tall city scale
+          const x = side * (ROAD_WIDTH / 2 + 8 + Math.random() * 10);
+          const z = -i * 25 - Math.random() * 10;
+          const s = 1.2 + Math.random() * 1.5;
           const model = this._placeModel(url, x, 0, z, s, side > 0 ? Math.PI : 0);
-
-          // Tint buildings darker for nighttime city feel
           model.traverse((child) => {
             if (child.isMesh && child.material) {
               child.material = child.material.clone();
-              child.material.color.multiplyScalar(0.35);
+              child.material.color.multiplyScalar(0.45);
             }
           });
         }
       }
 
-      // Roadside urban props
+      // Roadside props (smaller scales, further from road)
       this._scatterProps(
-        [MODEL_URLS.dumpster, MODEL_URLS.trafficLight, MODEL_URLS.bench, MODEL_URLS.firehydrant,
-         MODEL_URLS.trashcan, MODEL_URLS.mailbox],
-        16, [1.2, 3], 22, 1.3
+        [MODEL_URLS.dumpster, MODEL_URLS.trafficLight, MODEL_URLS.bench, MODEL_URLS.firehydrant, MODEL_URLS.trashcan, MODEL_URLS.mailbox],
+        12, [2, 5], 28, 0.5
       );
 
-      // Traffic cones along road edges
-      this._scatterProps([MODEL_URLS.trafficCone], 12, [0.8, 1.5], 26, 1.0);
+      // Traffic cones
+      this._scatterProps([MODEL_URLS.trafficCone], 8, [1.5, 2.5], 35, 0.4);
 
-      // Tire stacks and barriers at roadside
-      this._scatterProps([MODEL_URLS.tires, MODEL_URLS.raceBarrier], 6, [1.5, 3.5], 50, 1.0);
+      // Tire stacks and barriers
+      this._scatterProps([MODEL_URLS.tires, MODEL_URLS.raceBarrier], 4, [2.5, 5], 65, 0.4);
 
-      // Parked cars along roadside
-      this._scatterProps(
-        [MODEL_URLS.carSedan, MODEL_URLS.carTaxi, MODEL_URLS.carHatchback],
-        8, [1.5, 3], 40, 1.2
-      );
+      // Parked cars
+      this._scatterProps([MODEL_URLS.carSedan, MODEL_URLS.carTaxi, MODEL_URLS.carHatchback], 6, [2, 4], 50, 0.5);
     }
 
-    // --- Neon signs (keep as emissive boxes — good for neon effect) ---
+    // Neon signs (attached to building height, pushed back)
     const neonColors = [0xff00ff, 0x00ffff, 0xff4444, 0x44ff44];
     for (let i = 0; i < 6; i++) {
       const side = i % 2 === 0 ? -1 : 1;
-      const nGeo = new THREE.BoxGeometry(2 + Math.random() * 2, 0.8, 0.1);
-      const nColor = neonColors[Math.floor(Math.random() * neonColors.length)];
-      const nMat = new THREE.MeshBasicMaterial({ color: nColor });
+      const nGeo = new THREE.BoxGeometry(2.5, 0.6, 0.1);
+      const nMat = new THREE.MeshBasicMaterial({ color: neonColors[Math.floor(Math.random() * neonColors.length)] });
       const neon = new THREE.Mesh(nGeo, nMat);
-      neon.position.set(side * (ROAD_WIDTH / 2 + 3), 4 + Math.random() * 3, -i * 40 - 20);
+      neon.position.set(side * (ROAD_WIDTH / 2 + 6), 3 + Math.random() * 2, -i * 45 - 20);
       this.scene.add(neon);
       this.themeObjects.push(neon);
       this.decorations.push(neon);
@@ -455,26 +389,26 @@ export class Environment {
   //  PERU — mountains & valleys
   // =====================================================================
   _buildPeru() {
-    // --- Mountains (keep procedural — they look good at large scale) ---
+    // Mountains (distant, large — not scrolling)
     const mountainColors = [0x556B2F, 0x4a7a3a, 0x6B8E23, 0x5a8a4a, 0x3a6a2a];
     for (const side of [-1, 1]) {
-      for (let i = 0; i < 8; i++) {
-        const radius = 15 + Math.random() * 25;
-        const height = 20 + Math.random() * 50;
+      for (let i = 0; i < 6; i++) {
+        const radius = 20 + Math.random() * 30;
+        const height = 25 + Math.random() * 45;
         const color = mountainColors[Math.floor(Math.random() * mountainColors.length)];
-        const mGeo = new THREE.ConeGeometry(radius, height, 6 + Math.floor(Math.random() * 4));
+        const mGeo = new THREE.ConeGeometry(radius, height, 6 + Math.floor(Math.random() * 3));
         const mMat = new THREE.MeshStandardMaterial({ color, roughness: 0.9 });
         const mountain = new THREE.Mesh(mGeo, mMat);
         mountain.position.set(
-          side * (ROAD_WIDTH / 2 + 15 + Math.random() * 30),
-          height / 2 - 2,
-          -i * 40 - Math.random() * 20
+          side * (ROAD_WIDTH / 2 + 25 + Math.random() * 35),
+          height / 2 - 3,
+          -i * 50 - Math.random() * 20
         );
         this.scene.add(mountain);
         this.themeObjects.push(mountain);
 
         if (height > 40) {
-          const snowGeo = new THREE.ConeGeometry(radius * 0.25, height * 0.15, 6);
+          const snowGeo = new THREE.ConeGeometry(radius * 0.2, height * 0.12, 6);
           const snowMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.5 });
           const snow = new THREE.Mesh(snowGeo, snowMat);
           snow.position.y = height * 0.45;
@@ -483,18 +417,18 @@ export class Environment {
       }
     }
 
-    // --- Rolling green hills ---
+    // Rolling hills (smaller, further from road)
     for (const side of [-1, 1]) {
-      for (let i = 0; i < 10; i++) {
-        const hillGeo = new THREE.SphereGeometry(8 + Math.random() * 6, 12, 8);
+      for (let i = 0; i < 6; i++) {
+        const hillGeo = new THREE.SphereGeometry(5 + Math.random() * 4, 10, 6);
         const hillMat = new THREE.MeshStandardMaterial({
           color: 0x4a8a2a + Math.floor(Math.random() * 0x101010), roughness: 0.9
         });
         const hill = new THREE.Mesh(hillGeo, hillMat);
-        hill.scale.y = 0.4;
+        hill.scale.y = 0.3;
         hill.position.set(
-          side * (ROAD_WIDTH / 2 + 5 + Math.random() * 10), -1,
-          -i * 30 - Math.random() * 15
+          side * (ROAD_WIDTH / 2 + 8 + Math.random() * 12), -1.5,
+          -i * 45 - Math.random() * 15
         );
         this.scene.add(hill);
         this.themeObjects.push(hill);
@@ -502,34 +436,31 @@ export class Environment {
       }
     }
 
-    // --- Trees (procedural + loaded bushes alongside) ---
+    // Trees (procedural, properly spaced from road)
     const foliageColors = [0x2d5a1e, 0x3a6a2a, 0x1a5a1a, 0x4a8a3a];
     const trunkMat = new THREE.MeshStandardMaterial({ color: 0x4a3728 });
 
     for (const side of [-1, 1]) {
-      for (let i = 0; i < 14; i++) {
+      for (let i = 0; i < 10; i++) {
         const treeGroup = new THREE.Group();
-        const trunkH = 1.5 + Math.random() * 2;
-        const trunkGeo = new THREE.CylinderGeometry(0.12, 0.18, trunkH, 6);
+        const trunkH = 1.5 + Math.random() * 1.5;
+        const trunkGeo = new THREE.CylinderGeometry(0.1, 0.15, trunkH, 6);
         const trunk = new THREE.Mesh(trunkGeo, trunkMat);
         trunk.position.y = trunkH / 2;
         treeGroup.add(trunk);
 
         const fColor = foliageColors[Math.floor(Math.random() * foliageColors.length)];
         const fMat = new THREE.MeshStandardMaterial({ color: fColor, roughness: 0.8 });
-        for (let f = 0; f < 3; f++) {
-          const fGeo = new THREE.SphereGeometry(0.8 + Math.random() * 0.6, 8, 6);
+        for (let f = 0; f < 2; f++) {
+          const fGeo = new THREE.SphereGeometry(0.6 + Math.random() * 0.4, 6, 5);
           const foliage = new THREE.Mesh(fGeo, fMat);
-          foliage.position.set(
-            (Math.random() - 0.5) * 0.6, trunkH + 0.5 + f * 0.4,
-            (Math.random() - 0.5) * 0.6
-          );
+          foliage.position.set((Math.random() - 0.5) * 0.4, trunkH + 0.3 + f * 0.3, (Math.random() - 0.5) * 0.4);
           treeGroup.add(foliage);
         }
 
         treeGroup.position.set(
-          side * (ROAD_WIDTH / 2 + 2 + Math.random() * 6), 0,
-          -i * 22 - Math.random() * 10
+          side * (ROAD_WIDTH / 2 + 3 + Math.random() * 6), 0,
+          -i * 28 - Math.random() * 10
         );
         this.scene.add(treeGroup);
         this.themeObjects.push(treeGroup);
@@ -537,47 +468,44 @@ export class Environment {
       }
     }
 
-    // --- Loaded models ---
+    // Loaded models
     if (this.modelsReady) {
-      // Bushes and flowers scattered between trees
-      this._scatterProps([MODEL_URLS.bush], 16, [1.5, 8], 20, 1.8);
-      this._scatterProps([MODEL_URLS.flowers], 14, [2, 10], 24, 0.8);
+      // Bushes (small, spread out)
+      this._scatterProps([MODEL_URLS.bush], 10, [3, 8], 28, 0.5);
 
-      // Llamas grazing alongside the road
-      this._scatterProps([MODEL_URLS.llama], 8, [3, 12], 38, 0.6);
+      // Flowers
+      this._scatterProps([MODEL_URLS.flowers], 8, [3, 10], 32, 0.3);
 
-      // Stone walls (Inca ruins alongside road)
-      this._scatterProps([MODEL_URLS.stoneWall], 6, [2, 6], 52, 1.2);
+      // Llamas (alongside road, moderate distance)
+      this._scatterProps([MODEL_URLS.llama], 5, [4, 10], 55, 0.25);
 
-      // Andean huts (small villages)
-      for (let i = 0; i < 5; i++) {
+      // Stone walls
+      this._scatterProps([MODEL_URLS.stoneWall], 4, [3, 7], 70, 0.5);
+
+      // Andean huts (well back from road)
+      for (let i = 0; i < 3; i++) {
         const side = i % 2 === 0 ? -1 : 1;
-        this._placeModel(
-          MODEL_URLS.hut,
-          side * (ROAD_WIDTH / 2 + 8 + Math.random() * 6), 0,
-          -i * 65 - 30,
-          1.2 + Math.random() * 0.5, Math.random() * Math.PI * 2
-        );
+        this._placeModel(MODEL_URLS.hut, side * (ROAD_WIDTH / 2 + 12 + Math.random() * 5), 0, -i * 90 - 40, 0.5, Math.random() * Math.PI * 2);
       }
 
-      // Race barriers along road edges
-      this._scatterProps([MODEL_URLS.tires, MODEL_URLS.raceBarrier], 6, [0.8, 2], 55, 0.9);
+      // Race barriers
+      this._scatterProps([MODEL_URLS.tires, MODEL_URLS.raceBarrier], 4, [1.5, 3], 70, 0.35);
     }
 
-    // --- Inca-like terraces (keep procedural) ---
+    // Inca terraces (procedural, pushed further back)
     const terrMat = new THREE.MeshStandardMaterial({ color: 0x8B7355, roughness: 0.9 });
     for (let i = 0; i < 3; i++) {
       const terrGroup = new THREE.Group();
       for (let level = 0; level < 4; level++) {
-        const w = 6 - level * 1.2;
-        const geo = new THREE.BoxGeometry(w, 1, w);
+        const w = 4 - level * 0.8;
+        const geo = new THREE.BoxGeometry(w, 0.8, w);
         const step = new THREE.Mesh(geo, terrMat);
-        step.position.y = level * 1;
+        step.position.y = level * 0.8;
         terrGroup.add(step);
       }
       terrGroup.position.set(
-        (i % 2 === 0 ? -1 : 1) * (ROAD_WIDTH / 2 + 10 + Math.random() * 5), 0,
-        -i * 80 - 40
+        (i % 2 === 0 ? -1 : 1) * (ROAD_WIDTH / 2 + 14 + Math.random() * 5), 0,
+        -i * 100 - 50
       );
       this.scene.add(terrGroup);
       this.themeObjects.push(terrGroup);
