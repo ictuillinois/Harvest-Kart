@@ -7,10 +7,13 @@ export const ROAD_WIDTH = 12;
 export const ROAD_SEGMENT_LENGTH = 100;
 export const ROAD_SEGMENT_COUNT = 3;
 
-// Speeds
-export const INITIAL_SPEED = 20;
-export const MAX_SPEED = 35;
-export const ACCELERATION = 0.3; // per second
+// Speeds (internal units — mapped to 20-70 mph for display)
+export const MIN_SPEED = 15;          // idle / coast speed
+export const MAX_SPEED = 45;          // full pedal speed
+export const PEDAL_ACCELERATION = 25; // units/sec when pedal held
+export const COAST_DECELERATION = 12; // units/sec when pedal released
+export const MIN_SPEED_MPH = 20;
+export const MAX_SPEED_MPH = 70;
 
 // Lane switching
 export const LANE_SWITCH_DURATION = 200; // ms

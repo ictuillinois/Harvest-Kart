@@ -16,7 +16,9 @@ import { WinScreen } from './ui/WinScreen.js';
 
 import { setupControls } from './utils/controls.js';
 import {
-  INITIAL_SPEED, MAX_SPEED, ACCELERATION,
+  MIN_SPEED, MAX_SPEED,
+  PEDAL_ACCELERATION, COAST_DECELERATION,
+  MIN_SPEED_MPH, MAX_SPEED_MPH,
   CAMERA_OFFSET, CAMERA_LOOK_AHEAD
 } from './utils/constants.js';
 
@@ -99,8 +101,9 @@ gameState.on('stateChange', ({ from, to }) => {
     case 'playing':
       hud.show();
       controls.showButtons();
-      gameState.speed = INITIAL_SPEED;
+      gameState.speed = MIN_SPEED;
       gameState.elapsed = 0;
+      hud.updateSpeed(MIN_SPEED_MPH);
       break;
     case 'complete':
       controls.hideButtons();
@@ -118,6 +121,12 @@ gameState.on('lampLit', ({ lampPostsLit }) => {
   lampPosts.lightNext();
   hud.updateCharge(0);
 });
+
+// --- Helper: map internal speed to display MPH ---
+function speedToMph(speed) {
+  const t = (speed - MIN_SPEED) / (MAX_SPEED - MIN_SPEED);
+  return MIN_SPEED_MPH + t * (MAX_SPEED_MPH - MIN_SPEED_MPH);
+}
 
 // --- Resize ---
 window.addEventListener('resize', () => {
@@ -139,11 +148,29 @@ function animate() {
   environment.update(delta, gameState.state === 'playing' ? gameState.speed : 0);
 
   if (gameState.state === 'playing') {
-    gameState.speed = Math.min(gameState.speed + ACCELERATION * delta, MAX_SPEED);
     gameState.elapsed += delta;
+
+    // --- Pedal-driven speed ---
+    if (controls.isPedalDown()) {
+      // Accelerate toward max
+      gameState.speed = Math.min(
+        gameState.speed + PEDAL_ACCELERATION * delta,
+        MAX_SPEED
+      );
+    } else {
+      // Decelerate toward idle
+      gameState.speed = Math.max(
+        gameState.speed - COAST_DECELERATION * delta,
+        MIN_SPEED
+      );
+    }
 
     const speed = gameState.speed;
 
+    // Update HUD speedometer
+    hud.updateSpeed(speedToMph(speed));
+
+    // Update game objects
     road.update(delta, speed);
     kart.update(delta, speed);
     plates.update(delta, speed);
@@ -153,6 +180,7 @@ function animate() {
       gameState.hitPlate();
     }
 
+    // Camera follows kart laterally
     camera.position.x += (kart.group.position.x * 0.3 - camera.position.x) * 0.1;
   }
 
@@ -161,16 +189,9 @@ function animate() {
 
 // --- Bootstrap: preload models, then show start screen ---
 async function init() {
-  // Start rendering immediately (sky will show while models load)
   animate();
-
-  // Preload all 3D models in background
   await environment.preload();
-
-  // Build default environment with loaded models
   await environment.build(0);
-
-  // Show start screen
   startScreen.show();
 }
 
