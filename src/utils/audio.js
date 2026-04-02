@@ -1,9 +1,33 @@
 // Procedural audio using Web Audio API — no files needed.
 let ctx = null;
+let masterGain = null;
+let noiseBuffer = null; // reused across all crackle sounds
 
 function getCtx() {
-  if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
+  if (!ctx) {
+    ctx = new (window.AudioContext || window.webkitAudioContext)();
+    masterGain = ctx.createGain();
+    masterGain.gain.value = 0.7;
+    masterGain.connect(ctx.destination);
+  }
   return ctx;
+}
+
+function getMaster() {
+  getCtx();
+  return masterGain;
+}
+
+// Pre-create reusable noise buffer (Task 45 — fix memory leak)
+function getNoiseBuffer() {
+  const c = getCtx();
+  if (!noiseBuffer) {
+    const bufSize = c.sampleRate * 0.1;
+    noiseBuffer = c.createBuffer(1, bufSize, c.sampleRate);
+    const data = noiseBuffer.getChannelData(0);
+    for (let i = 0; i < bufSize; i++) data[i] = (Math.random() * 2 - 1) * 0.3;
+  }
+  return noiseBuffer;
 }
 
 // Resume on first user interaction (browser autoplay policy)
@@ -14,14 +38,17 @@ function ensureResumed() {
 window.addEventListener('pointerdown', ensureResumed, { once: true });
 window.addEventListener('keydown', ensureResumed, { once: true });
 
-/**
- * Plate hit — short bright "ping" + energy crackle
- */
+/** Master volume (0-1) */
+export function setVolume(v) {
+  getMaster().gain.value = Math.max(0, Math.min(1, v));
+}
+
+/** Plate hit — bright ping + reused noise crackle */
 export function playPlateHit() {
   const c = getCtx();
   const t = c.currentTime;
+  const out = getMaster();
 
-  // Bright ping
   const osc = c.createOscillator();
   const gain = c.createGain();
   osc.type = 'sine';
@@ -30,30 +57,25 @@ export function playPlateHit() {
   osc.frequency.exponentialRampToValueAtTime(440, t + 0.15);
   gain.gain.setValueAtTime(0.15, t);
   gain.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
-  osc.connect(gain).connect(c.destination);
+  osc.connect(gain).connect(out);
   osc.start(t);
   osc.stop(t + 0.2);
 
-  // Energy crackle (noise burst)
-  const bufSize = c.sampleRate * 0.08;
-  const buf = c.createBuffer(1, bufSize, c.sampleRate);
-  const data = buf.getChannelData(0);
-  for (let i = 0; i < bufSize; i++) data[i] = (Math.random() * 2 - 1) * 0.3;
+  // Reused noise buffer (no allocation per hit)
   const noise = c.createBufferSource();
   const nGain = c.createGain();
-  noise.buffer = buf;
+  noise.buffer = getNoiseBuffer();
   nGain.gain.setValueAtTime(0.08, t);
   nGain.gain.exponentialRampToValueAtTime(0.001, t + 0.08);
-  noise.connect(nGain).connect(c.destination);
+  noise.connect(nGain).connect(out);
   noise.start(t);
 }
 
-/**
- * Lamp light-up — ascending chord sting
- */
+/** Lamp light-up — ascending chord sting */
 export function playLampLit() {
   const c = getCtx();
   const t = c.currentTime;
+  const out = getMaster();
 
   for (const [freq, delay] of [[523, 0], [659, 0.08], [784, 0.16], [1047, 0.24]]) {
     const osc = c.createOscillator();
@@ -63,18 +85,17 @@ export function playLampLit() {
     gain.gain.setValueAtTime(0, t + delay);
     gain.gain.linearRampToValueAtTime(0.12, t + delay + 0.04);
     gain.gain.exponentialRampToValueAtTime(0.001, t + delay + 0.5);
-    osc.connect(gain).connect(c.destination);
+    osc.connect(gain).connect(out);
     osc.start(t + delay);
     osc.stop(t + delay + 0.5);
   }
 }
 
-/**
- * Combo break — low "thud"
- */
+/** Combo break — low thud */
 export function playComboBreak() {
   const c = getCtx();
   const t = c.currentTime;
+  const out = getMaster();
 
   const osc = c.createOscillator();
   const gain = c.createGain();
@@ -83,17 +104,16 @@ export function playComboBreak() {
   osc.frequency.exponentialRampToValueAtTime(60, t + 0.15);
   gain.gain.setValueAtTime(0.15, t);
   gain.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
-  osc.connect(gain).connect(c.destination);
+  osc.connect(gain).connect(out);
   osc.start(t);
   osc.stop(t + 0.2);
 }
 
-/**
- * Win fanfare — major arpeggio
- */
+/** Win fanfare — major arpeggio */
 export function playWinFanfare() {
   const c = getCtx();
   const t = c.currentTime;
+  const out = getMaster();
 
   const notes = [523, 659, 784, 1047, 784, 1047, 1319];
   notes.forEach((freq, i) => {
@@ -105,18 +125,17 @@ export function playWinFanfare() {
     gain.gain.setValueAtTime(0, start);
     gain.gain.linearRampToValueAtTime(0.08, start + 0.03);
     gain.gain.exponentialRampToValueAtTime(0.001, start + 0.4);
-    osc.connect(gain).connect(c.destination);
+    osc.connect(gain).connect(out);
     osc.start(start);
     osc.stop(start + 0.4);
   });
 }
 
-/**
- * Lane switch — quick whoosh
- */
+/** Lane switch — quick whoosh */
 export function playLaneSwitch() {
   const c = getCtx();
   const t = c.currentTime;
+  const out = getMaster();
 
   const osc = c.createOscillator();
   const gain = c.createGain();
@@ -126,7 +145,12 @@ export function playLaneSwitch() {
   osc.frequency.exponentialRampToValueAtTime(200, t + 0.1);
   gain.gain.setValueAtTime(0.04, t);
   gain.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
-  osc.connect(gain).connect(c.destination);
+  osc.connect(gain).connect(out);
   osc.start(t);
   osc.stop(t + 0.1);
+}
+
+/** Haptic feedback (mobile vibration) */
+export function haptic(ms = 15) {
+  if (navigator.vibrate) navigator.vibrate(ms);
 }

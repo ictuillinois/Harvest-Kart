@@ -18,7 +18,7 @@ import { HUD } from './ui/HUD.js';
 import { WinScreen } from './ui/WinScreen.js';
 
 import { setupControls } from './utils/controls.js';
-import { playPlateHit, playLampLit, playComboBreak, playWinFanfare, playLaneSwitch } from './utils/audio.js';
+import { playPlateHit, playLampLit, playComboBreak, playWinFanfare, playLaneSwitch, haptic } from './utils/audio.js';
 import {
   MIN_SPEED, MAX_SPEED, MAP_THEMES,
   PEDAL_ACCELERATION, COAST_DECELERATION,
@@ -178,6 +178,7 @@ const controls = setupControls((direction) => {
   kart.switchLane(direction);
   gameState.currentLane = kart.currentLane;
   playLaneSwitch();
+  haptic(15);
 });
 
 // --- State change handling ---
@@ -250,6 +251,7 @@ gameState.on('plateHit', ({ currentCharge, combo, score }) => {
   const points = 100 + Math.min(combo - 1, 9) * 25;
   hud.showFloatingScore(points);
   playPlateHit();
+  haptic(25);
 });
 
 gameState.on('comboBreak', () => {
