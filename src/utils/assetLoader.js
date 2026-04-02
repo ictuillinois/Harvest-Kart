@@ -1,11 +1,9 @@
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { asset } from './base.js';
 
 const loader = new GLTFLoader();
 const cache = new Map();
 
-/**
- * Load a GLTF/GLB model. Returns a clone from cache on subsequent calls.
- */
 export async function loadModel(url) {
   if (cache.has(url)) {
     return cache.get(url).scene.clone(true);
@@ -15,10 +13,6 @@ export async function loadModel(url) {
   return gltf.scene.clone(true);
 }
 
-/**
- * Preload an array of model URLs in parallel.
- * Returns a Map<url, gltf> for direct access.
- */
 export async function preloadAll(urls) {
   const results = await Promise.all(
     urls.map(async (url) => {
@@ -32,46 +26,43 @@ export async function preloadAll(urls) {
   return new Map(results);
 }
 
-/**
- * Get a clone from the cache (sync). Must have been preloaded first.
- */
 export function getModel(url) {
   const gltf = cache.get(url);
   if (!gltf) throw new Error(`Model not preloaded: ${url}`);
   return gltf.scene.clone(true);
 }
 
-// All model paths — import this list for preloading
+// All model paths — resolved against Vite base URL
 export const MODEL_URLS = {
   // Buildings (KayKit City Builder)
-  buildingA: '/models/buildings/building_A.gltf',
-  buildingB: '/models/buildings/building_B.gltf',
-  buildingC: '/models/buildings/building_C.gltf',
-  buildingD: '/models/buildings/building_D.gltf',
-  buildingE: '/models/buildings/building_E.gltf',
-  buildingF: '/models/buildings/building_F.gltf',
-  buildingG: '/models/buildings/building_G.gltf',
-  buildingH: '/models/buildings/building_H.gltf',
+  buildingA: asset('models/buildings/building_A.gltf'),
+  buildingB: asset('models/buildings/building_B.gltf'),
+  buildingC: asset('models/buildings/building_C.gltf'),
+  buildingD: asset('models/buildings/building_D.gltf'),
+  buildingE: asset('models/buildings/building_E.gltf'),
+  buildingF: asset('models/buildings/building_F.gltf'),
+  buildingG: asset('models/buildings/building_G.gltf'),
+  buildingH: asset('models/buildings/building_H.gltf'),
   // Props
-  streetlight: '/models/props/streetlight.gltf',
-  bush: '/models/props/bush.gltf',
-  bench: '/models/props/bench.gltf',
-  firehydrant: '/models/props/firehydrant.gltf',
-  trafficLight: '/models/props/trafficlight_A.gltf',
-  dumpster: '/models/props/dumpster.gltf',
-  watertower: '/models/props/watertower.gltf',
+  streetlight: asset('models/props/streetlight.gltf'),
+  bush: asset('models/props/bush.gltf'),
+  bench: asset('models/props/bench.gltf'),
+  firehydrant: asset('models/props/firehydrant.gltf'),
+  trafficLight: asset('models/props/trafficlight_A.gltf'),
+  dumpster: asset('models/props/dumpster.gltf'),
+  watertower: asset('models/props/watertower.gltf'),
   // Cars
-  carSedan: '/models/props/car_sedan.gltf',
-  carTaxi: '/models/props/car_taxi.gltf',
-  carHatchback: '/models/props/car_hatchback.gltf',
+  carSedan: asset('models/props/car_sedan.gltf'),
+  carTaxi: asset('models/props/car_taxi.gltf'),
+  carHatchback: asset('models/props/car_hatchback.gltf'),
   // Beach (Brazil)
-  beachBall: '/models/beach/beach_ball.glb',
-  beachUmbrella: '/models/beach/umbrella.glb',
-  surfboard: '/models/beach/surfboard.glb',
-  crab: '/models/beach/crab.glb',
-  beachChair: '/models/beach/chair.glb',
-  lifeguardTower: '/models/beach/lifeguard.glb',
-  sailboat: '/models/beach/sailboat.glb',
-  seagull: '/models/beach/seagull.glb',
-  palmTree: '/models/beach/palm.glb',
+  beachBall: asset('models/beach/beach_ball.glb'),
+  beachUmbrella: asset('models/beach/umbrella.glb'),
+  surfboard: asset('models/beach/surfboard.glb'),
+  crab: asset('models/beach/crab.glb'),
+  beachChair: asset('models/beach/chair.glb'),
+  lifeguardTower: asset('models/beach/lifeguard.glb'),
+  sailboat: asset('models/beach/sailboat.glb'),
+  seagull: asset('models/beach/seagull.glb'),
+  palmTree: asset('models/beach/palm.glb'),
 };

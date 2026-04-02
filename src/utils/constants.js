@@ -1,3 +1,5 @@
+import { asset } from './base.js';
+
 // Lane positions (X coordinates)
 export const LANE_POSITIONS = [-3, 0, 3];
 export const LANE_COUNT = 3;
@@ -45,7 +47,7 @@ export const DRIVER_TYPES = [
     description: 'The wise inventor',
     tagline: 'Years of research meet the open road',
     type: 'professor',
-    avatar: '/characters/professor.svg',
+    avatar: asset('characters/professor.svg'),
     skinColor: 0xf0c8a0,
     hairColor: 0xcccccc,
     shirtColor: 0xffffff,
@@ -58,7 +60,7 @@ export const DRIVER_TYPES = [
     description: 'The curious kid',
     tagline: 'Fastest wheels on the playground',
     type: 'kid',
-    avatar: '/characters/kid.svg',
+    avatar: asset('characters/kid.svg'),
     skinColor: 0xdeb887,
     hairColor: 0x4a3728,
     shirtColor: 0xff6b35,
@@ -71,7 +73,7 @@ export const DRIVER_TYPES = [
     description: 'The young scientist',
     tagline: 'Powered by science and determination',
     type: 'woman',
-    avatar: '/characters/woman.svg',
+    avatar: asset('characters/woman.svg'),
     skinColor: 0xf5deb3,
     hairColor: 0xf0d060,
     shirtColor: 0x9b59b6,
@@ -88,7 +90,7 @@ export const MAP_THEMES = [
     name: 'Brazil',
     description: 'Sun, beaches & tropical vibes',
     subtitle: 'Rio de Janeiro Highway',
-    flag: '/flags/brazil.png',
+    flag: asset('flags/brazil.png'),
     features: ['Palm-lined coast road', 'Golden hour sunset', 'Colorful buildings'],
     // Sky shader (Preetham model)
     sky: {
@@ -122,7 +124,7 @@ export const MAP_THEMES = [
     name: 'USA',
     description: 'Big city lights & skyscrapers',
     subtitle: 'Downtown Night Drive',
-    flag: '/flags/usa.png',
+    flag: asset('flags/usa.png'),
     features: ['Neon-lit skyline', 'Moonlit twilight sky', 'Urban traffic'],
     sky: {
       turbidity: 12,
@@ -154,7 +156,7 @@ export const MAP_THEMES = [
     name: 'Peru',
     description: 'Majestic mountains & green valleys',
     subtitle: 'Andean Mountain Pass',
-    flag: '/flags/peru.png',
+    flag: asset('flags/peru.png'),
     features: ['Snow-capped peaks', 'Lush green valleys', 'Inca terraces'],
     sky: {
       turbidity: 1.8,

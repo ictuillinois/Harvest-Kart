@@ -3,6 +3,7 @@ import { Sky } from 'three/addons/objects/Sky.js';
 import { Water } from 'three/addons/objects/Water.js';
 import { ROAD_WIDTH, ROAD_SEGMENT_LENGTH, MAP_THEMES } from '../utils/constants.js';
 import { getModel, preloadAll, MODEL_URLS } from '../utils/assetLoader.js';
+import { asset } from '../utils/base.js';
 
 export class Environment {
   constructor(scene, renderer) {
@@ -239,7 +240,7 @@ export class Environment {
     //  ANIMATED OCEAN (right side of road)
     // =================================================================
     const waterGeo = new THREE.PlaneGeometry(400, 400);
-    const waterNormals = new THREE.TextureLoader().load('/textures/waternormals.jpg', (tex) => {
+    const waterNormals = new THREE.TextureLoader().load(asset('textures/waternormals.jpg'), (tex) => {
       tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
     });
     this.water = new Water(waterGeo, {

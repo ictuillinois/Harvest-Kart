@@ -1,3 +1,5 @@
+import { asset } from '../utils/base.js';
+
 export class StartScreen {
   constructor(onStart) {
     this.el = document.createElement('div');
@@ -24,7 +26,7 @@ export class StartScreen {
          *          (sky blue top, wheat gold sides, dark road bottom)
          */
         background:
-          url('/Start_Screen.png') center center / cover no-repeat,
+          url('${asset('Start_Screen.png')}') center center / cover no-repeat,
           radial-gradient(
             ellipse at center 60%,
             rgba(0,0,0,0) 40%,
