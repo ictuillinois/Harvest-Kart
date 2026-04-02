@@ -1,7 +1,7 @@
 import { MAP_THEMES } from '../utils/constants.js';
 
 export class MapSelect {
-  constructor(onSelect) {
+  constructor(onSelect, onBack) {
     this.el = document.createElement('div');
     this.el.id = 'map-select';
 
@@ -56,6 +56,7 @@ export class MapSelect {
 
     this.el.innerHTML = `
       <div class="mselect-content">
+        <button class="nav-back" id="ms-back" aria-label="Back">&#9664; BACK</button>
         <h2 class="mselect-title">SELECT A MAP</h2>
         <div class="map-cards">${cards}</div>
       </div>
@@ -175,6 +176,7 @@ export class MapSelect {
     document.head.appendChild(style);
     document.body.appendChild(this.el);
 
+    this.el.querySelector('#ms-back').addEventListener('click', () => onBack());
     this.el.querySelectorAll('.map-card').forEach(card => {
       card.addEventListener('click', () => onSelect(parseInt(card.dataset.index)));
     });

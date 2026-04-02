@@ -1,7 +1,7 @@
 import { DRIVER_TYPES } from '../utils/constants.js';
 
 export class DriverSelect {
-  constructor(onSelect) {
+  constructor(onSelect, onBack) {
     this.el = document.createElement('div');
     this.el.id = 'driver-select';
     this.activeIndex = -1;
@@ -29,6 +29,7 @@ export class DriverSelect {
     this.el.innerHTML = `
       <div class="ds-backdrop"></div>
       <div class="ds-content">
+        <button class="nav-back" id="ds-back" aria-label="Back">&#9664; BACK</button>
         <h2 class="ds-title">CHOOSE YOUR DRIVER</h2>
         <div class="ds-cards">${cards}</div>
       </div>
@@ -224,6 +225,9 @@ export class DriverSelect {
       }
     `;
     document.head.appendChild(style);
+
+    // --- Back button ---
+    this.el.querySelector('#ds-back').addEventListener('click', () => onBack());
 
     // --- Interaction ---
     const cardEls = this.el.querySelectorAll('.ds-card');

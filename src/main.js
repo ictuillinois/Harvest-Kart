@@ -46,31 +46,40 @@ const plates = new Plate(scene);
 const lampPosts = new LampPost(scene);
 const environment = new Environment(scene, renderer);
 
+// --- Helper: reset game and go home ---
+function goHome() {
+  gameState.reset();
+  hud.reset();
+  lampPosts.resetAll();
+  gameState.transition('menu');
+}
+
 // --- UI ---
 const startScreen = new StartScreen(() => {
   gameState.transition('driverSelect');
 });
 
-const driverSelect = new DriverSelect((driverIndex) => {
-  gameState.selectedDriver = driverIndex;
-  kart.setDriver(driverIndex);
-  gameState.transition('mapSelect');
-});
+const driverSelect = new DriverSelect(
+  (driverIndex) => {
+    gameState.selectedDriver = driverIndex;
+    kart.setDriver(driverIndex);
+    gameState.transition('mapSelect');
+  },
+  () => gameState.transition('menu') // back
+);
 
-const mapSelect = new MapSelect(async (mapIndex) => {
-  gameState.selectedMap = mapIndex;
-  await environment.build(mapIndex);
-  gameState.transition('playing');
-});
+const mapSelect = new MapSelect(
+  async (mapIndex) => {
+    gameState.selectedMap = mapIndex;
+    await environment.build(mapIndex);
+    gameState.transition('playing');
+  },
+  () => gameState.transition('driverSelect') // back
+);
 
-const hud = new HUD();
+const hud = new HUD(() => goHome());
 
-const winScreen = new WinScreen(() => {
-  gameState.reset();
-  hud.reset();
-  lampPosts.resetAll();
-  gameState.transition('menu');
-});
+const winScreen = new WinScreen(() => goHome());
 
 // --- Controls ---
 const controls = setupControls((direction) => {
@@ -109,6 +118,18 @@ gameState.on('stateChange', ({ from, to }) => {
       controls.hideButtons();
       winScreen.show(gameState.platesHit);
       break;
+  }
+});
+
+// --- Escape key: go back one screen or home ---
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    switch (gameState.state) {
+      case 'driverSelect': gameState.transition('menu'); break;
+      case 'mapSelect': gameState.transition('driverSelect'); break;
+      case 'playing': goHome(); break;
+      case 'complete': goHome(); break;
+    }
   }
 });
 

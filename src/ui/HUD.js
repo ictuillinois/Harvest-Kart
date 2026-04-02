@@ -1,10 +1,11 @@
 import { PLATES_TO_FILL_BAR, TOTAL_LAMP_POSTS } from '../utils/constants.js';
 
 export class HUD {
-  constructor() {
+  constructor(onHome) {
     this.el = document.createElement('div');
     this.el.id = 'hud';
     this.el.innerHTML = `
+      <button class="hud-home-btn" id="hud-home" aria-label="Home">&#9664; HOME</button>
       <div class="hud-left">
         <div class="hud-bar-container">
           <span class="hud-energy-icon">&#9889;</span>
@@ -155,6 +156,24 @@ export class HUD {
         margin-top: 2px;
       }
 
+      /* ── home button ── */
+      .hud-home-btn {
+        position: fixed; top: 14px; left: 14px; z-index: 55;
+        background: rgba(0,0,0,0.45);
+        border: 1.5px solid rgba(255,255,255,0.25);
+        border-radius: 8px;
+        color: rgba(255,255,255,0.8);
+        font-family: 'Segoe UI', Tahoma, sans-serif;
+        font-size: 0.72rem; font-weight: 600;
+        letter-spacing: 1px;
+        padding: 6px 12px;
+        cursor: pointer;
+        backdrop-filter: blur(4px);
+        transition: background 0.15s, border-color 0.15s;
+      }
+      .hud-home-btn:hover { background: rgba(255,255,255,0.12); border-color: rgba(255,255,255,0.5); }
+      .hud-home-btn:active { transform: scale(0.95); }
+
       /* ── responsive ── */
       @media (max-width: 500px) {
         .hud-bar { width: 100px; height: 12px; }
@@ -166,6 +185,8 @@ export class HUD {
     `;
     document.head.appendChild(style);
     document.body.appendChild(this.el);
+
+    this.el.querySelector('#hud-home').addEventListener('click', () => onHome());
 
     this.barFill = this.el.querySelector('#hud-bar-fill');
     this.chargeText = this.el.querySelector('#hud-charge-text');
