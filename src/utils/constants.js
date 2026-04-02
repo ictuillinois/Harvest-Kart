@@ -87,6 +87,9 @@ export const MAP_THEMES = [
     id: 'brazil',
     name: 'Brazil',
     description: 'Sun, beaches & tropical vibes',
+    subtitle: 'Rio de Janeiro Highway',
+    flag: '/flags/brazil.png',
+    features: ['Palm-lined coast road', 'Golden hour sunset', 'Colorful buildings'],
     // Sky shader (Preetham model)
     sky: {
       turbidity: 8,
@@ -118,6 +121,9 @@ export const MAP_THEMES = [
     id: 'usa',
     name: 'USA',
     description: 'Big city lights & skyscrapers',
+    subtitle: 'Downtown Night Drive',
+    flag: '/flags/usa.png',
+    features: ['Neon-lit skyline', 'Moonlit twilight sky', 'Urban traffic'],
     sky: {
       turbidity: 12,
       rayleigh: 0.5,
@@ -147,6 +153,9 @@ export const MAP_THEMES = [
     id: 'peru',
     name: 'Peru',
     description: 'Majestic mountains & green valleys',
+    subtitle: 'Andean Mountain Pass',
+    flag: '/flags/peru.png',
+    features: ['Snow-capped peaks', 'Lush green valleys', 'Inca terraces'],
     sky: {
       turbidity: 1.8,
       rayleigh: 2.0,
