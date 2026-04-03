@@ -1,112 +1,90 @@
-# Harvest Kart — Project Guide
+# CLAUDE.md
 
-## What This Is
-A 3D browser-based kart mini-game built with Three.js + Vite. Demonstrates piezoelectric energy harvesting: drive over glowing plates on a highway to charge lamp posts and power the city.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Tech Stack
-- **Three.js** v0.183.2 (WebGL renderer)
-- **Vite** v8 (dev + build)
-- **@tweenjs/tween.js** v25 (requires explicit `Group` — see tweenGroup.js)
-- No React, no backend, pure frontend
+## Build & Run Commands
 
-## How to Run
 ```bash
-npm run dev    # Vite dev server
-npm run build  # Production build (uses --base=/Harvest-Kart/ for GitHub Pages)
+npm run dev      # Start Vite dev server (hot reload)
+npm run build    # Production build → dist/
+npm run preview  # Preview production build locally
 ```
+
+GitHub Pages deployment is automatic on push to main via `.github/workflows/deploy.yml`. The workflow builds with `--base=/Harvest-Kart/` for correct subpath asset resolution.
+
+## Project Overview
+
+A 3D browser-based kart mini-game (Three.js v0.183.2 + Vite v8 + @tweenjs/tween.js v25). No React, no backend. Demonstrates piezoelectric energy harvesting: drive over glowing plates on a highway to charge lamp posts.
+
+**Game flow:** `menu` → `driverSelect` → `mapSelect` → `playing` ↔ `paused` → `complete`
+
+Three map themes: Brazil (sunset coastal highway), USA (night city), Peru (mountain pass). Each has distinct sky (Preetham shader), lighting, decorations, and color grading.
+
+## Critical Patterns
+
+### Model Scale Normalization (most important)
+
+GLTF models from different sources have wildly different internal scales: KayKit models are 0.1-3.0 units, Poly Pizza models can be 50-150 units (centimeter scale). **Never hand-tune scales.**
+
+`assetLoader.js` has `normalizeToHeight(object3D, targetHeight)` which uses `Box3.setFromObject()` to measure real bounds and scales to an exact world-space height. The `MODEL_HEIGHTS` registry maps every model URL to its target height. `getModel(url)` auto-normalizes on every clone.
+
+When adding a new model: measure its bounds first, add a target height to `MODEL_HEIGHTS`, then place it with `_placeModel(url, x, y, z, rotY, sizeVariation)` — no explicit scale needed.
+
+### Asset Path Resolution
+
+All public assets must use `asset('path/to/file')` from `src/utils/base.js`. This prepends `import.meta.env.BASE_URL` so paths work both in dev (`/`) and on GitHub Pages (`/Harvest-Kart/`). Hardcoding `/path` will break on Pages.
+
+### Tween.js v25 Requires Explicit Group
+
+`new Tween(obj)` alone creates an orphan that never updates. Always pass the shared group:
+```js
+import { tweenGroup } from '../utils/tweenGroup.js';
+new Tween(obj, tweenGroup).to({...}).start();
+```
+The game loop calls `tweenGroup.update()` each frame.
+
+### Parallax Depth Layers
+
+Environment decorations are in 3 arrays with different scroll speeds:
+- `this.foreground[]` — 100% speed (bushes, barriers, props near road)
+- `this.midground[]` — 60% speed (buildings, palms, hills)
+- `this.background[]` — 20% speed (mountains)
+
+When placing objects in `_buildBrazil/USA/Peru`, pass the layer as the last parameter to `_placeModel()` or `_scatterProps()`.
+
+### Post-Processing
+
+`EffectComposer` pipeline: RenderPass → ColorGradePass → VignettePass. Bloom was removed because the Preetham sky shader outputs HDR values near the sun disc that blow out at any bloom threshold. Use `AgXToneMapping` (not ACES) — it handles HDR sky much better.
+
+### Water/Ocean
+
+The Three.js Water addon (`three/addons/objects/Water.js`) was replaced with a simple blue `MeshStandardMaterial` plane because the Water shader reflects the sky so heavily at sunset that it becomes invisible. The current ocean uses vertex displacement for wave animation.
 
 ## Architecture
 
-### Directory Structure
-```
-src/
-├── main.js              # Entry: renderer, camera, game loop, post-processing
-├── game/
-│   ├── Road.js           # 3-segment scrolling road with asphalt texture + UV scrolling
-│   ├── Kart.js           # Player kart (primitives), 3 driver characters, exhaust particles
-│   ├── Plate.js          # Piezoelectric plates (pool of 20), glow sprites, collision
-│   ├── LampPost.js       # 4 lamp posts with dim→bright tween lighting
-│   ├── Environment.js    # Sky, lighting, 3 theme builders, parallax depth layers
-│   └── GameState.js      # State machine + scoring + combo system
-├── ui/
-│   ├── StartScreen.js    # Background image overlay
-│   ├── DriverSelect.js   # 3 DiceBear avatar cards
-│   ├── MapSelect.js      # 3 map cards with CSS mini-scenes
-│   ├── HUD.js            # Charge bar, lamps, score, dashboard speedometer, pause
-│   └── WinScreen.js      # Stats + high score (localStorage)
-└── utils/
-    ├── constants.js       # ALL game config (speeds, lanes, themes, model registry)
-    ├── controls.js        # Keyboard + touch + swipe + GAS pedal (multi-touch)
-    ├── audio.js           # Procedural Web Audio (master volume, haptic)
-    ├── assetLoader.js     # GLTFLoader + cache + normalizeToHeight() + MODEL_REGISTRY
-    ├── tweenGroup.js      # Shared tween.js Group (v25 requirement)
-    └── base.js            # asset() helper for Vite BASE_URL path resolution
-```
+`src/main.js` is the orchestrator: creates renderer, scene, camera, all game objects and UI screens, wires events, and runs the game loop. Game state is event-driven via `GameState.js` (observer pattern). UI screens are DOM overlays (HTML/CSS) at z-index 100, HUD at z-index 50.
 
-### Key Patterns
+`Environment.js` is the largest file — it builds the Sky (Preetham addon), lighting, ground, barriers, and theme-specific decorations. The `build(themeIndex)` method is async (loads models). Three private methods `_buildBrazil/USA/Peru` place theme decorations.
 
-**Model Scale Normalization** (THE most important pattern):
-- `normalizeToHeight(object3D, targetHeight)` in assetLoader.js
-- Uses `Box3.setFromObject()` to measure actual bounds, scales to exact target
-- `MODEL_HEIGHTS` registry maps every URL to world-space height
-- `getModel(url)` auto-normalizes on clone — no scale parameter needed
-- KayKit models are 0.1-3.0 internal units; Poly Pizza models can be 50-150 units (cm scale)
-
-**Parallax Depth Layers**:
-- `this.foreground[]` — 100% scroll speed (bushes, props near road)
-- `this.midground[]` — 60% scroll speed (buildings, palms)
-- `this.background[]` — 20% scroll speed (mountains)
-
-**Post-Processing Pipeline**:
-- EffectComposer → RenderPass → ColorGradePass → VignettePass
-- Bloom removed (Preetham sky HDR blows it out at any threshold)
-- AgX tone mapping (better than ACES for HDR sky handling)
-
-**Tween.js v25 Gotcha**:
-- `new Tween(obj)` alone creates orphan — must pass `tweenGroup`
-- `new Tween(obj, tweenGroup).to({...}).start()`
-- `tweenGroup.update()` called in game loop
-
-## Game Flow
-`menu` → `driverSelect` → `mapSelect` → `playing` ↔ `paused` → `complete`
-
-## Three Map Themes
-| Theme | Sky | Unique Elements |
-|-------|-----|-----------------|
-| Brazil | Golden hour sunset, turbidity 8 | Ocean (blue plane + wave vertices), sand, palm trees, city buildings |
-| USA | Deep twilight, turbidity 12, stars | Dark tinted buildings, neon signs, moon, traffic cones, parked cars |
-| Peru | Crisp mountain, turbidity 1.8 | Cone mountains with snow, green hills, llamas, stone walls, huts |
+Controls (`controls.js`) handle keyboard (arrows/WASD/space), touch (pointer events with capture for multi-touch), and swipe. The GAS pedal is a holdable button that reports `isPedalDown()` — speed is managed in the game loop, not in controls.
 
 ## 3D Assets
-- **KayKit City Builder** (CC0): 8 buildings, bush, bench, cars, dumpster, etc. Internal scale ~0.1-3 units.
-- **Poly Pizza** (CC0/CC-BY): palm tree, traffic cone, mailbox, trashcan, llama, flowers, hut, stone wall, tires, barrier. Internal scale VARIES WILDLY (0.5 to 150 units).
-- **DiceBear Avataaars**: 3 driver SVG portraits (professor, kid, woman)
-- **Flags**: Brazil/USA/Peru PNGs from flagcdn.com
 
-## Known Issues / Tech Debt
-- Poly Pizza beach props (chair, crab, seagull, lifeguard, sailboat, surfboard) removed — internal geometry 50-150 units, unusable even with normalization
-- Water shader (three/addons/objects/Water.js) replaced with simple blue plane — the shader reflects sky too heavily at sunset
-- No InstancedMesh yet (barriers + road dashes could save ~50 draw calls)
-- Environment theme builders have code duplication (3 similar methods)
+All in `public/models/`. KayKit City Builder (CC0, GLTF+texture atlas), Poly Pizza models (CC0/CC-BY, GLB). Poly Pizza beach props were removed — their 50-150 unit internal geometry was unusable. Only `palm.glb` from that set survived.
+
+## Known Issues
+
+- Environment theme builders have duplicated code (3 similar methods)
+- No InstancedMesh (barriers + road dashes could save ~50 draw calls)
 - No frustum culling on decorations
+- Kart and driver are built from primitives (no loaded model)
 
-## Performance Notes
-- ~120-140 draw calls per frame (acceptable for WebGL)
-- Shadow map: 1024x1024, PCFSoft on desktop, PCF on mobile
-- Mobile: no AA, pixelRatio capped at 1.5
-- Models preloaded in parallel before start screen
+## Remaining Roadmap
 
-## Roadmap (from 50-task plan, remaining items)
-- [ ] Theme config objects to replace duplicated builders (task 26)
-- [ ] InstancedMesh for barriers + road dashes (tasks 22-23)
-- [ ] Kart headlights for USA night map (task 36)
-- [ ] Loading progress bar during preload (task 38)
-- [ ] Confetti on WinScreen (task 39)
-- [ ] Engine hum sound mapped to speed (task 47)
-- [ ] Ambient sounds per theme (task 48)
-- [ ] Keyboard Tab navigation on all screens (task 49)
-
-## Deployment
-- GitHub Pages via `.github/workflows/deploy.yml`
-- Builds with `--base=/Harvest-Kart/`
-- All asset paths use `asset()` helper from `base.js`
+- Theme config objects to DRY the 3 builders
+- InstancedMesh for barriers + road dashes
+- Kart headlights for USA night map
+- Loading progress bar during model preload
+- Engine hum sound mapped to speed
+- Ambient sounds per theme (ocean waves, city hum, wind)
+- Keyboard Tab navigation on selection screens
