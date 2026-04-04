@@ -1,11 +1,18 @@
 import { asset, gameRoot } from '../utils/base.js';
+import { fadeIn, fadeOut } from '../utils/transition.js';
 
 export class StartScreen {
   constructor(onStart) {
     this.el = document.createElement('div');
     this.el.id = 'start-screen';
     this.el.innerHTML = `
-      <div class="ss-prompt">PRESS HERE TO START</div>
+      <div class="ss-bottom">
+        <div class="ss-prompt">PRESS HERE TO START</div>
+        <div class="ss-credits">
+          <span class="ss-license">Licensed by the Illinois Center for Transportation</span>
+          <span class="ss-copyright">© 2026 JJC Inc.</span>
+        </div>
+      </div>
     `;
 
     gameRoot().appendChild(this.el);
@@ -60,11 +67,19 @@ export class StartScreen {
         pointer-events: none;
       }
 
-      /* ── PRESS HERE TO START ── */
-      .ss-prompt {
+      /* ── bottom block: prompt + credits ── */
+      .ss-bottom {
         position: relative;
         z-index: 2;
-        padding-bottom: clamp(36px, 7vh, 72px);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 14px;
+        padding-bottom: clamp(24px, 4vh, 48px);
+      }
+
+      /* ── PRESS HERE TO START ── */
+      .ss-prompt {
         font-family: Impact, 'Arial Black', Tahoma, sans-serif;
         font-size: clamp(1.1rem, 3.8vw, 1.9rem);
         font-weight: 700;
@@ -81,26 +96,48 @@ export class StartScreen {
         0%, 100% { opacity: 1;   }
         50%      { opacity: 0.3; }
       }
+
+      /* ── credits ── */
+      .ss-credits {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+      }
+      .ss-license {
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        font-size: 13px;
+        font-weight: 400;
+        letter-spacing: 1px;
+        color: rgba(255,255,255,0.75);
+        text-shadow: 0 1px 4px rgba(0,0,0,0.8);
+      }
+      .ss-copyright {
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        font-size: 12px;
+        font-weight: 300;
+        letter-spacing: 0.5px;
+        color: rgba(255,255,255,0.5);
+        text-shadow: 0 1px 4px rgba(0,0,0,0.8);
+      }
     `;
     document.head.appendChild(style);
 
     this.el.addEventListener('click', () => onStart());
   }
 
-  show(fade = false) {
-    this.el.style.transition = '';
-    this.el.style.opacity = fade ? '0' : '1';
-    this.el.style.display = 'flex';
-    if (fade) {
-      // Force a reflow so the transition registers from opacity 0
+  show(longFade = false) {
+    if (longFade) {
+      // Slow fade used when transitioning from the intro screen (0.9s)
+      this.el.style.transition = '';
+      this.el.style.opacity = '0';
+      this.el.style.display = 'flex';
       void this.el.offsetWidth;
       this.el.style.transition = 'opacity 0.9s ease';
       this.el.style.opacity = '1';
+    } else {
+      fadeIn(this.el);
     }
   }
-  hide() {
-    this.el.style.display = 'none';
-    this.el.style.transition = '';
-    this.el.style.opacity = '1';
-  }
+  hide() { fadeOut(this.el); }
 }

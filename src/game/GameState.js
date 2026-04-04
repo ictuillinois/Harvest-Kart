@@ -7,7 +7,7 @@ export class GameState {
   }
 
   reset() {
-    this.state = 'menu'; // menu | driverSelect | mapSelect | playing | paused | complete
+    this.state = 'menu'; // menu | driverSelect | mapSelect | playing | paused | completing | complete
     this.currentLane = 1;
     this.platesHit = 0;
     this.currentCharge = 0;
@@ -62,7 +62,7 @@ export class GameState {
       this.emit('lampLit', { lampPostsLit: this.lampPostsLit, score: this.score });
 
       if (this.isComplete()) {
-        this.transition('complete');
+        this.transition('completing');
       }
     }
   }

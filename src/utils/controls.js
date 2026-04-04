@@ -4,8 +4,10 @@ export function setupControls(onSwitch) {
   let switching = false;
   const cooldown = 220;
   let _pedalDown = false;
+  let _locked = false;
 
   function triggerSwitch(direction) {
+    if (_locked) return;
     if (switching) return;
     switching = true;
     onSwitch(direction);
@@ -269,6 +271,8 @@ export function setupControls(onSwitch) {
       pedalBtn.classList.remove('touched');
     },
     hideButtons() { container.style.display = 'none'; },
-    isPedalDown() { return _pedalDown; },
+    isPedalDown() { return !_locked && _pedalDown; },
+    lock()   { _locked = true; },
+    unlock() { _locked = false; },
   };
 }

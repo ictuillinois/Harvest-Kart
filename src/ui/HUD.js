@@ -1,74 +1,76 @@
 import { PLATES_TO_FILL_BAR, TOTAL_LAMP_POSTS } from '../utils/constants.js';
 import { gameRoot } from '../utils/base.js';
 
+const SP_SEGS = 20;   // speedometer LED segments
+const EN_SEGS = 16;   // energy bar LED segments
+
 export class HUD {
   constructor(onHome, onPause) {
-    // ── Top bar: charge + lamps + score + pause ──
+    this._charge = 0;
+    this._lamps  = 0;
+
+    // ── Speedometer segments ──
+    const spHTML = Array.from({ length: SP_SEGS }, (_, i) =>
+      `<div class="sp-seg" data-i="${i}"></div>`).join('');
+
+    // ── Energy bar segments (rendered bottom-to-top via flex-direction:column-reverse) ──
+    const enHTML = Array.from({ length: EN_SEGS }, (_, i) =>
+      `<div class="en-seg" data-i="${i}"></div>`).join('');
+
+    // ── Minimap lamp post markers ──
+    const lampHTML = Array.from({ length: TOTAL_LAMP_POSTS }, (_, i) => {
+      const pct = ((i + 1) / TOTAL_LAMP_POSTS) * 92 + 4; // 4%..96% within road strip
+      return `<div class="mm-lamp" data-lamp="${i}" style="bottom:${pct.toFixed(1)}%"></div>`;
+    }).join('');
+
+    // ── Main HUD element ──
     this.el = document.createElement('div');
     this.el.id = 'hud';
     this.el.innerHTML = `
-      <button class="nav-back hud-home" id="hud-home" aria-label="Home">&#9664; HOME</button>
-      <div class="hud-left">
-        <div class="hud-bar-container">
-          <span class="hud-energy-icon">&#9889;</span>
-          <div class="hud-bar">
-            <div class="hud-bar-fill" id="hud-bar-fill"></div>
-            ${Array.from({ length: PLATES_TO_FILL_BAR }, (_, i) =>
-              `<div class="hud-tick" style="left:${((i + 1) / PLATES_TO_FILL_BAR) * 100}%"></div>`
-            ).join('')}
+      <!-- Top-left: HOME + minimap -->
+      <div class="hud-tl">
+        <button class="hud-btn" id="hud-home" aria-label="Home">&#9664; HOME</button>
+        <div class="hud-panel mm-panel">
+          <div class="mm-label">MAP</div>
+          <div class="mm-road">
+            <div class="mm-stripe"></div>
+            ${lampHTML}
+            <div class="mm-player" id="mm-player"></div>
           </div>
-          <span class="hud-charge-text" id="hud-charge-text" aria-live="polite">0/${PLATES_TO_FILL_BAR}</span>
         </div>
-        <div class="hud-lamps">
-          <span class="hud-lamp-icon">&#128161;</span>
-          <span class="hud-lamp-count" id="hud-lamp-count" aria-live="polite">0 / ${TOTAL_LAMP_POSTS}</span>
-        </div>
-        <div class="hud-score-row">
-          <span class="hud-score" id="hud-score">0</span>
-          <span class="hud-combo" id="hud-combo"></span>
-        </div>
-        <div class="hud-stage" id="hud-stage">STAGE 1/4</div>
       </div>
-      <div class="hud-right">
-        <button class="hud-pause-btn" id="hud-pause" aria-label="Pause">&#9646;&#9646;</button>
-      </div>
-    `;
 
-    // ── Bottom-center dashboard panel ──
-    this.dashboard = document.createElement('div');
-    this.dashboard.id = 'dashboard';
-    this.dashboard.innerHTML = `
-      <svg class="dash-arc" viewBox="0 0 200 110" xmlns="http://www.w3.org/2000/svg">
-        <!-- Background arc -->
-        <path class="dash-arc-bg" d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="8" stroke-linecap="round"/>
-        <!-- Tick marks -->
-        ${Array.from({length: 11}, (_, i) => {
-          const angle = Math.PI + (i / 10) * Math.PI;
-          const cx = 100, cy = 100, r1 = 76, r2 = 84;
-          const x1 = cx + r1 * Math.cos(angle), y1 = cy + r1 * Math.sin(angle);
-          const x2 = cx + r2 * Math.cos(angle), y2 = cy + r2 * Math.sin(angle);
-          const major = i % 5 === 0;
-          return `<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="rgba(255,255,255,${major ? 0.6 : 0.25})" stroke-width="${major ? 1.5 : 0.8}"/>`;
-        }).join('')}
-        <!-- Speed arc (filled portion) -->
-        <path id="dash-arc-fill" d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="url(#arcGrad)" stroke-width="8" stroke-linecap="round" stroke-dasharray="251.3" stroke-dashoffset="251.3"/>
-        <!-- Gradient -->
-        <defs>
-          <linearGradient id="arcGrad" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0%" stop-color="#44ff44"/>
-            <stop offset="50%" stop-color="#ffaa00"/>
-            <stop offset="100%" stop-color="#ff3333"/>
-          </linearGradient>
-        </defs>
-        <!-- Speed labels at ends -->
-        <text x="16" y="96" class="dash-label">20</text>
-        <text x="176" y="96" class="dash-label">70</text>
-      </svg>
-      <div class="dash-center">
-        <span class="dash-speed" id="dash-speed">20</span>
-        <span class="dash-unit">MPH</span>
+      <!-- Top-center: score + combo -->
+      <div class="hud-tc">
+        <div class="hud-score" id="hud-score">0</div>
+        <div class="hud-combo" id="hud-combo"></div>
       </div>
-      <div class="dash-gear" id="dash-gear">1</div>
+
+      <!-- Top-right: PAUSE + speedometer -->
+      <div class="hud-tr">
+        <button class="hud-btn" id="hud-pause" aria-label="Pause">&#9646;&#9646; PAUSE</button>
+        <div class="hud-panel sp-panel">
+          <div class="sp-bar" id="sp-bar">${spHTML}</div>
+          <div class="sp-readout">
+            <span class="sp-num" id="sp-num">20</span>
+            <span class="sp-unit">MPH</span>
+            <span class="sp-time" id="sp-time">00'00"00</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right edge: energy bar -->
+      <div class="hud-re">
+        <div class="hud-panel en-panel">
+          <div class="en-label-top">E</div>
+          <div class="en-bar" id="en-bar">${enHTML}</div>
+          <div class="en-label-bot">0</div>
+          <div class="en-lamps">
+            <span class="en-lamp-icon">&#128161;</span>
+            <span class="en-lamp-count" id="en-lamp-count">0/${TOTAL_LAMP_POSTS}</span>
+          </div>
+        </div>
+      </div>
     `;
 
     // ── Pause overlay ──
@@ -77,225 +79,413 @@ export class HUD {
     this.pauseOverlay.innerHTML = `
       <div class="pause-card">
         <h2 class="pause-title">PAUSED</h2>
-        <button class="pause-btn pause-resume" id="pause-resume">RESUME</button>
-        <button class="pause-btn pause-quit" id="pause-quit">QUIT</button>
+        <button class="pause-btn pause-resume" id="pause-resume">&#9654; RESUME</button>
+        <button class="pause-btn pause-quit"   id="pause-quit">&#9664; QUIT</button>
       </div>
     `;
 
-    this.el.style.cssText = `
-      position: fixed; top: 0; left: 0; right: 0; z-index: 50;
-      display: none; justify-content: space-between; align-items: flex-start;
-      padding: 12px 16px;
-      background: linear-gradient(180deg, rgba(0,0,0,0.65) 0%, rgba(0,0,0,0) 100%);
-    `;
-
+    // ── Styles ──
     const style = document.createElement('style');
     style.textContent = `
-      /* ── Top bar ── */
-      .hud-left { display: flex; flex-direction: column; gap: 6px; }
-      .hud-bar-container { display: flex; align-items: center; gap: 8px; }
-      .hud-energy-icon { font-size: 1.4rem; }
-      .hud-bar {
-        position: relative;
-        width: clamp(110px, 22vw, 180px); height: 16px;
-        background: rgba(255,255,255,0.12);
-        border: 1px solid rgba(255,255,255,0.25);
-        border-radius: 8px; overflow: hidden;
-      }
-      .hud-bar-fill {
-        position: absolute; top: 0; left: 0; bottom: 0;
-        width: 0%; border-radius: 8px;
-        background: linear-gradient(90deg, #39ff14, #7fff00);
-        box-shadow: 0 0 10px rgba(57,255,20,0.5);
-        transition: width 0.3s ease-out;
-      }
-      .hud-bar-fill.celebrate {
-        animation: barCelebrate 0.5s ease-out;
-      }
-      @keyframes barCelebrate {
-        0%   { box-shadow: 0 0 10px rgba(57,255,20,0.5); }
-        50%  { box-shadow: 0 0 30px rgba(57,255,20,1), 0 0 60px rgba(57,255,20,0.5); }
-        100% { box-shadow: 0 0 10px rgba(57,255,20,0.5); }
-      }
-      .hud-tick { position: absolute; top: 0; bottom: 0; width: 1px; background: rgba(0,0,0,0.3); }
-      .hud-charge-text { color: rgba(255,255,255,0.7); font-size: 0.8rem; font-weight: 600; min-width: 32px; }
-      .hud-lamps { display: flex; align-items: center; gap: 6px; color: #fff; font-size: 0.9rem; font-weight: 600; text-shadow: 0 1px 3px rgba(0,0,0,0.5); }
-      .hud-lamp-icon { font-size: 1.1rem; }
-      .hud-score-row { display: flex; align-items: center; gap: 10px; margin-top: 2px; }
-      .hud-score { font-family: 'Courier New', monospace; font-size: 0.9rem; font-weight: 900; color: rgba(255,255,255,0.8); letter-spacing: 1px; }
-      .hud-combo { font-family: Impact, 'Arial Black', sans-serif; font-size: 0.85rem; font-weight: 700; color: #ffaa00; text-shadow: 0 0 6px rgba(255,170,0,0.5); letter-spacing: 1px; transition: transform 0.15s; }
-      .hud-combo.pop { transform: scale(1.4); }
-      .hud-stage {
-        font-family: Impact, 'Arial Black', sans-serif;
-        font-size: 0.7rem; color: rgba(255,255,255,0.5);
-        letter-spacing: 2px; margin-top: 1px;
-      }
-
-      /* Floating score text */
-      .hud-float-score {
-        position: fixed; z-index: 55;
-        font-family: Impact, 'Arial Black', sans-serif;
-        font-size: 1.2rem; font-weight: 900;
-        color: #39ff14;
-        text-shadow: 0 0 6px rgba(57,255,20,0.6);
-        pointer-events: none;
-        animation: floatUp 0.8s ease-out forwards;
-      }
-      @keyframes floatUp {
-        0%   { opacity: 1; transform: translateY(0); }
-        100% { opacity: 0; transform: translateY(-40px); }
-      }
-
-      .hud-right { display: flex; align-items: flex-start; gap: 10px; }
-      .hud-pause-btn {
-        background: rgba(0,0,0,0.4); border: 1.5px solid rgba(255,255,255,0.25);
-        border-radius: 8px; color: rgba(255,255,255,0.8); font-size: 0.9rem;
-        padding: 6px 10px; cursor: pointer; backdrop-filter: blur(4px);
-        transition: background 0.15s; letter-spacing: 2px;
-      }
-      .hud-pause-btn:hover { background: rgba(255,255,255,0.12); }
-      .hud-pause-btn:active { transform: scale(0.95); }
-      .hud-home { position: fixed; z-index: 55; }
-
-      /* ══════════════════════════════════════
-         DASHBOARD PANEL (bottom center)
-         ══════════════════════════════════════ */
-      #dashboard {
-        position: fixed;
-        bottom: clamp(8px, 2vh, 20px);
-        left: 50%; transform: translateX(-50%);
-        z-index: 58;
+      /* ══════════════════════════════════════════
+         ROOT CONTAINER
+         ══════════════════════════════════════════ */
+      #hud {
+        position: fixed; inset: 0; z-index: 50;
         display: none;
-        width: clamp(140px, 22vw, 200px);
+        pointer-events: none;
+        font-family: 'Press Start 2P', 'VT323', monospace;
+      }
+      #hud * { box-sizing: border-box; }
+      #hud button { pointer-events: all; cursor: pointer; }
+
+      /* ── Shared dark panel ── */
+      .hud-panel {
+        background: rgba(0,0,0,0.82);
+        border: 1px solid #3a3a3a;
+        border-radius: 5px;
+      }
+
+      /* ── Shared small button ── */
+      .hud-btn {
+        font-family: 'Press Start 2P', monospace;
+        font-size: 7px;
+        color: rgba(255,255,255,0.65);
+        background: rgba(0,0,0,0.78);
+        border: 1px solid #3a3a3a;
+        border-radius: 4px;
+        padding: 7px 10px;
+        letter-spacing: 1px;
+        transition: background 0.15s, color 0.15s;
+        white-space: nowrap;
+      }
+      .hud-btn:hover  { background: rgba(255,255,255,0.1); color: #fff; }
+      .hud-btn:active { transform: scale(0.93); }
+
+      /* ══════════════════════════════════════════
+         TOP-LEFT  —  HOME button + minimap
+         ══════════════════════════════════════════ */
+      .hud-tl {
+        position: absolute;
+        top: 12px; left: 12px;
+        display: flex; flex-direction: column;
+        align-items: flex-start; gap: 8px;
+      }
+
+      /* Minimap panel */
+      .mm-panel { padding: 7px 8px 8px; width: 80px; }
+      .mm-label {
+        font-size: 6px; color: rgba(255,255,255,0.35);
+        letter-spacing: 3px; text-align: center;
+        margin-bottom: 6px;
+      }
+
+      /* Road strip */
+      .mm-road {
+        position: relative;
+        width: 24px; height: 100px;
+        margin: 0 auto;
+        background: rgba(50,50,50,0.9);
+        border: 1px solid #3a3a3a;
+        border-radius: 3px;
+        overflow: hidden;
+      }
+      .mm-stripe {
+        position: absolute; left: 50%; top: 0; bottom: 0; width: 1px;
+        background: repeating-linear-gradient(
+          to bottom,
+          rgba(255,255,255,0.35) 0, rgba(255,255,255,0.35) 4px,
+          transparent 4px, transparent 8px
+        );
+        transform: translateX(-50%);
+      }
+
+      /* Lamp post dots on minimap */
+      .mm-lamp {
+        position: absolute; left: 50%;
+        width: 7px; height: 7px; border-radius: 50%;
+        border: 1.5px solid rgba(255,190,0,0.45);
+        background: transparent;
+        transform: translate(-50%, 50%);
+        transition: background 0.35s, border-color 0.35s, box-shadow 0.35s;
+      }
+      .mm-lamp.lit {
+        background: #ffcc00;
+        border-color: #ffcc00;
+        box-shadow: 0 0 5px 2px rgba(255,200,0,0.75);
+      }
+
+      /* Player dot */
+      .mm-player {
+        position: absolute; left: 50%; bottom: 4%;
+        width: 8px; height: 8px; border-radius: 50%;
+        background: #39ff14;
+        box-shadow: 0 0 5px 2px rgba(57,255,20,0.85);
+        transform: translate(-50%, 50%);
+        transition: bottom 0.28s ease-out;
+      }
+
+      /* ══════════════════════════════════════════
+         TOP-CENTER  —  score + combo
+         ══════════════════════════════════════════ */
+      .hud-tc {
+        position: absolute;
+        top: 12px; left: 50%; transform: translateX(-50%);
+        display: flex; flex-direction: column; align-items: center; gap: 5px;
         pointer-events: none;
       }
-
-      /* SVG arc gauge */
-      .dash-arc {
-        width: 100%;
-        filter: drop-shadow(0 2px 8px rgba(0,0,0,0.5));
-      }
-      .dash-label {
-        font-size: 8px; fill: rgba(255,255,255,0.4);
-        font-family: 'Courier New', monospace; font-weight: 600;
-        text-anchor: middle;
-      }
-
-      /* Center speed readout (overlaid on the arc) */
-      .dash-center {
-        position: absolute;
-        bottom: clamp(8px, 1.5vh, 16px);
-        left: 50%; transform: translateX(-50%);
-        display: flex; flex-direction: column; align-items: center;
-        line-height: 1;
-      }
-      .dash-speed {
-        font-family: 'Courier New', monospace;
-        font-size: clamp(1.6rem, 4vw, 2.4rem);
-        font-weight: 900; color: #fff;
-        text-shadow: 0 0 10px rgba(255,255,255,0.3), 0 2px 4px rgba(0,0,0,0.5);
-        letter-spacing: -1px;
-      }
-      .dash-unit {
-        font-size: 0.55rem; font-weight: 700;
-        color: rgba(255,255,255,0.5);
+      .hud-score {
+        font-size: 10px; color: rgba(255,255,255,0.7);
+        text-shadow: 0 0 5px rgba(255,255,255,0.25);
         letter-spacing: 2px;
       }
+      .hud-combo {
+        font-size: 9px; color: #ffaa00;
+        text-shadow: 0 0 6px #ffaa00, 0 0 14px rgba(255,170,0,0.45);
+        letter-spacing: 1px;
+        transition: transform 0.12s;
+        min-height: 14px;
+      }
+      .hud-combo.pop { transform: scale(1.4); }
 
-      /* Gear indicator */
-      .dash-gear {
+      /* ── Floating score popup ── */
+      .hud-float-score {
+        position: fixed; z-index: 55;
+        font-family: 'Press Start 2P', monospace;
+        font-size: 11px; color: #39ff14;
+        text-shadow: 0 0 6px #39ff14, 0 0 14px rgba(57,255,20,0.5);
+        pointer-events: none;
+        animation: floatUp 0.9s ease-out forwards;
+      }
+      @keyframes floatUp {
+        0%   { opacity: 1; transform: translateX(-50%) translateY(0); }
+        100% { opacity: 0; transform: translateX(-50%) translateY(-50px); }
+      }
+
+      /* ══════════════════════════════════════════
+         TOP-RIGHT  —  PAUSE button + speedometer
+         ══════════════════════════════════════════ */
+      .hud-tr {
         position: absolute;
-        top: clamp(6px, 1vh, 12px);
-        right: clamp(10px, 2vw, 22px);
-        font-family: Impact, 'Arial Black', sans-serif;
-        font-size: clamp(1.1rem, 2.5vw, 1.6rem);
-        font-weight: 900; color: #39ff14;
-        text-shadow: 0 0 8px rgba(57,255,20,0.4);
-        line-height: 1;
+        top: 12px; right: 12px;
+        display: flex; flex-direction: column;
+        align-items: flex-end; gap: 8px;
       }
 
-      /* ── Responsive ── */
-      @media (max-width: 500px) {
-        #dashboard { width: 120px; }
-        .hud-bar { width: 100px; height: 12px; }
-        .hud-lamps { font-size: 0.8rem; }
+      /* Speedometer panel */
+      .sp-panel { padding: 8px 10px; width: 220px; }
+
+      /* LED segment bar */
+      .sp-bar {
+        display: flex; gap: 2px;
+        margin-bottom: 7px;
+      }
+      .sp-seg {
+        flex: 1; height: 16px;
+        border-radius: 2px;
+        background: #0e0e0e;
+        border: 1px solid #2a2a2a;
+        transition: background 0.06s, box-shadow 0.06s;
+      }
+      .sp-seg.on-g { background:#00cc22; border-color:#00cc22; box-shadow:0 0 4px #00cc22; }
+      .sp-seg.on-y { background:#ccbb00; border-color:#ccbb00; box-shadow:0 0 4px #ccbb00; }
+      .sp-seg.on-o { background:#ff7700; border-color:#ff7700; box-shadow:0 0 4px #ff7700; }
+      .sp-seg.on-r { background:#ff1a1a; border-color:#ff1a1a; box-shadow:0 0 4px #ff1a1a; }
+
+      /* Speed number + unit + time on one row */
+      .sp-readout {
+        display: flex; align-items: baseline; gap: 5px;
+      }
+      .sp-num {
+        font-size: 26px; color: #ff3333; line-height: 1;
+        text-shadow: 0 0 8px #ff3333, 0 0 18px rgba(255,50,50,0.4);
+        min-width: 48px; text-align: right;
+        transition: color 0.2s, text-shadow 0.2s;
+      }
+      .sp-unit {
+        font-size: 6px; color: rgba(255,255,255,0.35);
+        letter-spacing: 1px; padding-bottom: 3px;
+      }
+      .sp-time {
+        font-size: 8px; color: #ffaa00;
+        text-shadow: 0 0 6px #ffaa00, 0 0 14px rgba(255,170,0,0.4);
+        margin-left: auto;
+        letter-spacing: 0.5px;
       }
 
-      /* ── Pause overlay ── */
+      /* ══════════════════════════════════════════
+         RIGHT EDGE  —  vertical energy bar
+         ══════════════════════════════════════════ */
+      .hud-re {
+        position: absolute;
+        right: 12px; top: 50%; transform: translateY(-50%);
+      }
+      .en-panel {
+        display: flex; flex-direction: column;
+        align-items: center; gap: 4px;
+        padding: 8px 7px;
+        width: 38px;
+      }
+      .en-label-top, .en-label-bot {
+        font-size: 7px; color: rgba(255,255,255,0.35);
+        letter-spacing: 1px;
+      }
+
+      /* Vertical LED bar — flex column-reverse so data-i=0 sits at bottom */
+      .en-bar {
+        display: flex; flex-direction: column-reverse; gap: 2px;
+      }
+      .en-seg {
+        width: 20px; height: 8px; border-radius: 2px;
+        background: #0e0e0e; border: 1px solid #2a2a2a;
+        transition: background 0.1s, box-shadow 0.1s;
+      }
+      .en-seg.on-r { background:#ff1a1a; border-color:#ff1a1a; box-shadow:0 0 3px #ff1a1a; }
+      .en-seg.on-o { background:#ff7700; border-color:#ff7700; box-shadow:0 0 3px #ff7700; }
+      .en-seg.on-y { background:#ccbb00; border-color:#ccbb00; box-shadow:0 0 3px #ccbb00; }
+      .en-seg.on-g { background:#00cc22; border-color:#00cc22; box-shadow:0 0 3px #00cc22; }
+
+      .en-seg.flash { animation: segFlash 0.3s ease-out; }
+      @keyframes segFlash {
+        0%   { filter: brightness(1);   }
+        40%  { filter: brightness(2.8); }
+        100% { filter: brightness(1);   }
+      }
+
+      /* Lamp counter below the bar */
+      .en-lamps {
+        display: flex; flex-direction: column;
+        align-items: center; gap: 3px;
+        margin-top: 3px;
+      }
+      .en-lamp-icon { font-size: 13px; }
+      .en-lamp-count {
+        font-size: 6px; color: #ffcc00;
+        text-shadow: 0 0 5px rgba(255,200,0,0.7);
+        text-align: center; letter-spacing: 0;
+      }
+
+      /* ══════════════════════════════════════════
+         PAUSE OVERLAY
+         ══════════════════════════════════════════ */
       #pause-overlay {
         position: fixed; inset: 0; z-index: 200;
         display: none; align-items: center; justify-content: center;
-        background: rgba(0,0,0,0.7); backdrop-filter: blur(6px);
-        animation: fadeIn 0.2s ease-out;
+        background: rgba(0,0,0,0.78); backdrop-filter: blur(6px);
       }
       .pause-card {
-        text-align: center; background: rgba(0,0,0,0.4);
-        border: 2px solid rgba(255,255,255,0.15); border-radius: 20px;
-        padding: clamp(24px, 4vw, 40px); min-width: 220px;
+        text-align: center;
+        background: rgba(0,0,0,0.55);
+        border: 2px solid #3a3a3a;
+        border-radius: 6px;
+        padding: 36px 44px;
+        min-width: 250px;
       }
       .pause-title {
-        font-family: Impact, 'Arial Black', sans-serif;
-        font-size: clamp(1.8rem, 5vw, 2.5rem); color: #fff;
-        letter-spacing: 6px; margin-bottom: 24px;
-        text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+        font-family: 'Press Start 2P', monospace;
+        font-size: 18px; color: #fff; letter-spacing: 4px;
+        margin-bottom: 30px;
+        text-shadow: 0 0 10px rgba(255,255,255,0.3);
       }
       .pause-btn {
         display: block; width: 100%;
-        font-family: Impact, 'Arial Black', sans-serif;
-        font-size: 1.1rem; font-weight: 700; letter-spacing: 3px;
-        text-transform: uppercase; padding: 12px 0; margin-bottom: 10px;
-        border: none; border-radius: 10px; cursor: pointer;
-        transition: transform 0.15s, box-shadow 0.15s;
+        font-family: 'Press Start 2P', monospace;
+        font-size: 9px; letter-spacing: 2px;
+        text-transform: uppercase;
+        padding: 14px 0; margin-bottom: 12px;
+        border: none; border-radius: 4px;
+        pointer-events: all;
+        transition: transform 0.12s, box-shadow 0.12s;
       }
-      .pause-btn:active { transform: scale(0.96); }
+      .pause-btn:last-child { margin-bottom: 0; }
+      .pause-btn:active { transform: scale(0.95); }
       .pause-resume {
         background: linear-gradient(135deg, #39ff14, #7fff00);
-        color: #1a2e18; box-shadow: 0 0 15px rgba(57,255,20,0.3);
+        color: #061206;
+        box-shadow: 0 0 14px rgba(57,255,20,0.35);
       }
-      .pause-resume:hover { box-shadow: 0 0 25px rgba(57,255,20,0.5); }
+      .pause-resume:hover { box-shadow: 0 0 24px rgba(57,255,20,0.6); }
       .pause-quit {
-        background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.7);
-        border: 1px solid rgba(255,255,255,0.2);
+        background: rgba(255,255,255,0.07);
+        color: rgba(255,255,255,0.55);
+        border: 1px solid #3a3a3a;
       }
-      .pause-quit:hover { background: rgba(255,255,255,0.15); }
+      .pause-quit:hover { background: rgba(255,255,255,0.13); }
+
+      /* ── Toast notification ── */
+      .hud-toast {
+        position: fixed; z-index: 120;
+        left: 50%; top: 38%;
+        transform: translate(-50%, -50%);
+        font-family: 'Press Start 2P', monospace;
+        font-size: clamp(12px, 2.5vw, 18px);
+        color: #fff;
+        text-shadow: 0 0 12px rgba(255,255,255,0.6), 0 0 24px rgba(255,255,255,0.3);
+        letter-spacing: 3px;
+        text-align: center;
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity 0.2s ease;
+      }
+      .hud-toast.visible { opacity: 1; }
     `;
     document.head.appendChild(style);
+
     gameRoot().appendChild(this.el);
-    gameRoot().appendChild(this.dashboard);
     gameRoot().appendChild(this.pauseOverlay);
 
+    // ── Wire up buttons ──
     this.el.querySelector('#hud-home').addEventListener('click', () => onHome());
     this.el.querySelector('#hud-pause').addEventListener('click', () => onPause());
     this.pauseOverlay.querySelector('#pause-resume').addEventListener('click', () => onPause());
     this.pauseOverlay.querySelector('#pause-quit').addEventListener('click', () => onHome());
 
-    this.barFill = this.el.querySelector('#hud-bar-fill');
-    this.chargeText = this.el.querySelector('#hud-charge-text');
-    this.lampCount = this.el.querySelector('#hud-lamp-count');
-    this.scoreEl = this.el.querySelector('#hud-score');
-    this.comboEl = this.el.querySelector('#hud-combo');
-    this.stageEl = this.el.querySelector('#hud-stage');
-    this.dashSpeed = this.dashboard.querySelector('#dash-speed');
-    this.dashArcFill = this.dashboard.querySelector('#dash-arc-fill');
-    this.dashGear = this.dashboard.querySelector('#dash-gear');
+    // ── Cache DOM refs ──
+    this.spSegs      = [...this.el.querySelectorAll('.sp-seg')];
+    this.enSegs      = [...this.el.querySelectorAll('.en-seg')];
+    this.mmLamps     = [...this.el.querySelectorAll('.mm-lamp')];
+    this.mmPlayer    = this.el.querySelector('#mm-player');
+    this.spNum       = this.el.querySelector('#sp-num');
+    this.spTime      = this.el.querySelector('#sp-time');
+    this.enLampCount = this.el.querySelector('#en-lamp-count');
+    this.scoreEl     = this.el.querySelector('#hud-score');
+    this.comboEl     = this.el.querySelector('#hud-combo');
+  }
 
-    // Arc total length (semicircle with r=80): π * 80 ≈ 251.3
-    this.arcTotal = 251.3;
+  // ── Internal helpers ──
+
+  _spColor(segIndex) {
+    const t = segIndex / SP_SEGS;
+    if (t < 0.40) return 'on-g';
+    if (t < 0.60) return 'on-y';
+    if (t < 0.80) return 'on-o';
+    return 'on-r';
+  }
+
+  _enColor(segIndex) {
+    const t = segIndex / EN_SEGS;
+    if (t < 0.20) return 'on-r';
+    if (t < 0.40) return 'on-o';
+    if (t < 0.65) return 'on-y';
+    return 'on-g';
+  }
+
+  _updateMinimap() {
+    const totalPlates = TOTAL_LAMP_POSTS * PLATES_TO_FILL_BAR;
+    const progress = (this._lamps * PLATES_TO_FILL_BAR + this._charge) / totalPlates;
+    // Keep dot 4%..96% inside the strip so it stays visible
+    const pct = 4 + Math.min(92, progress * 92);
+    this.mmPlayer.style.bottom = pct.toFixed(1) + '%';
+  }
+
+  // ── Public update methods ──
+
+  updateSpeed(mph) {
+    const display = Math.round(mph);
+    this.spNum.textContent = display;
+
+    const frac = Math.max(0, Math.min(1, (mph - 20) / 50));
+    const lit  = Math.round(frac * SP_SEGS);
+    this.spSegs.forEach((seg, i) => {
+      seg.className = 'sp-seg' + (i < lit ? ' ' + this._spColor(i) : '');
+    });
+
+    // Speed-number color tracks the gauge
+    const col = frac > 0.78 ? '#ff1a1a' : frac > 0.5 ? '#ff8800' : '#ff3333';
+    this.spNum.style.color = col;
+    this.spNum.style.textShadow = `0 0 8px ${col}, 0 0 18px ${col}60`;
+  }
+
+  updateTime(elapsed) {
+    const mm = Math.floor(elapsed / 60).toString().padStart(2, '0');
+    const ss = Math.floor(elapsed % 60).toString().padStart(2, '0');
+    const cs = Math.floor((elapsed % 1) * 100).toString().padStart(2, '0');
+    this.spTime.textContent = `${mm}'${ss}"${cs}`;
   }
 
   updateCharge(charge) {
-    const pct = (charge / PLATES_TO_FILL_BAR) * 100;
-    this.barFill.style.width = pct + '%';
-    this.chargeText.textContent = `${charge}/${PLATES_TO_FILL_BAR}`;
+    this._charge = charge;
+    const lit = Math.round((charge / PLATES_TO_FILL_BAR) * EN_SEGS);
+    this.enSegs.forEach((seg, i) => {
+      seg.className = 'en-seg' + (i < lit ? ' ' + this._enColor(i) : '');
+    });
+    this._updateMinimap();
   }
 
   celebrateCharge() {
-    this.barFill.classList.add('celebrate');
-    setTimeout(() => this.barFill.classList.remove('celebrate'), 500);
+    // All segments light up bright green, then flash 3×
+    this.enSegs.forEach((seg, i) => {
+      seg.className = 'en-seg on-g flash';
+      // Stagger removal so the flash cascades slightly
+      setTimeout(() => seg.classList.remove('flash'), 320 + i * 8);
+    });
   }
 
   updateLamps(lit) {
-    this.lampCount.textContent = `${lit} / ${TOTAL_LAMP_POSTS}`;
+    this._lamps = lit;
+    this.enLampCount.textContent = `${lit}/${TOTAL_LAMP_POSTS}`;
+    this.mmLamps.forEach((el, i) => el.classList.toggle('lit', i < lit));
+    this._updateMinimap();
   }
 
   updateScore(score) {
@@ -304,7 +494,7 @@ export class HUD {
 
   updateCombo(combo) {
     if (combo >= 2) {
-      this.comboEl.textContent = `x${combo}`;
+      this.comboEl.textContent = `x${combo} COMBO`;
       this.comboEl.classList.add('pop');
       setTimeout(() => this.comboEl.classList.remove('pop'), 150);
     } else {
@@ -312,65 +502,67 @@ export class HUD {
     }
   }
 
-  updateSpeed(mph) {
-    const display = Math.round(mph);
-    this.dashSpeed.textContent = display;
-
-    // Arc fill: 0% at 20mph, 100% at 70mph
-    const pct = Math.max(0, Math.min(1, (mph - 20) / 50));
-    const offset = this.arcTotal * (1 - pct);
-    this.dashArcFill.setAttribute('stroke-dashoffset', offset.toFixed(1));
-
-    // Color the speed number
-    if (display >= 55) {
-      this.dashSpeed.style.color = '#ff4444';
-    } else if (display >= 40) {
-      this.dashSpeed.style.color = '#ffaa00';
-    } else {
-      this.dashSpeed.style.color = '#fff';
-    }
-
-    // Gear indicator based on speed zones
-    const gear = display < 30 ? 1 : display < 42 ? 2 : display < 54 ? 3 : display < 64 ? 4 : 5;
-    this.dashGear.textContent = gear;
-  }
-
-  updateStage(lampPostsLit, total) {
-    this.stageEl.textContent = `STAGE ${lampPostsLit + 1}/${total}`;
-  }
+  // Kept for backwards-compatibility — lamp count covers this now
+  updateStage() {}
 
   showFloatingScore(points) {
     const el = document.createElement('div');
     el.className = 'hud-float-score';
     el.textContent = `+${points}`;
     el.style.left = '50%';
-    el.style.top = '45%';
-    el.style.transform = 'translateX(-50%)';
+    el.style.top  = '42%';
     gameRoot().appendChild(el);
-    setTimeout(() => el.remove(), 800);
+    setTimeout(() => el.remove(), 900);
+  }
+
+  /** Show a center-screen toast that fades in, holds, then fades out. */
+  showToast(text) {
+    const el = document.createElement('div');
+    el.className = 'hud-toast';
+    el.textContent = text;
+    gameRoot().appendChild(el);
+
+    // fade-in
+    void el.offsetWidth;
+    el.classList.add('visible');
+
+    // hold 1s, then fade-out
+    setTimeout(() => el.classList.remove('visible'), 1200);
+    setTimeout(() => el.remove(), 1500);
   }
 
   showPause() { this.pauseOverlay.style.display = 'flex'; }
   hidePause() { this.pauseOverlay.style.display = 'none'; }
 
   reset() {
+    this._charge = 0;
+    this._lamps  = 0;
     this.updateCharge(0);
     this.updateLamps(0);
     this.updateSpeed(20);
+    this.updateTime(0);
     this.updateScore(0);
     this.updateCombo(0);
-    this.updateStage(0, 4);
     this.hidePause();
   }
 
   show() {
-    this.el.style.display = 'flex';
-    this.dashboard.style.display = 'block';
+    clearTimeout(this._hideTimer);
+    this.el.style.opacity = '0';
+    this.el.style.display = 'block';
+    void this.el.offsetWidth;
+    this.el.style.transition = 'opacity 0.4s ease';
+    this.el.style.opacity = '1';
   }
 
   hide() {
-    this.el.style.display = 'none';
-    this.dashboard.style.display = 'none';
+    clearTimeout(this._hideTimer);
+    this.el.style.transition = 'opacity 0.25s ease';
+    this.el.style.opacity = '0';
+    this._hideTimer = setTimeout(() => {
+      this.el.style.display = 'none';
+      this.el.style.transition = '';
+    }, 260);
     this.hidePause();
   }
 }

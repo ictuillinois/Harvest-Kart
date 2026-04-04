@@ -14,25 +14,25 @@ GitHub Pages deployment is automatic on push to main via `.github/workflows/depl
 
 ## Project Overview
 
-A 3D browser-based kart mini-game (Three.js v0.183.2 + Vite v8 + @tweenjs/tween.js v25). No React, no backend. Demonstrates piezoelectric energy harvesting: drive over glowing plates on a highway to charge lamp posts.
+A 3D browser-based kart racing mini-game (Three.js v0.183.2 + Vite v8 + @tweenjs/tween.js v25). No React, no backend. Demonstrates piezoelectric energy harvesting: drive over glowing plates on a highway to charge lamp posts progressively.
 
-**Game flow:** `menu` → `driverSelect` → `mapSelect` → `playing` ↔ `paused` → `complete`
+**Game flow:** `menu` → `driverSelect` → `mapSelect` → `playing` ↔ `paused` → `completing` → `complete`
 
-Three map themes: Brazil (sunset coastal highway), USA (night city), Peru (mountain pass). Each has distinct sky (Preetham shader), lighting, decorations, and color grading.
+**Drivers:** Ethan (black, Sports GT), Kate (pink, Compact), Destiny (blue, Formula), Luke (green, Rally). Each has a unique vehicle type and color. Character PNGs in `public/characters/`.
+
+**Maps:** Peru (mountain pass), USA (night city), Brazil (coastal highway). Each has a custom gradient sky (no Preetham shader), distinct lighting, decorations, and fog.
 
 ## Critical Patterns
 
 ### Model Scale Normalization (most important)
 
-GLTF models from different sources have wildly different internal scales: KayKit models are 0.1-3.0 units, Poly Pizza models can be 50-150 units (centimeter scale). **Never hand-tune scales.**
+GLTF models from different sources have wildly different internal scales. **Never hand-tune scales.**
 
 `assetLoader.js` has `normalizeToHeight(object3D, targetHeight)` which uses `Box3.setFromObject()` to measure real bounds and scales to an exact world-space height. The `MODEL_HEIGHTS` registry maps every model URL to its target height. `getModel(url)` auto-normalizes on every clone.
 
-When adding a new model: measure its bounds first, add a target height to `MODEL_HEIGHTS`, then place it with `_placeModel(url, x, y, z, rotY, sizeVariation)` — no explicit scale needed.
-
 ### Asset Path Resolution
 
-All public assets must use `asset('path/to/file')` from `src/utils/base.js`. This prepends `import.meta.env.BASE_URL` so paths work both in dev (`/`) and on GitHub Pages (`/Harvest-Kart/`). Hardcoding `/path` will break on Pages.
+All public assets must use `asset('path/to/file')` from `src/utils/base.js`. This prepends `import.meta.env.BASE_URL` so paths work both in dev (`/`) and on GitHub Pages (`/Harvest-Kart/`).
 
 ### Tween.js v25 Requires Explicit Group
 
@@ -41,50 +41,67 @@ All public assets must use `asset('path/to/file')` from `src/utils/base.js`. Thi
 import { tweenGroup } from '../utils/tweenGroup.js';
 new Tween(obj, tweenGroup).to({...}).start();
 ```
-The game loop calls `tweenGroup.update()` each frame.
 
 ### Parallax Depth Layers
 
-Environment decorations are in 3 arrays with different scroll speeds:
-- `this.foreground[]` — 100% speed (bushes, barriers, props near road)
-- `this.midground[]` — 60% speed (buildings, palms, hills)
-- `this.background[]` — 20% speed (mountains)
+Environment decorations scroll at 3 speeds:
+- `this.foreground[]` — 100% (barriers, bushes, props near road)
+- `this.midground[]` — 60% (buildings, palms, hills)
+- `this.background[]` — 20% (mountains, clouds)
 
-When placing objects in `_buildBrazil/USA/Peru`, pass the layer as the last parameter to `_placeModel()` or `_scatterProps()`.
+### Sky System
 
-### Post-Processing
+Each map uses a custom gradient sky (ShaderMaterial on inverted sphere) instead of the Preetham sky addon. Brazil = daytime blue gradient with cloud sprites. USA = night gradient with stars + city light pollution glow. Peru = deep mountain blue with dusty horizon haze.
 
-`EffectComposer` pipeline: RenderPass → ColorGradePass → VignettePass. Bloom was removed because the Preetham sky shader outputs HDR values near the sun disc that blow out at any bloom threshold. Use `AgXToneMapping` (not ACES) — it handles HDR sky much better.
+### Lamp Post Progressive Lighting
 
-### Water/Ocean
+20 recycling lamp posts (10 pairs, both sides of road). 5-tier brightness system (tier 0-4) with color progression (brown → amber → gold → warm white). Per-coin micro-progression interpolates between tiers. Inverted light cones (narrow at lamp, wide at road) with additive blending + ground light pools. `AMBIENT_MULTIPLIERS` exported from LampPost.js for scene ambient scaling.
 
-The Three.js Water addon (`three/addons/objects/Water.js`) was replaced with a simple blue `MeshStandardMaterial` plane because the Water shader reflects the sky so heavily at sunset that it becomes invisible. The current ocean uses vertex displacement for wave animation.
+### Vehicle System
+
+4 vehicle types in `Kart.js`: `_buildFormula()` (open-wheel F1), `_buildSportsGT()` (closed coupe), `_buildCompact()` (hatchback), `_buildRally()` (off-road). Dispatcher via `driver.vehicleType`. Each builder sets `this._exhaustZ` for exhaust particles. 3-light vehicle rig (overhead, rear, low rim) ensures visibility on all maps.
+
+### Race Start & Completion Sequences
+
+`RaceStartSequence.js` — Black overlay fade → 3-2-1-GO countdown → controls unlock. `CompletionSequence.js` — Tier 4 flash → auto-drive → camera pullback → "MISSION ACCOMPLISHED" two-line text → fade to black → win screen.
+
+### Engine Sound (Web Audio API)
+
+American Muscle V8: 4 layered oscillators (45Hz fundamental + 2nd/3rd/4th harmonics), waveshaper distortion, lowpass filter, idle-lope LFO for "potato-potato" burble. `updateEngine(speed)` called every frame. `playCountdownRev()` for countdown. Volume tuned to 70% so music track is audible.
+
+### Controls Lock/Unlock
+
+`controls.js` has `lock()`/`unlock()` methods. When locked, `isPedalDown()` returns false and lane switches are blocked. Used during countdown and completion sequences.
 
 ## Architecture
 
-`src/main.js` is the orchestrator: creates renderer, scene, camera, all game objects and UI screens, wires events, and runs the game loop. Game state is event-driven via `GameState.js` (observer pattern). UI screens are DOM overlays (HTML/CSS) at z-index 100, HUD at z-index 50.
+`src/main.js` — Orchestrator: renderer, scene, camera, game objects, UI screens, event wiring, game loop. Kart-attached headlights for USA night map created/destroyed here.
 
-`Environment.js` is the largest file — it builds the Sky (Preetham addon), lighting, ground, barriers, and theme-specific decorations. The `build(themeIndex)` method is async (loads models). Three private methods `_buildBrazil/USA/Peru` place theme decorations.
+`Environment.js` — Sky, lighting, ground, barriers, theme decorations. `_buildGradientSky()`, `_buildNightSky()`, `_buildMountainSky()` for per-theme skies. Per-theme hemisphere light overrides.
 
-Controls (`controls.js`) handle keyboard (arrows/WASD/space), touch (pointer events with capture for multi-touch), and swipe. The GAS pedal is a holdable button that reports `isPedalDown()` — speed is managed in the game loop, not in controls.
+`GameState.js` — Observer pattern state machine. States: menu, driverSelect, mapSelect, playing, paused, completing, complete.
+
+`Kart.js` — Vehicle constructor with 4 body types. Shared methods: `_addWheels()`, `_addHeadlights()`, `_addTailLights()`, `_addExhaustPipes()`. Exhaust particle system.
+
+`LampPost.js` — 20 recycling posts, tier system, micro-progression, flash effects, ground pools, inverted cones with additive blending.
+
+`audio.js` — Procedural Web Audio: V8 engine, countdown tones/revs, plate hit, lamp lit, combo break, lane switch, win fanfare, final power-on. Background music via HTML Audio elements.
 
 ## 3D Assets
 
-All in `public/models/`. KayKit City Builder (CC0, GLTF+texture atlas), Poly Pizza models (CC0/CC-BY, GLB). Poly Pizza beach props were removed — their 50-150 unit internal geometry was unusable. Only `palm.glb` from that set survived.
+All in `public/models/`. KayKit City Builder (CC0, GLTF+texture atlas), Poly Pizza models (CC0/CC-BY, GLB). Character portraits in `public/characters/` (PNG). Map preview images in `public/maps/` (PNG).
 
 ## Known Issues
 
 - Environment theme builders have duplicated code (3 similar methods)
-- No InstancedMesh (barriers + road dashes could save ~50 draw calls)
+- No InstancedMesh (barriers + road dashes could save draw calls)
 - No frustum culling on decorations
-- Kart and driver are built from primitives (no loaded model)
+- Vehicles built from primitives (no loaded GLTF models)
 
 ## Remaining Roadmap
 
 - Theme config objects to DRY the 3 builders
 - InstancedMesh for barriers + road dashes
-- Kart headlights for USA night map
 - Loading progress bar during model preload
-- Engine hum sound mapped to speed
 - Ambient sounds per theme (ocean waves, city hum, wind)
 - Keyboard Tab navigation on selection screens
