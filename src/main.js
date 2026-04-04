@@ -24,13 +24,13 @@ import { CompletionSequence } from './game/CompletionSequence.js';
 import { AMBIENT_MULTIPLIERS } from './game/LampPost.js';
 
 import { setupControls } from './utils/controls.js';
-import { playPlateHit, playLampLit, playComboBreak, playWinFanfare, playLaneSwitch, haptic, playMusic, stopMusic, startEngineIdle, stopEngine, updateEngine, playCountdownTone, playCountdownRev, playFinalPowerOn } from './utils/audio.js';
+import { playPlateHit, playLampLit, playComboBreak, playWinFanfare, playLaneSwitch, haptic, playMusic, stopMusic, startEngineIdle, stopEngine, updateEngine, playGearShift, playCountdownTone, playCountdownRev, playFinalPowerOn } from './utils/audio.js';
 import { gameRoot } from './utils/base.js';
 import {
-  MIN_SPEED, MAX_SPEED, MAP_THEMES,
-  PEDAL_ACCELERATION, COAST_DECELERATION,
-  MIN_SPEED_MPH, MAX_SPEED_MPH,
-  PLATE_SPAWN_INTERVAL,
+  MIN_SPEED_MPH, MAX_SPEED_MPH, STARTING_SPEED_MPH, SCROLL_FACTOR,
+  GEAR_THRESHOLDS, GEAR_ACCEL, DECEL_RATE, SHIFT_PAUSE_MS,
+  RPM_IDLE, RPM_REDLINE,
+  MAP_THEMES, PLATE_SPAWN_INTERVAL,
   CAMERA_OFFSET, CAMERA_LOOK_AHEAD,
   CAMERA_FOV_MIN, CAMERA_FOV_MAX, CAMERA_SHAKE_THRESHOLD
 } from './utils/constants.js';
@@ -42,7 +42,7 @@ const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, isMobile ? 1.5 : 2));
 renderer.toneMapping = THREE.AgXToneMapping;
-renderer.toneMappingExposure = 1.0;
+renderer.toneMappingExposure = 1.3;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = isMobile ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
 gameRoot().appendChild(renderer.domElement);
@@ -67,8 +67,8 @@ composer.addPass(new RenderPass(scene, camera));
 const vignetteShader = {
   uniforms: {
     tDiffuse: { value: null },
-    darkness: { value: 0.4 },
-    offset: { value: 1.3 },
+    darkness: { value: 0.25 },
+    offset: { value: 1.5 },
   },
   vertexShader: `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
   fragmentShader: `
@@ -127,11 +127,28 @@ const plates = new Plate(scene);
 const lampPosts = new LampPost(scene);
 const environment = new Environment(scene, renderer);
 
-// Per-theme vehicle lighting config
+// ── Gear/RPM state ──
+let currentGear = 0;
+let shiftCooldown = 0;
+let currentRPM = RPM_IDLE;
+
+function computeGearAndRPM(speedMph) {
+  let gear = 0;
+  for (let g = GEAR_THRESHOLDS.length - 2; g >= 0; g--) {
+    if (speedMph >= GEAR_THRESHOLDS[g]) { gear = g; break; }
+  }
+  gear = Math.min(gear, GEAR_ACCEL.length - 1);
+  const lo = GEAR_THRESHOLDS[gear], hi = GEAR_THRESHOLDS[gear + 1];
+  const t = Math.max(0, Math.min(1, (speedMph - lo) / (hi - lo)));
+  const rpm = RPM_IDLE + t * (RPM_REDLINE - RPM_IDLE);
+  return { gear, rpm: Math.max(RPM_IDLE, Math.min(RPM_REDLINE, rpm)) };
+}
+
+// Per-theme vehicle lighting config — aggressive intensities
 const THEME_VEHICLE_LIGHT = {
-  usa:    { headFwd: 3.0, headFar: 1.5, backfill: 0.5, underglow: 2.5 },
-  brazil: { headFwd: 1.0, headFar: 0.5, backfill: 0.3, underglow: 1.2 },
-  peru:   { headFwd: 1.5, headFar: 0.8, backfill: 0.4, underglow: 1.5 },
+  usa:    { headlights: 5.0, backfill: 4.0, underglow: 5.0 },
+  brazil: { headlights: 2.0, backfill: 2.5, underglow: 3.0 },
+  peru:   { headlights: 3.0, backfill: 3.0, underglow: 4.0 },
 };
 
 let kartLights = [];
@@ -140,22 +157,24 @@ function addKartLights(themeId) {
   removeKartLights();
   const cfg = THEME_VEHICLE_LIGHT[themeId] || THEME_VEHICLE_LIGHT.brazil;
 
-  // Forward headlight pool — illuminates road ahead
-  const headlightFwd = new THREE.PointLight(0xffffdd, cfg.headFwd, 35, 1);
-  headlightFwd.position.set(0, 2, -8);
-  kart.group.add(headlightFwd);
-  kartLights.push(headlightFwd);
+  // === SPOTLIGHT HEADLIGHTS — visible cones on road ===
+  const headlightTarget = new THREE.Object3D();
+  headlightTarget.position.set(0, -1, -40);
+  kart.group.add(headlightTarget);
+  kartLights.push(headlightTarget);
 
-  // Extended forward fill
-  const headlightFar = new THREE.PointLight(0xffffdd, cfg.headFar, 55, 1.5);
-  headlightFar.position.set(0, 3, -18);
-  kart.group.add(headlightFar);
-  kartLights.push(headlightFar);
+  for (const xOff of [-0.5, 0.5]) {
+    const spot = new THREE.SpotLight(0xfff5e6, cfg.headlights, 80, Math.PI / 5, 0.6, 1.2);
+    spot.position.set(xOff, 0.8, -1.5);
+    spot.target = headlightTarget;
+    spot.castShadow = false;
+    kart.group.add(spot);
+    kartLights.push(spot);
+  }
 
-  // Camera backfill — cool-tinted light from behind/above camera
-  const backfill = new THREE.DirectionalLight(0x8899bb, cfg.backfill);
-  backfill.position.set(0, 5, 8);
-  backfill.castShadow = false;
+  // === CAMERA BACKFILL — ensures kart rear is lit for chase cam ===
+  const backfill = new THREE.PointLight(0xaabbdd, cfg.backfill, 25, 1);
+  backfill.position.set(0, 6, 6);
   kart.group.add(backfill);
   kartLights.push(backfill);
 
@@ -213,16 +232,59 @@ const driverSelect = new DriverSelect(
   () => gameState.transition('menu')
 );
 
+// Loading overlay — masks synchronous environment.build() with a smooth fade-to-black
+const loadingOverlay = document.createElement('div');
+Object.assign(loadingOverlay.style, {
+  position: 'fixed', inset: '0', zIndex: '150',
+  background: '#000', opacity: '0', pointerEvents: 'none',
+  transition: 'opacity 0.45s ease', display: 'none',
+});
+document.body.appendChild(loadingOverlay);
+
+function fadeToBlack() {
+  return new Promise(resolve => {
+    loadingOverlay.style.display = 'block';
+    loadingOverlay.style.opacity = '0';
+    loadingOverlay.style.pointerEvents = 'all';
+    void loadingOverlay.offsetWidth;
+    loadingOverlay.style.opacity = '1';
+    setTimeout(resolve, 480); // wait for fade to fully complete
+  });
+}
+
+function clearLoadingOverlay() {
+  // RaceStartSequence has its own black overlay — just hide ours instantly
+  loadingOverlay.style.transition = 'none';
+  loadingOverlay.style.opacity = '0';
+  loadingOverlay.style.display = 'none';
+  loadingOverlay.style.pointerEvents = 'none';
+  void loadingOverlay.offsetWidth;
+  loadingOverlay.style.transition = 'opacity 0.45s ease';
+}
+
 const mapSelect = new MapSelect(
   async (mapIndex) => {
     gameState.selectedMap = mapIndex;
+
+    // Fade to black FIRST so the build happens behind a black screen
+    await fadeToBlack();
+
+    // Yield to browser so the black frame paints before heavy build work
+    await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+
     await environment.build(mapIndex);
+
     // Apply per-theme color grading
     const cg = MAP_THEMES[mapIndex]?.colorGrade || { saturation: 1, contrast: 1, brightness: 1 };
     colorGradePass.uniforms.saturation.value = cg.saturation;
     colorGradePass.uniforms.contrast.value = cg.contrast;
     colorGradePass.uniforms.brightness.value = cg.brightness;
+
+    // Transition to playing — RaceStartSequence creates its own black overlay
     gameState.transition('playing');
+
+    // Remove our loading overlay once RaceStartSequence is in control
+    clearLoadingOverlay();
   },
   () => gameState.transition('driverSelect')
 );
@@ -307,9 +369,14 @@ gameState.on('stateChange', ({ from, to }) => {
           playCountdownRev,
           startEngine: startEngineIdle,
           onComplete: () => {
-            // Player gains control — road starts moving
-            gameState.speed = MIN_SPEED;
-            hud.updateSpeed(MIN_SPEED_MPH);
+            // Player gains control — starts at 40 MPH in gear 2
+            gameState.speed = STARTING_SPEED_MPH;
+            hud.updateSpeed(STARTING_SPEED_MPH);
+            currentGear = 1; // gear 2 (0-indexed)
+            shiftCooldown = 0;
+            const { rpm } = computeGearAndRPM(STARTING_SPEED_MPH);
+            currentRPM = rpm;
+            hud.updateTacho(rpm, 2);
             raceStart = null;
           },
         });
@@ -431,11 +498,7 @@ gameState.on('lampLit', ({ lampPostsLit }) => {
   }, 500);
 });
 
-// --- Helper: map internal speed to display MPH ---
-function speedToMph(speed) {
-  const t = (speed - MIN_SPEED) / (MAX_SPEED - MIN_SPEED);
-  return MIN_SPEED_MPH + t * (MAX_SPEED_MPH - MIN_SPEED_MPH);
-}
+// speedToMph removed — gameState.speed IS MPH directly
 
 // --- Resize ---
 // Renderer uses full viewport — no fixed resolution.
@@ -459,41 +522,58 @@ function animate() {
 
   // Always animate sky (clouds, stars) even on menus
   const isActive = gameState.state === 'playing' || gameState.state === 'completing';
-  environment.update(delta, isActive ? gameState.speed : 0);
-
+  environment.update(delta, isActive ? gameState.speed * SCROLL_FACTOR : 0);
 
   if (gameState.state === 'completing') {
-    // Auto-drive: speed is controlled by CompletionSequence via tweens
     const speed = gameState.speed;
-    updateEngine(speed / MAX_SPEED);
+    const scrollSpeed = speed * SCROLL_FACTOR;
+    const { rpm } = computeGearAndRPM(speed);
+    updateEngine(rpm);
 
-    road.update(delta, speed);
-    kart.update(delta, speed, true); // wheels spinning
-    plates.update(delta, speed);     // existing plates scroll past
-    lampPosts.update(delta, speed);
+    road.update(delta, scrollSpeed);
+    kart.update(delta, scrollSpeed, true);
+    plates.update(delta, scrollSpeed);
+    lampPosts.update(delta, scrollSpeed);
   }
 
   if (gameState.state === 'playing') {
     if (!raceStart) {
       gameState.elapsed += delta;
 
-      // Pedal-driven speed
+      // Gear-aware acceleration
       if (controls.isPedalDown()) {
-        gameState.speed = Math.min(gameState.speed + PEDAL_ACCELERATION * delta, MAX_SPEED);
+        if (shiftCooldown <= 0) {
+          gameState.speed = Math.min(gameState.speed + GEAR_ACCEL[currentGear] * delta, MAX_SPEED_MPH);
+        }
       } else {
-        gameState.speed = Math.max(gameState.speed - COAST_DECELERATION * delta, MIN_SPEED);
+        gameState.speed = Math.max(gameState.speed - DECEL_RATE * delta, MIN_SPEED_MPH);
       }
+      shiftCooldown = Math.max(0, shiftCooldown - delta);
+
+      // Gear shift detection
+      const { gear: newGear, rpm } = computeGearAndRPM(gameState.speed);
+      if (newGear !== currentGear && shiftCooldown <= 0) {
+        const isUpshift = newGear > currentGear;
+        currentGear = newGear;
+        shiftCooldown = SHIFT_PAUSE_MS / 1000;
+        playGearShift(isUpshift, newGear);
+        hud.flashTacho();
+        haptic(20);
+      }
+      currentRPM = rpm;
     }
 
     const speed = gameState.speed;
-    updateEngine(speed / MAX_SPEED);
-    hud.updateSpeed(speedToMph(speed));
+    const scrollSpeed = speed * SCROLL_FACTOR;
+    updateEngine(currentRPM);
+    hud.updateSpeed(speed);
+    hud.updateTacho(currentRPM, currentGear + 1);
     hud.updateTime(gameState.elapsed);
 
-    road.update(delta, speed);
-    kart.update(delta, speed, controls.isPedalDown());
-    plates.update(delta, speed);
-    lampPosts.update(delta, speed);
+    road.update(delta, scrollSpeed);
+    kart.update(delta, scrollSpeed, controls.isPedalDown());
+    plates.update(delta, scrollSpeed);
+    lampPosts.update(delta, scrollSpeed);
 
     if (plates.checkCollision(gameState.currentLane)) {
       gameState.hitPlate();
@@ -502,12 +582,12 @@ function animate() {
       gameState.missPlate();
     }
 
-    // Smooth camera follow (lerp toward kart lane position)
+    // Smooth camera follow
     const targetCamX = kart.group.position.x * 0.25;
     camera.position.x += (targetCamX - camera.position.x) * 0.08;
 
-    // Dynamic FOV: widens with speed for visceral feel
-    const speedFraction = (speed - MIN_SPEED) / (MAX_SPEED - MIN_SPEED);
+    // Dynamic FOV: widens with speed
+    const speedFraction = (speed - MIN_SPEED_MPH) / (MAX_SPEED_MPH - MIN_SPEED_MPH);
     const targetFOV = CAMERA_FOV_MIN + speedFraction * (CAMERA_FOV_MAX - CAMERA_FOV_MIN);
     camera.fov += (targetFOV - camera.fov) * 0.05;
     camera.updateProjectionMatrix();

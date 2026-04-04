@@ -21,12 +21,12 @@ function describeArc(cx, cy, r, startDeg, sweepDeg) {
 
 const ARC_D = describeArc(ARC_CX, ARC_CY, ARC_R, ARC_START_DEG, ARC_SWEEP_DEG);
 
-// ── Build minor tick marks (every 5 MPH) ──
+// ── Build minor tick marks (every 10 MPH, skip major ticks at 20) ──
 function buildMinorTicks() {
   const ticks = [];
-  for (let mph = 20; mph <= 70; mph += 5) {
-    if (mph % 10 === 0) continue; // skip major ticks
-    const frac = (mph - 20) / 50;
+  for (let mph = 0; mph <= 100; mph += 10) {
+    if (mph % 20 === 0) continue;
+    const frac = mph / 100;
     const deg = ARC_START_DEG + frac * ARC_SWEEP_DEG;
     const inner = polarToXY(ARC_CX, ARC_CY, ARC_R - 10, deg);
     const outer = polarToXY(ARC_CX, ARC_CY, ARC_R - 5, deg);
@@ -35,11 +35,11 @@ function buildMinorTicks() {
   return ticks.join('');
 }
 
-// ── Build major tick marks (every 10 MPH) ──
+// ── Build major tick marks (every 20 MPH: 0,20,40,60,80,100) ──
 function buildTicks() {
   const ticks = [];
-  for (let mph = 20; mph <= 70; mph += 10) {
-    const frac = (mph - 20) / 50;
+  for (let mph = 0; mph <= 100; mph += 20) {
+    const frac = mph / 100;
     const deg = ARC_START_DEG + frac * ARC_SWEEP_DEG;
     const inner = polarToXY(ARC_CX, ARC_CY, ARC_R - 14, deg);
     const outer = polarToXY(ARC_CX, ARC_CY, ARC_R - 4, deg);
@@ -50,6 +50,43 @@ function buildTicks() {
   return ticks.join('');
 }
 
+// ── Tachometer arc (same geometry as speedometer for visual symmetry) ──
+const TACHO_ARC_D = ARC_D; // reuse same arc path
+
+// RPM range: 0-8000, but we display 1-8 (in thousands)
+function buildTachoMinorTicks() {
+  const ticks = [];
+  for (let rpm = 500; rpm <= 8000; rpm += 500) {
+    if (rpm % 1000 === 0) continue;
+    const frac = rpm / 8000;
+    const deg = ARC_START_DEG + frac * ARC_SWEEP_DEG;
+    const inner = polarToXY(ARC_CX, ARC_CY, ARC_R - 8, deg);
+    const outer = polarToXY(ARC_CX, ARC_CY, ARC_R - 4, deg);
+    ticks.push(`<line x1="${inner.x}" y1="${inner.y}" x2="${outer.x}" y2="${outer.y}" stroke="rgba(255,255,255,0.12)" stroke-width="0.8" stroke-linecap="round"/>`);
+  }
+  return ticks.join('');
+}
+
+function buildTachoMajorTicks() {
+  const ticks = [];
+  for (let rpm = 0; rpm <= 8000; rpm += 1000) {
+    const frac = rpm / 8000;
+    const deg = ARC_START_DEG + frac * ARC_SWEEP_DEG;
+    const inner = polarToXY(ARC_CX, ARC_CY, ARC_R - 14, deg);
+    const outer = polarToXY(ARC_CX, ARC_CY, ARC_R - 4, deg);
+    const label = polarToXY(ARC_CX, ARC_CY, ARC_R - 22, deg);
+    const isRedline = rpm >= 7000;
+    const strokeColor = isRedline ? 'rgba(255,50,50,0.6)' : 'rgba(255,255,255,0.3)';
+    ticks.push(`<line x1="${inner.x}" y1="${inner.y}" x2="${outer.x}" y2="${outer.y}" stroke="${strokeColor}" stroke-width="1.5" stroke-linecap="round"/>`);
+    ticks.push(`<text x="${label.x}" y="${label.y}" text-anchor="middle" dominant-baseline="central" fill="${isRedline ? 'rgba(255,50,50,0.5)' : 'rgba(255,255,255,0.25)'}" font-family="var(--hud-font)" font-size="7">${rpm / 1000}</text>`);
+  }
+  return ticks.join('');
+}
+
+// Redline arc segment (7000-8000 RPM = 87.5% to 100% of arc)
+const REDLINE_START_FRAC = 7000 / 8000;
+const REDLINE_ARC = describeArc(ARC_CX, ARC_CY, ARC_R, ARC_START_DEG + REDLINE_START_FRAC * ARC_SWEEP_DEG, (1 - REDLINE_START_FRAC) * ARC_SWEEP_DEG);
+
 export class HUD {
   constructor(onHome, onPause) {
     this._charge = 0;
@@ -59,6 +96,9 @@ export class HUD {
     // ── Energy segments HTML ──
     const enHTML = Array.from({ length: EN_SEGS }, (_, i) =>
       `<div class="en-seg" data-i="${i}"></div>`).join('');
+
+    // ── Tachometer needle start ──
+    const tachoNeedleStart = polarToXY(ARC_CX, ARC_CY, ARC_R - 18, ARC_START_DEG);
 
     // ── Minimap lamp markers ──
     const lampHTML = Array.from({ length: TOTAL_LAMP_POSTS }, (_, i) => {
@@ -106,6 +146,65 @@ export class HUD {
         <button class="hud-btn hud-glass hud-pause-btn" id="hud-pause" aria-label="Pause">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>
         </button>
+      </div>
+
+      <!-- Bottom-left: Tachometer -->
+      <div class="hud-bl">
+        <div class="tacho-wrap">
+          <svg class="tacho-svg" viewBox="0 0 200 140">
+            <defs>
+              <linearGradient id="tacho-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stop-color="#00ff88"/>
+                <stop offset="55%" stop-color="#ffdd00"/>
+                <stop offset="82%" stop-color="#ff8800"/>
+                <stop offset="100%" stop-color="#ff2233"/>
+              </linearGradient>
+              <filter id="tacho-glow" x="-20%" y="-20%" width="140%" height="140%">
+                <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="blur"/>
+                <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+              </filter>
+              <filter id="tacho-needle-glow" x="-50%" y="-50%" width="200%" height="200%">
+                <feGaussianBlur in="SourceGraphic" stdDeviation="2" result="blur"/>
+                <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+              </filter>
+              <radialGradient id="tacho-bg-grad" cx="50%" cy="70%" r="55%">
+                <stop offset="0%" stop-color="rgba(255,50,50,0.03)"/>
+                <stop offset="100%" stop-color="rgba(0,0,0,0)"/>
+              </radialGradient>
+            </defs>
+            <!-- Background glow -->
+            <circle cx="${ARC_CX}" cy="${ARC_CY}" r="90" fill="url(#tacho-bg-grad)"/>
+            <!-- Outer decorative ring -->
+            <path d="${describeArc(ARC_CX, ARC_CY, ARC_R + 6, ARC_START_DEG, ARC_SWEEP_DEG)}" fill="none" stroke="rgba(255,255,255,0.04)" stroke-width="1.5" stroke-linecap="round"/>
+            <!-- Arc track -->
+            <path d="${TACHO_ARC_D}" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="14" stroke-linecap="round"/>
+            <!-- Redline zone background (always visible, subtle) -->
+            <path d="${REDLINE_ARC}" fill="none" stroke="rgba(255,30,30,0.12)" stroke-width="14" stroke-linecap="round"/>
+            <!-- Arc fill (animated) -->
+            <path id="tacho-fill" d="${TACHO_ARC_D}" fill="none" stroke="url(#tacho-grad)" stroke-width="14" stroke-linecap="round"
+                  stroke-dasharray="${ARC_LENGTH}" stroke-dashoffset="${ARC_LENGTH}" filter="url(#tacho-glow)"
+                  style="transition: stroke-dashoffset 80ms ease-out;"/>
+            <!-- Minor ticks -->
+            ${buildTachoMinorTicks()}
+            <!-- Major ticks + labels -->
+            ${buildTachoMajorTicks()}
+            <!-- Needle -->
+            <line id="tacho-needle" x1="${ARC_CX}" y1="${ARC_CY}" x2="${tachoNeedleStart.x}" y2="${tachoNeedleStart.y}"
+                  stroke="#fff" stroke-width="2.5" stroke-linecap="round" filter="url(#tacho-needle-glow)"/>
+            <!-- Center cap -->
+            <circle cx="${ARC_CX}" cy="${ARC_CY}" r="8" fill="rgba(0,0,0,0.5)" stroke="rgba(255,255,255,0.1)" stroke-width="1"/>
+            <circle cx="${ARC_CX}" cy="${ARC_CY}" r="4.5" fill="var(--hud-danger)" opacity="0.8"/>
+            <!-- Gear number (large, center) -->
+            <text id="tacho-gear" x="${ARC_CX}" y="${ARC_CY - 14}" text-anchor="middle" dominant-baseline="central"
+                  fill="#fff" font-family="var(--hud-font)" font-size="40" font-weight="900">1</text>
+            <!-- "GEAR" label -->
+            <text x="${ARC_CX}" y="${ARC_CY + 8}" text-anchor="middle" dominant-baseline="central"
+                  fill="rgba(255,255,255,0.3)" font-family="var(--hud-font)" font-size="8" font-weight="700" letter-spacing="3">GEAR</text>
+            <!-- RPM x1000 label at bottom -->
+            <text x="${ARC_CX}" y="132" text-anchor="middle" dominant-baseline="central"
+                  fill="rgba(255,255,255,0.2)" font-family="var(--hud-font)" font-size="6" letter-spacing="1">RPM x1000</text>
+          </svg>
+        </div>
       </div>
 
       <!-- Right edge: energy gauge -->
@@ -165,7 +264,7 @@ export class HUD {
             <circle cx="${ARC_CX}" cy="${ARC_CY}" r="4.5" fill="var(--hud-accent)" opacity="0.9"/>
             <!-- Speed number -->
             <text id="speedo-num" x="${ARC_CX}" y="${ARC_CY - 12}" text-anchor="middle" dominant-baseline="central"
-                  fill="#fff" font-family="var(--hud-font)" font-size="36" font-weight="900">20</text>
+                  fill="#fff" font-family="var(--hud-font)" font-size="36" font-weight="900">0</text>
             <!-- MPH label -->
             <text x="${ARC_CX}" y="${ARC_CY + 10}" text-anchor="middle" dominant-baseline="central"
                   fill="rgba(255,255,255,0.35)" font-family="var(--hud-font)" font-size="10" font-weight="700" letter-spacing="3">MPH</text>
@@ -464,6 +563,42 @@ export class HUD {
       }
 
       /* ══════════════════════════════════════════
+         BOTTOM-LEFT — TACHOMETER (circular SVG dial)
+         ══════════════════════════════════════════ */
+      .hud-bl {
+        position: absolute;
+        bottom: clamp(8px, 1.5vh, 20px); left: clamp(8px, 1.5vw, 24px);
+      }
+      .tacho-wrap {
+        width: clamp(200px, 28vw, 520px);
+        position: relative;
+      }
+      .tacho-svg {
+        width: 100%; height: auto;
+        filter: drop-shadow(0 4px 16px rgba(0,0,0,0.5));
+      }
+      #tacho-needle {
+        transform-origin: ${ARC_CX}px ${ARC_CY}px;
+        transition: transform 80ms ease-out;
+      }
+      #tacho-fill {
+        transition: stroke-dashoffset 80ms ease-out;
+      }
+      /* Redline pulse on the fill arc when in redline */
+      .tacho-svg.redline #tacho-fill {
+        animation: tachoRedlinePulse 0.35s ease-in-out infinite;
+      }
+      @keyframes tachoRedlinePulse {
+        0%, 100% { opacity: 0.85; }
+        50% { opacity: 1; }
+      }
+      /* Gear shift flash — brief white flash on the arc */
+      .tacho-svg.shift-flash #tacho-fill {
+        stroke: #fff !important;
+        filter: drop-shadow(0 0 8px rgba(255,255,255,0.6)) !important;
+      }
+
+      /* ══════════════════════════════════════════
          BOTTOM-RIGHT — SPEEDOMETER
          ══════════════════════════════════════════ */
       .hud-br {
@@ -569,6 +704,7 @@ export class HUD {
          ══════════════════════════════════════════ */
       @media (max-height: 380px) {
         .mm-panel { display: none; }
+        .hud-bl { display: none; }
         .en-panel { padding: 4px; }
         .hud-tl, .hud-tr { gap: 4px; }
       }
@@ -599,6 +735,14 @@ export class HUD {
     this._needle    = this.el.querySelector('#speedo-needle');
     this._speedText = this.el.querySelector('#speedo-num');
     this._arcLength = ARC_LENGTH;
+
+    // Tachometer refs (SVG dial)
+    this._tachoFill   = this.el.querySelector('#tacho-fill');
+    this._tachoNeedle = this.el.querySelector('#tacho-needle');
+    this._tachoGear   = this.el.querySelector('#tacho-gear');
+    this._tachoSvg    = this.el.querySelector('.tacho-svg');
+    this._lastGear    = 1;
+    this._tachoArcLen  = ARC_LENGTH;
   }
 
   // ── Internal helpers ──
@@ -621,7 +765,7 @@ export class HUD {
   // ── Public API ──
 
   updateSpeed(mph) {
-    const frac = Math.max(0, Math.min(1, (mph - 20) / 50));
+    const frac = Math.max(0, Math.min(1, mph / 100));
 
     // Arc fill
     this._arcFill.style.strokeDashoffset = String(this._arcLength * (1 - frac));
@@ -699,6 +843,37 @@ export class HUD {
   // Kept for backwards-compatibility
   updateStage() {}
 
+  updateTacho(rpm, gear) {
+    const frac = Math.max(0, Math.min(1, rpm / 8000));
+
+    // Arc fill
+    this._tachoFill.style.strokeDashoffset = String(this._tachoArcLen * (1 - frac));
+
+    // Needle
+    const angle = ARC_START_DEG + frac * ARC_SWEEP_DEG;
+    const nEnd = polarToXY(ARC_CX, ARC_CY, ARC_R - 18, angle);
+    this._tachoNeedle.setAttribute('x2', nEnd.x);
+    this._tachoNeedle.setAttribute('y2', nEnd.y);
+
+    // Redline visual feedback
+    this._tachoSvg.classList.toggle('redline', rpm > 7500);
+
+    // Gear number
+    if (this._lastGear !== gear) {
+      const isUp = gear > this._lastGear;
+      this._tachoGear.textContent = gear;
+      // Brief color flash
+      this._tachoGear.setAttribute('fill', isUp ? 'var(--hud-accent)' : '#ff8800');
+      setTimeout(() => this._tachoGear.setAttribute('fill', '#fff'), 300);
+      this._lastGear = gear;
+    }
+  }
+
+  flashTacho() {
+    this._tachoSvg.classList.add('shift-flash');
+    setTimeout(() => this._tachoSvg.classList.remove('shift-flash'), 120);
+  }
+
   celebrateCharge() {
     this.enSegs.forEach((seg, i) => {
       seg.classList.remove('on-r', 'on-o', 'on-y', 'seg-flash');
@@ -737,7 +912,9 @@ export class HUD {
     this._prevLit = 0;
     this.updateCharge(0);
     this.updateLamps(0);
-    this.updateSpeed(20);
+    this.updateSpeed(0);
+    this.updateTacho(1000, 1);
+    this._lastGear = 1;
     this.updateTime(0);
     this.updateScore(0);
     this.updateCombo(0);

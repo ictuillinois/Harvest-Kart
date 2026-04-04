@@ -119,28 +119,28 @@ export class Environment {
     this.scene.add(this.dirLight);
 
     if (theme.id === 'brazil') {
-      this.hemiLight = new THREE.HemisphereLight(0x87ceeb, 0xffe4b5, 0.5);
+      this.hemiLight = new THREE.HemisphereLight(0x87ceeb, 0xffe4b5, 0.7);
       this.dirLight.position.set(10, 30, -20);
     } else if (theme.id === 'usa') {
-      this.hemiLight = new THREE.HemisphereLight(0x0a0a2e, 0x2a2020, 0.35);
+      this.hemiLight = new THREE.HemisphereLight(0x334466, 0x332222, 0.5);
       this.dirLight.position.set(10, 25, -15);
     } else if (theme.id === 'peru') {
-      this.hemiLight = new THREE.HemisphereLight(0x6699cc, 0x8b7355, 0.4);
+      this.hemiLight = new THREE.HemisphereLight(0x6699cc, 0x8b7355, 0.6);
       this.dirLight.position.set(15, 35, -10);
     } else {
-      this.hemiLight = new THREE.HemisphereLight(theme.dirColor, theme.ground, 0.25);
+      this.hemiLight = new THREE.HemisphereLight(theme.dirColor, theme.ground, 0.5);
     }
     this.scene.add(this.hemiLight);
 
     const groundGeo = new THREE.PlaneGeometry(800, 800);
-    // Road-specific color overrides (asphalt gray, not pure ground color)
-    const roadColors = { brazil: 0x2e2e32, usa: 0x1e1e24, peru: 0x282830 };
-    const roadColor = roadColors[theme.id] || theme.ground;
+    // Road colors — REAL asphalt gray, clearly lighter than black
+    const roadColors = { brazil: 0x4a4a50, usa: 0x3a3a42, peru: 0x484850 };
+    const roadColor = roadColors[theme.id] || 0x464650;
     const groundMat = new THREE.MeshStandardMaterial({
       color: roadColor,
-      roughness: 0.75,
-      metalness: 0.05,
-      envMapIntensity: 0.3,
+      roughness: 0.6,
+      metalness: 0.02,
+      envMapIntensity: 0.4,
     });
     this.ground = new THREE.Mesh(groundGeo, groundMat);
     this.ground.rotation.x = -Math.PI / 2;

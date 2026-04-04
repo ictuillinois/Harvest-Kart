@@ -237,11 +237,11 @@ export function playLaneSwitch() {
 
 const ENG_BASE     = 45;     // fundamental idle Hz (deep V8)
 const ENG_IDLE_VOL = 0.08;   // master gain at idle (70% of previous)
-const ENG_MAX_VOL  = 0.24;   // master gain at max rev
-const ENG_FILT_LO  = 250;    // lowpass cutoff at idle (darker than V10)
-const ENG_FILT_HI  = 2200;   // cutoff at max (muscle = less bright)
-const ENG_SMOOTH   = 0.08;   // param smoothing time-constant (s)
-const ENG_FREQ_MUL = 2.2;    // frequency range: 1× → 3.2× (V8 doesn't rev as high)
+const ENG_MAX_VOL  = 0.30;   // master gain at max rev (louder at high RPM)
+const ENG_FILT_LO  = 250;    // lowpass cutoff at idle (dark rumble)
+const ENG_FILT_HI  = 2800;   // cutoff at max (brighter, more aggressive)
+const ENG_SMOOTH   = 0.04;   // param smoothing time-constant (s) — fast response for gear shifts
+const ENG_FREQ_MUL = 2.8;    // frequency range: 1× → 3.8× (wider range for dramatic gear drops)
 
 // Oscillator bank: [waveform, harmonic, gain@idle, gain@max]
 const OSC_DEFS = [
@@ -365,13 +365,13 @@ export function stopEngine() {
 
 /**
  * Update engine sound every frame.
- * @param {number} speed  0.0 (stopped) → 1.0 (max speed)
+ * @param {number} rpm  RPM value (1000–8000)
  */
-export function updateEngine(speed) {
+export function updateEngine(rpm) {
   if (!_eRunning) return;
   const c = getCtx();
   const t = c.currentTime;
-  const s = Math.max(0, Math.min(1, speed));
+  const s = Math.max(0, Math.min(1, (rpm - 1000) / 7000));
 
   // Frequency: 1× at idle → 3.2× at max (45 → 144 Hz fundamental)
   const fMul = 1 + s * ENG_FREQ_MUL;
@@ -401,6 +401,118 @@ export function updateEngine(speed) {
   _eLopeGain.gain.setTargetAtTime(lopeDepth, t, ENG_SMOOTH);
   // Lope rate increases slightly (burble speeds up with RPM)
   _eLope.frequency.setTargetAtTime(1.8 + s * 3, t, ENG_SMOOTH);
+}
+
+/**
+ * Play a gear shift sound effect with layered audio feedback.
+ * @param {boolean} isUpshift  true = upshift, false = downshift
+ * @param {number}  gear       0-indexed new gear (0=1st, 4=5th) — higher gears get deeper sounds
+ */
+export function playGearShift(isUpshift, gear = 0) {
+  if (!_eRunning) return;
+  const c = getCtx();
+  const t = c.currentTime;
+  const out = getMaster();
+  const gearFrac = Math.min(gear, 4) / 4; // 0.0 (1st) → 1.0 (5th)
+
+  if (isUpshift) {
+    // ── 1. Brief engine dip (NOT silence — just softer, 15ms) ──
+    const prevGain = _eMaster.gain.value;
+    _eMaster.gain.cancelScheduledValues(t);
+    _eMaster.gain.setValueAtTime(prevGain, t);
+    _eMaster.gain.linearRampToValueAtTime(prevGain * 0.55, t + 0.015);
+    // Quick bounce back, slightly louder than before (gear engaged surge)
+    _eMaster.gain.linearRampToValueAtTime(prevGain * 1.15, t + 0.06);
+    _eMaster.gain.setTargetAtTime(prevGain, t + 0.12, 0.06);
+
+    // ── 2. Mechanical clunk (deeper for higher gears) ──
+    const clunkBuf = c.createBuffer(1, c.sampleRate * 0.035, c.sampleRate);
+    const clunkData = clunkBuf.getChannelData(0);
+    for (let i = 0; i < clunkData.length; i++) clunkData[i] = (Math.random() * 2 - 1);
+    const clunk = c.createBufferSource();
+    clunk.buffer = clunkBuf;
+    const clunkBP = c.createBiquadFilter();
+    clunkBP.type = 'bandpass';
+    clunkBP.frequency.value = 600 + gearFrac * 400; // 600-1000Hz, higher gears = tighter
+    clunkBP.Q.value = 2;
+    const clunkGain = c.createGain();
+    clunkGain.gain.setValueAtTime(0.10 + gearFrac * 0.04, t + 0.01);
+    clunkGain.gain.exponentialRampToValueAtTime(0.001, t + 0.045);
+    clunk.connect(clunkBP).connect(clunkGain).connect(out);
+    clunk.start(t + 0.01);
+
+    // ── 3. Turbo whoosh / air release (rises with gear) ──
+    const whoosh = c.createBufferSource();
+    const whooshLen = 0.08 + gearFrac * 0.06; // longer whoosh in higher gears
+    const whooshBuf = c.createBuffer(1, c.sampleRate * whooshLen, c.sampleRate);
+    const whooshData = whooshBuf.getChannelData(0);
+    for (let i = 0; i < whooshData.length; i++) whooshData[i] = (Math.random() * 2 - 1) * 0.5;
+    whoosh.buffer = whooshBuf;
+    const whooshHP = c.createBiquadFilter();
+    whooshHP.type = 'highpass';
+    whooshHP.frequency.value = 2000 + gearFrac * 2000; // higher gears = more sibilant
+    whooshHP.Q.value = 0.5;
+    const whooshGain = c.createGain();
+    whooshGain.gain.setValueAtTime(0.04 + gearFrac * 0.03, t + 0.02);
+    whooshGain.gain.exponentialRampToValueAtTime(0.001, t + 0.02 + whooshLen);
+    whoosh.connect(whooshHP).connect(whooshGain).connect(out);
+    whoosh.start(t + 0.02);
+
+    // ── 4. Subtle "thump" — low-end punch on engagement ──
+    const thump = c.createOscillator();
+    thump.type = 'sine';
+    thump.frequency.setValueAtTime(60 + gear * 15, t + 0.01); // deeper in higher gears
+    const thumpGain = c.createGain();
+    thumpGain.gain.setValueAtTime(0.06, t + 0.01);
+    thumpGain.gain.exponentialRampToValueAtTime(0.001, t + 0.06);
+    thump.connect(thumpGain).connect(out);
+    thump.start(t + 0.01);
+    thump.stop(t + 0.08);
+
+  } else {
+    // ── DOWNSHIFT: rev-match blip + exhaust crackle ──
+
+    // 1. RPM spikes up briefly (engine braking blip)
+    const prevGain = _eMaster.gain.value;
+    _eMaster.gain.cancelScheduledValues(t);
+    _eMaster.gain.setValueAtTime(prevGain, t);
+    _eMaster.gain.linearRampToValueAtTime(prevGain * 1.3, t + 0.03);
+    _eMaster.gain.setTargetAtTime(prevGain, t + 0.08, 0.04);
+
+    for (const e of _eOscs) {
+      const curr = e.osc.frequency.value;
+      e.osc.frequency.cancelScheduledValues(t);
+      e.osc.frequency.setValueAtTime(curr, t);
+      e.osc.frequency.linearRampToValueAtTime(curr * 1.35, t + 0.03);
+      e.osc.frequency.setTargetAtTime(curr, t + 0.06, 0.04);
+    }
+
+    // 2. Brief filter spike (brighter exhaust note)
+    const prevCut = _eFilter.frequency.value;
+    _eFilter.frequency.cancelScheduledValues(t);
+    _eFilter.frequency.setValueAtTime(prevCut, t);
+    _eFilter.frequency.linearRampToValueAtTime(Math.min(prevCut * 1.8, 3000), t + 0.03);
+    _eFilter.frequency.setTargetAtTime(prevCut, t + 0.08, 0.05);
+
+    // 3. Exhaust crackle — short burst of filtered noise pops
+    for (let p = 0; p < 3; p++) {
+      const popDelay = 0.03 + p * 0.025 + Math.random() * 0.01;
+      const pop = c.createBufferSource();
+      const popBuf = c.createBuffer(1, c.sampleRate * 0.012, c.sampleRate);
+      const popData = popBuf.getChannelData(0);
+      for (let i = 0; i < popData.length; i++) popData[i] = (Math.random() * 2 - 1);
+      pop.buffer = popBuf;
+      const popBP = c.createBiquadFilter();
+      popBP.type = 'bandpass';
+      popBP.frequency.value = 400 + Math.random() * 600;
+      popBP.Q.value = 3;
+      const popGain = c.createGain();
+      popGain.gain.setValueAtTime(0.06 + Math.random() * 0.04, t + popDelay);
+      popGain.gain.exponentialRampToValueAtTime(0.001, t + popDelay + 0.015);
+      pop.connect(popBP).connect(popGain).connect(out);
+      pop.start(t + popDelay);
+    }
+  }
 }
 
 /**

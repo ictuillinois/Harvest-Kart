@@ -9,13 +9,21 @@ export const ROAD_WIDTH = 12;
 export const ROAD_SEGMENT_LENGTH = 100;
 export const ROAD_SEGMENT_COUNT = 3;
 
-// Speeds (internal units — mapped to 20-70 mph for display)
-export const MIN_SPEED = 15;          // idle / coast speed
-export const MAX_SPEED = 45;          // full pedal speed
-export const PEDAL_ACCELERATION = 35; // units/sec when pedal held (snappy 0.85s)
-export const COAST_DECELERATION = 14; // units/sec when pedal released
-export const MIN_SPEED_MPH = 20;
-export const MAX_SPEED_MPH = 70;
+// Speed system — gameState.speed is MPH directly (0-100)
+export const MIN_SPEED_MPH = 25;         // coast floor
+export const MAX_SPEED_MPH = 100;        // top speed
+export const STARTING_SPEED_MPH = 40;    // speed after green light (gear 2)
+export const SCROLL_FACTOR = 0.5;        // MPH → world scroll units/sec
+
+// 5-gear transmission
+export const GEAR_THRESHOLDS = [0, 12, 28, 50, 75, 100]; // MPH boundaries (6 for 5 gears)
+export const GEAR_ACCEL = [20, 16, 12, 8, 5];             // MPH/sec per gear
+export const DECEL_RATE = 8;              // MPH/sec when coasting
+export const SHIFT_PAUSE_MS = 200;        // brief accel pause on shift
+
+// RPM simulation
+export const RPM_IDLE = 1000;
+export const RPM_REDLINE = 8000;
 
 // Lane switching
 export const LANE_SWITCH_DURATION = 200; // ms
@@ -154,7 +162,7 @@ export const MAP_THEMES = [
     dirIntensity: 0.7,
     stars: true,
     shadow: { far: 40, size: 15 },
-    colorGrade: { saturation: 1.0, contrast: 1.15, brightness: 0.95 },
+    colorGrade: { saturation: 1.0, contrast: 1.05, brightness: 1.05 },
   },
   {
     id: 'peru',

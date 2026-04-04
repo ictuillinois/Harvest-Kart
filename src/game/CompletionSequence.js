@@ -48,7 +48,7 @@ export class CompletionSequence {
     playFinalPowerOn();
 
     // Auto-drive at max speed — main.js game loop reads gameState.speed
-    gameState.speed = 45; // MAX_SPEED
+    gameState.speed = 100; // MAX_SPEED_MPH — auto-drive at top speed
 
     // ── T+0.5: stop spawning plates ──
     this._at(500, () => {

@@ -26,11 +26,11 @@ export class Kart {
   // ═══════════════════════════════════════════
   _makeMats(driver) {
     return {
-      body:   new THREE.MeshStandardMaterial({ color: driver.carBody,   metalness: 0.6, roughness: 0.35 }),
-      accent: new THREE.MeshStandardMaterial({ color: driver.carAccent, metalness: 0.5, roughness: 0.4 }),
-      dark:   new THREE.MeshStandardMaterial({ color: 0x1a1a1a, metalness: 0.7, roughness: 0.3 }),
+      body:   new THREE.MeshStandardMaterial({ color: driver.carBody,   metalness: 0.3, roughness: 0.25, emissive: new THREE.Color(driver.carBody), emissiveIntensity: 0.15 }),
+      accent: new THREE.MeshStandardMaterial({ color: driver.carAccent, metalness: 0.3, roughness: 0.3,  emissive: new THREE.Color(driver.carAccent), emissiveIntensity: 0.12 }),
+      dark:   new THREE.MeshStandardMaterial({ color: 0x2a2a2a, metalness: 0.5, roughness: 0.4 }),
       chrome: new THREE.MeshStandardMaterial({ color: 0xcccccc, metalness: 0.9, roughness: 0.15 }),
-      carbon: new THREE.MeshStandardMaterial({ color: 0x222222, metalness: 0.4, roughness: 0.6 }),
+      carbon: new THREE.MeshStandardMaterial({ color: 0x333333, metalness: 0.3, roughness: 0.5 }),
       glass:  new THREE.MeshStandardMaterial({ color: 0x112233, metalness: 0.9, roughness: 0.1, transparent: true, opacity: 0.4 }),
     };
   }
@@ -133,39 +133,67 @@ export class Kart {
       default:         this._buildFormula(m); break;
     }
 
-    // ── Vehicle lighting rig (ensures car is visible on all maps) ──
-    // Overhead fill — illuminates roof and top surfaces
-    const fillTop = new THREE.PointLight(0xfff5ee, 0.8, 12, 1.5);
-    fillTop.position.set(0, 3, -0.5);
+    // ── Vehicle lighting rig (ensures car is ALWAYS visible) ──
+    // Overhead key — main illumination from above, low decay for consistent coverage
+    const fillTop = new THREE.PointLight(0xffffff, 2.0, 20, 1);
+    fillTop.position.set(0, 4, 0);
     this.group.add(fillTop);
 
-    // Rear fill — illuminates the back of the car (visible from chase cam)
-    const fillRear = new THREE.PointLight(0xffffff, 0.7, 10, 1.5);
-    fillRear.position.set(0, 2, 3);
+    // Rear chase-cam fill — the camera is BEHIND, so this is critical
+    const fillRear = new THREE.PointLight(0xffffff, 1.8, 16, 1);
+    fillRear.position.set(0, 3, 5);
     this.group.add(fillRear);
 
-    // Low rim — catches wheel arches, side panels, and underbody
-    const fillLow = new THREE.PointLight(0xddeeff, 0.4, 8, 2);
-    fillLow.position.set(0, 0.5, -1);
+    // Low side fill — catches wheel arches, side panels
+    const fillLow = new THREE.PointLight(0xddeeff, 1.0, 12, 1);
+    fillLow.position.set(0, 0.8, -1);
     this.group.add(fillLow);
 
     // ── Underglow — colored pool beneath vehicle ──
-    // For very dark karts, use the accent color instead and boost intensity
     const bodyLum = ((driver.carBody >> 16) & 0xff) + ((driver.carBody >> 8) & 0xff) + (driver.carBody & 0xff);
     const underglowColor = bodyLum < 120 ? driver.carAccent : driver.carBody;
-    const underglowIntensity = bodyLum < 120 ? 2.0 : 1.5;
-    this._underglow = new THREE.PointLight(underglowColor, underglowIntensity, 8, 1.5);
-    this._underglow.position.set(0, 0.25, 0);
+    const underglowIntensity = bodyLum < 120 ? 4.0 : 3.0;
+    this._underglow = new THREE.PointLight(underglowColor, underglowIntensity, 14, 1);
+    this._underglow.position.set(0, 0.15, 0);
     this.group.add(this._underglow);
 
     // ── Taillight point lights — red glow visible from chase cam ──
-    const tailL = new THREE.PointLight(0xff2200, 0.8, 6, 1.5);
-    tailL.position.set(-0.4, 0.35, this._exhaustZ - 0.2);
+    const tailL = new THREE.PointLight(0xff2200, 2.0, 10, 1);
+    tailL.position.set(-0.4, 0.4, this._exhaustZ);
     this.group.add(tailL);
-    const tailR = new THREE.PointLight(0xff2200, 0.8, 6, 1.5);
-    tailR.position.set(0.4, 0.35, this._exhaustZ - 0.2);
+    const tailR = new THREE.PointLight(0xff2200, 2.0, 10, 1);
+    tailR.position.set(0.4, 0.4, this._exhaustZ);
     this.group.add(tailR);
     this._tailLights = [tailL, tailR];
+
+    // ── Edge highlight strips (MeshBasicMaterial = always visible, unlit) ──
+    const edgeMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.5 });
+    const accentEdgeMat = new THREE.MeshBasicMaterial({ color: driver.carAccent, transparent: true, opacity: 0.7 });
+
+    // Bottom edge — separates kart from road at contact line
+    const bottomEdge = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.03, 3.6), edgeMat);
+    bottomEdge.position.y = 0.12;
+    this.group.add(bottomEdge);
+
+    // Side accent strips (left + right)
+    for (const xOff of [-0.95, 0.95]) {
+      const side = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.18, 2.4), accentEdgeMat);
+      side.position.set(xOff, 0.35, 0);
+      this.group.add(side);
+    }
+
+    // ── Ground contact ring — colored halo beneath vehicle ──
+    const ringMat = new THREE.MeshBasicMaterial({
+      color: underglowColor,
+      transparent: true,
+      opacity: 0.1,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+    });
+    const groundRing = new THREE.Mesh(new THREE.RingGeometry(1.4, 2.4, 32), ringMat);
+    groundRing.rotation.x = -Math.PI / 2;
+    groundRing.position.y = 0.02;
+    this.group.add(groundRing);
 
     // Store driver color for theme adjustments
     this._driverColor = driver.carBody;
