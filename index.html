@@ -6,7 +6,7 @@
   <title>Harvest Kart</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Press+Start+2P&display=swap" rel="stylesheet">
   <style>
     /* ── Reset ── */
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -21,14 +21,12 @@
       display: flex; align-items: center; justify-content: center;
     }
 
-    /* ── Game viewport: always 1024×768, CSS-scaled to fit the window ── */
+    /* ── Game viewport: fills the entire browser window ── */
     #game-wrap {
       position: relative;
-      width: 1024px;
-      height: 768px;
+      width: 100vw;
+      height: 100vh;
       overflow: hidden;
-      flex-shrink: 0;
-      transform-origin: center center;
       background: #000;
     }
 
@@ -41,44 +39,24 @@
     */
 
     /* ── Shared nav button (back/home) ── */
-    .nav-btn {
-      position: absolute; top: 14px; left: 14px;
+    .nav-btn, .nav-back {
+      position: absolute; top: clamp(10px, 1.5vh, 24px); left: clamp(10px, 1.2vw, 24px);
       z-index: 10;
       background: rgba(0,0,0,0.4);
       border: 1.5px solid rgba(255,255,255,0.25);
-      border-radius: 8px;
+      border-radius: clamp(6px, 0.5vw, 12px);
       color: rgba(255,255,255,0.8);
       font-family: inherit;
-      font-size: 0.78rem; font-weight: 600;
+      font-size: clamp(0.65rem, 1vw, 1.3rem); font-weight: 600;
       letter-spacing: 1px;
-      padding: 7px 13px;
+      padding: clamp(5px, 0.7vh, 12px) clamp(9px, 1vw, 22px);
       cursor: pointer;
       backdrop-filter: blur(4px);
       -webkit-backdrop-filter: blur(4px);
       transition: background 0.15s, border-color 0.15s, transform 0.1s;
     }
-    .nav-btn:hover { background: rgba(255,255,255,0.12); border-color: rgba(255,255,255,0.5); }
-    .nav-btn:active { transform: scale(0.95); }
-
-    /* keep old class name working */
-    .nav-back {
-      position: absolute; top: 14px; left: 14px;
-      z-index: 10;
-      background: rgba(0,0,0,0.4);
-      border: 1.5px solid rgba(255,255,255,0.25);
-      border-radius: 8px;
-      color: rgba(255,255,255,0.8);
-      font-family: inherit;
-      font-size: 0.78rem; font-weight: 600;
-      letter-spacing: 1px;
-      padding: 7px 13px;
-      cursor: pointer;
-      backdrop-filter: blur(4px);
-      -webkit-backdrop-filter: blur(4px);
-      transition: background 0.15s, border-color 0.15s, transform 0.1s;
-    }
-    .nav-back:hover { background: rgba(255,255,255,0.12); border-color: rgba(255,255,255,0.5); }
-    .nav-back:active { transform: scale(0.95); }
+    .nav-btn:hover, .nav-back:hover { background: rgba(255,255,255,0.12); border-color: rgba(255,255,255,0.5); }
+    .nav-btn:active, .nav-back:active { transform: scale(0.95); }
 
     /* ── Shared keyframes ── */
     @keyframes fadeIn {
@@ -111,38 +89,74 @@
     #rotate-overlay {
       display: none;
       position: fixed; inset: 0; z-index: 9999;
-      background: #0a0a0a;
+      background: radial-gradient(ellipse at 50% 40%, #0d1117 0%, #000 100%);
       flex-direction: column;
       align-items: center; justify-content: center;
-      gap: 28px;
+      gap: 22px;
       color: #fff;
       text-align: center;
       padding: 32px;
     }
     #rotate-overlay.visible { display: flex; }
+
+    .rotate-icon-ring {
+      position: relative;
+      width: 100px; height: 100px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .rotate-icon-ring::before {
+      content: '';
+      position: absolute; inset: 0;
+      border-radius: 50%;
+      border: 2px solid rgba(57, 255, 20, 0.2);
+      animation: rotatePulseRing 2.5s ease-in-out infinite;
+    }
+    @keyframes rotatePulseRing {
+      0%, 100% { transform: scale(1); opacity: 0.4; }
+      50%      { transform: scale(1.12); opacity: 0.8; }
+    }
+
     #rotate-overlay svg {
-      width: 80px; height: 80px;
-      opacity: 0.85;
-      animation: rotateHint 2s ease-in-out infinite;
+      width: 56px; height: 56px;
+      filter: drop-shadow(0 0 8px rgba(57, 255, 20, 0.4));
+      animation: rotateHint 2.8s ease-in-out infinite;
     }
     @keyframes rotateHint {
-      0%   { transform: rotate(0deg);   }
-      40%  { transform: rotate(-90deg); }
-      60%  { transform: rotate(-90deg); }
-      100% { transform: rotate(0deg);   }
+      0%   { transform: rotate(0deg); }
+      35%  { transform: rotate(-90deg); }
+      55%  { transform: rotate(-90deg); }
+      100% { transform: rotate(0deg); }
     }
-    #rotate-overlay p {
-      font-size: 1.15rem;
-      font-weight: 600;
-      letter-spacing: 1px;
-      color: rgba(255,255,255,0.85);
-      max-width: 260px;
-      line-height: 1.5;
+
+    .rotate-title {
+      font-family: 'Press Start 2P', monospace;
+      font-size: clamp(10px, 2.5vw, 14px);
+      color: #39ff14;
+      letter-spacing: 3px;
+      text-shadow: 0 0 10px rgba(57, 255, 20, 0.5), 0 0 24px rgba(57, 255, 20, 0.2);
+      text-transform: uppercase;
     }
-    #rotate-overlay small {
-      font-size: 0.78rem;
-      color: rgba(255,255,255,0.4);
+
+    .rotate-subtitle {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      font-size: clamp(12px, 2.8vw, 16px);
+      font-weight: 300;
+      color: rgba(255, 255, 255, 0.65);
+      max-width: 280px;
+      line-height: 1.6;
       letter-spacing: 0.5px;
+    }
+
+    .rotate-badge {
+      margin-top: 4px;
+      font-family: 'Press Start 2P', monospace;
+      font-size: clamp(5px, 1.3vw, 7px);
+      color: rgba(255, 255, 255, 0.25);
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 4px;
+      padding: 6px 12px;
     }
   </style>
 </head>
@@ -153,32 +167,34 @@
   <!-- Rotate prompt: shown on touch devices in portrait mode.
        Intentionally outside #game-wrap so it covers the full device screen. -->
   <div id="rotate-overlay" role="alert" aria-live="polite">
-    <svg viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-      <!-- Phone outline -->
-      <rect x="24" y="8" width="32" height="56" rx="5" stroke="white" stroke-width="3"/>
-      <circle cx="40" cy="57" r="2.5" fill="white"/>
-      <!-- Rotation arrow -->
-      <path d="M14 52 A30 30 0 0 0 52 14" stroke="white" stroke-width="3" stroke-linecap="round" fill="none"/>
-      <polyline points="48,8 52,14 58,10" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-    </svg>
-    <p>Rotate your device for the best experience</p>
-    <small>LANDSCAPE MODE RECOMMENDED</small>
+    <div class="rotate-icon-ring">
+      <svg viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <!-- Phone outline -->
+        <rect x="24" y="8" width="32" height="56" rx="5" stroke="#39ff14" stroke-width="2.5"/>
+        <circle cx="40" cy="57" r="2" fill="#39ff14"/>
+        <!-- Rotation arrow -->
+        <path d="M14 52 A30 30 0 0 0 52 14" stroke="#39ff14" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+        <polyline points="48,8 52,14 58,10" stroke="#39ff14" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+      </svg>
+    </div>
+    <p class="rotate-title">Rotate Device</p>
+    <p class="rotate-subtitle">Turn your device sideways for the best racing experience</p>
+    <span class="rotate-badge">Landscape Mode</span>
   </div>
 
   <script>
-    // Scale #game-wrap (1024×768) to fit the available window, keeping aspect ratio.
+    // Notify main.js of viewport size. No CSS transform — renderer uses real pixels.
     // Show the rotate overlay on touch devices when in portrait orientation.
     (function () {
-      var GAME_W = 1024, GAME_H = 768;
-      var wrap = document.getElementById('game-wrap');
       var overlay = document.getElementById('rotate-overlay');
       var isTouch = navigator.maxTouchPoints > 0 || 'ontouchstart' in window;
 
       function fit() {
         var w = window.innerWidth, h = window.innerHeight;
-        // Always fill the screen, maintaining 4:3 aspect ratio (contain/letterbox)
-        var scale = Math.min(w / GAME_W, h / GAME_H);
-        wrap.style.transform = 'scale(' + scale + ')';
+
+        window.dispatchEvent(new CustomEvent('game-resize', {
+          detail: { w: w, h: h }
+        }));
 
         var portrait = h > w;
         overlay.classList.toggle('visible', isTouch && portrait);

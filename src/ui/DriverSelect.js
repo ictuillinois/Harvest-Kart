@@ -61,30 +61,30 @@ export class DriverSelect {
       }
 
       #ds-back {
-        position: absolute; top: 20px; left: 20px; z-index: 10;
+        position: absolute; top: clamp(12px, 2vh, 28px); left: clamp(12px, 1.5vw, 28px); z-index: 10;
       }
 
       .ds-content {
         position: relative; z-index: 1;
         text-align: center;
-        padding: 12px 16px;
+        padding: clamp(8px, 1.5vh, 20px) clamp(12px, 2vw, 32px);
         width: 100%;
-        max-width: 1000px;
+        max-width: clamp(700px, 80vw, 1600px);
       }
 
       .ds-title {
         font-family: 'Orbitron', 'Impact', sans-serif;
-        font-size: 26px;
+        font-size: clamp(18px, 2.5vw, 48px);
         font-weight: 900;
         color: #fff;
-        letter-spacing: 4px;
-        margin-bottom: 20px;
+        letter-spacing: clamp(2px, 0.4vw, 8px);
+        margin-bottom: clamp(12px, 2vh, 32px);
         text-shadow: 0 0 20px rgba(255,255,255,0.15), 0 2px 6px rgba(0,0,0,0.8);
       }
 
       .ds-cards {
         display: flex; justify-content: center;
-        gap: 16px;
+        gap: clamp(10px, 1.2vw, 28px);
         align-items: stretch;
       }
 
@@ -92,14 +92,14 @@ export class DriverSelect {
       .ds-card {
         display: flex; flex-direction: column;
         cursor: pointer;
-        border-radius: 10px;
+        border-radius: clamp(6px, 0.7vw, 16px);
         background: rgba(10,10,15,0.85);
         border: 2px solid rgba(255,255,255,0.08);
         backdrop-filter: blur(8px);
         -webkit-backdrop-filter: blur(8px);
         transition: transform 0.3s ease, border-color 0.3s, box-shadow 0.3s,
                     opacity 0.3s, filter 0.3s;
-        width: 210px;
+        width: clamp(140px, 17vw, 340px);
         overflow: hidden;
         user-select: none;
       }
@@ -142,42 +142,42 @@ export class DriverSelect {
 
       /* ── Info ── */
       .ds-info {
-        padding: 10px 12px 12px;
+        padding: clamp(6px, 0.8vh, 16px) clamp(8px, 0.8vw, 20px) clamp(8px, 1vh, 20px);
         display: flex; flex-direction: column;
-        align-items: center; gap: 4px;
+        align-items: center; gap: clamp(2px, 0.3vh, 6px);
       }
       .ds-desc {
         margin-top: 2px;
-        font-size: 10px;
+        font-size: clamp(8px, 0.8vw, 16px);
         color: rgba(255,255,255,0.4);
         font-style: italic;
-        margin-bottom: 6px;
+        margin-bottom: clamp(4px, 0.5vh, 10px);
       }
 
       /* ── Stats ── */
       .ds-stats {
         width: 100%;
-        display: flex; flex-direction: column; gap: 3px;
+        display: flex; flex-direction: column; gap: clamp(2px, 0.3vh, 6px);
       }
       .ds-stat {
         display: flex; align-items: center;
         justify-content: space-between;
-        gap: 6px;
+        gap: clamp(4px, 0.4vw, 10px);
       }
       .ds-stat-label {
         font-family: 'Orbitron', monospace;
-        font-size: 8px;
+        font-size: clamp(6px, 0.6vw, 14px);
         font-weight: 500;
         color: rgba(255,255,255,0.35);
         letter-spacing: 1px;
-        min-width: 28px;
+        min-width: clamp(20px, 2.5vw, 50px);
         text-align: left;
       }
       .ds-stat-stars {
         display: flex; gap: 1px;
       }
       .ds-star {
-        font-size: 11px;
+        font-size: clamp(9px, 0.9vw, 18px);
         color: rgba(255,255,255,0.15);
         transition: color 0.3s;
       }

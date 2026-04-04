@@ -36,12 +36,10 @@ import {
 } from './utils/constants.js';
 
 // --- Renderer ---
-// The game always renders at the native 1024×768 iPad-landscape resolution.
-// CSS scaling in index.html handles fitting to the actual window size.
-const GAME_W = 1024, GAME_H = 768;
+// Uses the full browser viewport — no fixed resolution, no CSS transform scaling.
 const isMobile = navigator.maxTouchPoints > 0 || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setSize(GAME_W, GAME_H);
+renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, isMobile ? 1.5 : 2));
 renderer.toneMapping = THREE.AgXToneMapping;
 renderer.toneMappingExposure = 1.0;
@@ -53,7 +51,7 @@ gameRoot().appendChild(renderer.domElement);
 const scene = new THREE.Scene();
 scene.fog = new THREE.FogExp2(0x1a0533, 0.006);
 
-const camera = new THREE.PerspectiveCamera(CAMERA_FOV_MIN, GAME_W / GAME_H, 0.1, 1000);
+const camera = new THREE.PerspectiveCamera(CAMERA_FOV_MIN, window.innerWidth / window.innerHeight, 0.1, 1000);
 camera.position.set(CAMERA_OFFSET.x, CAMERA_OFFSET.y, CAMERA_OFFSET.z);
 camera.lookAt(0, 0.5, -CAMERA_LOOK_AHEAD);
 
@@ -129,35 +127,42 @@ const plates = new Plate(scene);
 const lampPosts = new LampPost(scene);
 const environment = new Environment(scene, renderer);
 
-// Kart-attached lights for night maps (USA)
+// Per-theme vehicle lighting config
+const THEME_VEHICLE_LIGHT = {
+  usa:    { headFwd: 3.0, headFar: 1.5, backfill: 0.5, underglow: 2.5 },
+  brazil: { headFwd: 1.0, headFar: 0.5, backfill: 0.3, underglow: 1.2 },
+  peru:   { headFwd: 1.5, headFar: 0.8, backfill: 0.4, underglow: 1.5 },
+};
+
 let kartLights = [];
 
-function addKartLights() {
+function addKartLights(themeId) {
   removeKartLights();
+  const cfg = THEME_VEHICLE_LIGHT[themeId] || THEME_VEHICLE_LIGHT.brazil;
 
-  // Forward headlight pool — illuminates road ahead of kart
-  const headlightFwd = new THREE.PointLight(0xffffdd, 1.8, 30, 1);
+  // Forward headlight pool — illuminates road ahead
+  const headlightFwd = new THREE.PointLight(0xffffdd, cfg.headFwd, 35, 1);
   headlightFwd.position.set(0, 2, -8);
   kart.group.add(headlightFwd);
   kartLights.push(headlightFwd);
 
-  // Second forward light — longer range, dimmer
-  const headlightFar = new THREE.PointLight(0xffffdd, 1.0, 50, 1.5);
+  // Extended forward fill
+  const headlightFar = new THREE.PointLight(0xffffdd, cfg.headFar, 55, 1.5);
   headlightFar.position.set(0, 3, -18);
   kart.group.add(headlightFar);
   kartLights.push(headlightFar);
 
-  // Overhead fill — kart always visible from chase camera
-  const overhead = new THREE.PointLight(0xffffff, 1.0, 16);
-  overhead.position.set(0, 4, 2);
-  kart.group.add(overhead);
-  kartLights.push(overhead);
+  // Camera backfill — cool-tinted light from behind/above camera
+  const backfill = new THREE.DirectionalLight(0x8899bb, cfg.backfill);
+  backfill.position.set(0, 5, 8);
+  backfill.castShadow = false;
+  kart.group.add(backfill);
+  kartLights.push(backfill);
 
-  // Tail light glow
-  const tailGlow = new THREE.PointLight(0xff2200, 0.5, 6);
-  tailGlow.position.set(0, 0.5, 1.7);
-  kart.group.add(tailGlow);
-  kartLights.push(tailGlow);
+  // Boost underglow for theme
+  if (kart._underglow) {
+    kart._underglow.intensity = cfg.underglow;
+  }
 }
 
 function removeKartLights() {
@@ -286,9 +291,9 @@ gameState.on('stateChange', ({ from, to }) => {
           environment.ambientLight.intensity = baseAmbientIntensity * AMBIENT_MULTIPLIERS[0];
         }
 
-        // Night maps get kart-attached headlights
+        // All maps get kart-attached lights (scaled per theme)
         const themeId = MAP_THEMES[gameState.selectedMap]?.id;
-        if (themeId === 'usa') addKartLights();
+        addKartLights(themeId);
 
         const musicKey = MAP_MUSIC_KEYS[gameState.selectedMap] || 'brazil';
 
@@ -433,8 +438,14 @@ function speedToMph(speed) {
 }
 
 // --- Resize ---
-// The renderer is fixed at 1024×768; CSS handles visual scaling.
-// No renderer resize needed — just keep the composer in sync (it was already set).
+// Renderer uses full viewport — no fixed resolution.
+window.addEventListener('game-resize', (e) => {
+  const w = e.detail.w, h = e.detail.h;
+  renderer.setSize(w, h);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  composer.setSize(w, h);
+});
 
 
 // --- Game loop ---

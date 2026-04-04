@@ -133,11 +133,14 @@ export class Environment {
     this.scene.add(this.hemiLight);
 
     const groundGeo = new THREE.PlaneGeometry(800, 800);
+    // Road-specific color overrides (asphalt gray, not pure ground color)
+    const roadColors = { brazil: 0x2e2e32, usa: 0x1e1e24, peru: 0x282830 };
+    const roadColor = roadColors[theme.id] || theme.ground;
     const groundMat = new THREE.MeshStandardMaterial({
-      color: theme.ground,
-      roughness: 1.0,
-      metalness: 0,
-      envMapIntensity: 0,
+      color: roadColor,
+      roughness: 0.75,
+      metalness: 0.05,
+      envMapIntensity: 0.3,
     });
     this.ground = new THREE.Mesh(groundGeo, groundMat);
     this.ground.rotation.x = -Math.PI / 2;

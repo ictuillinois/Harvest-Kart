@@ -1,6 +1,5 @@
 import { Tween, Easing } from '@tweenjs/tween.js';
 import { tweenGroup } from '../utils/tweenGroup.js';
-import { gameRoot } from '../utils/base.js';
 
 /**
  * Cinematic game completion sequence.
@@ -97,7 +96,7 @@ export class CompletionSequence {
         opacity: '0',
         transition: 'opacity 1s ease',
       });
-      gameRoot().appendChild(this._overlay);
+      document.body.appendChild(this._overlay);
       void this._overlay.offsetWidth;
       this._overlay.style.opacity = '1';
     });
@@ -167,7 +166,7 @@ export class CompletionSequence {
       <div class="mission-line mission-w1">MISSION</div>
       <div class="mission-line mission-w2">ACCOMPLISHED</div>
     `;
-    gameRoot().appendChild(this._textEl);
+    document.body.appendChild(this._textEl);
   }
 
   cancel() {

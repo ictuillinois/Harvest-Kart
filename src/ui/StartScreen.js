@@ -74,16 +74,16 @@ export class StartScreen {
         display: flex;
         flex-direction: column;
         align-items: center;
-        gap: 14px;
-        padding-bottom: clamp(24px, 4vh, 48px);
+        gap: clamp(10px, 1.5vh, 24px);
+        padding-bottom: clamp(24px, 4vh, 64px);
       }
 
       /* ── PRESS HERE TO START ── */
       .ss-prompt {
         font-family: Impact, 'Arial Black', Tahoma, sans-serif;
-        font-size: clamp(1.1rem, 3.8vw, 1.9rem);
+        font-size: clamp(1.1rem, 2.4vw, 3.2rem);
         font-weight: 700;
-        letter-spacing: 5px;
+        letter-spacing: clamp(3px, 0.5vw, 10px);
         color: #fff;
         text-shadow:
           0 0 12px rgba(255,255,255,0.45),
@@ -102,19 +102,19 @@ export class StartScreen {
         display: flex;
         flex-direction: column;
         align-items: center;
-        gap: 4px;
+        gap: clamp(3px, 0.4vh, 8px);
       }
       .ss-license {
         font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        font-size: 13px;
+        font-size: clamp(11px, 1vw, 22px);
         font-weight: 400;
-        letter-spacing: 1px;
+        letter-spacing: clamp(0.5px, 0.1vw, 2px);
         color: rgba(255,255,255,0.75);
         text-shadow: 0 1px 4px rgba(0,0,0,0.8);
       }
       .ss-copyright {
         font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        font-size: 12px;
+        font-size: clamp(10px, 0.9vw, 20px);
         font-weight: 300;
         letter-spacing: 0.5px;
         color: rgba(255,255,255,0.5);

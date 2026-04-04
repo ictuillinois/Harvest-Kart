@@ -6,9 +6,9 @@ import { fadeIn, fadeOut } from '../utils/transition.js';
 const DISPLAY_ORDER = [2, 1, 0];
 
 const MAP_IMAGES = {
-  peru:   'maps/peru.png',
-  usa:    'maps/chicago.png',
-  brazil: 'maps/rio-de-janeiro.png',
+  peru:   'maps/peru.webp',
+  usa:    'maps/chicago.webp',
+  brazil: 'maps/rio-de-janeiro.webp',
 };
 
 export class MapSelect {
@@ -75,24 +75,24 @@ export class MapSelect {
       }
 
       #ms-back {
-        position: absolute; top: 20px; left: 20px;
+        position: absolute; top: clamp(12px, 2vh, 28px); left: clamp(12px, 1.5vw, 28px);
         z-index: 10;
       }
 
       .ms-content {
         position: relative; z-index: 1;
         text-align: center;
-        padding: 16px 20px;
+        padding: clamp(10px, 1.5vh, 24px) clamp(14px, 2vw, 36px);
         width: 100%;
-        max-width: 960px;
+        max-width: clamp(700px, 80vw, 1600px);
       }
 
       .ms-title {
         font-family: Impact, 'Arial Black', sans-serif;
-        font-size: 30px;
+        font-size: clamp(20px, 2.8vw, 54px);
         color: #fff;
-        letter-spacing: 5px;
-        margin-bottom: 24px;
+        letter-spacing: clamp(3px, 0.5vw, 10px);
+        margin-bottom: clamp(14px, 2.5vh, 36px);
         text-shadow:
           0 0 24px rgba(255,255,255,0.18),
           0 2px 6px rgba(0,0,0,0.8);
@@ -100,7 +100,7 @@ export class MapSelect {
 
       .ms-cards {
         display: flex; justify-content: center;
-        gap: 20px;
+        gap: clamp(12px, 1.5vw, 32px);
         align-items: stretch;
       }
 
@@ -108,14 +108,14 @@ export class MapSelect {
       .ms-card {
         display: flex; flex-direction: column;
         cursor: pointer;
-        border-radius: 12px;
+        border-radius: clamp(8px, 0.8vw, 18px);
         background: rgba(0,0,0,0.5);
         border: 2px solid rgba(255,255,255,0.1);
         backdrop-filter: blur(8px);
         -webkit-backdrop-filter: blur(8px);
         transition: transform 0.3s ease, border-color 0.3s, background 0.3s,
                     box-shadow 0.3s, opacity 0.3s, filter 0.3s;
-        width: 280px;
+        width: clamp(180px, 22vw, 440px);
         overflow: hidden;
         user-select: none;
       }
@@ -171,31 +171,31 @@ export class MapSelect {
 
       /* ── Info block ── */
       .ms-info {
-        padding: 12px 14px 14px;
+        padding: clamp(8px, 1vh, 20px) clamp(10px, 1vw, 24px) clamp(10px, 1.2vh, 24px);
         display: flex; flex-direction: column;
-        align-items: center; gap: 4px;
+        align-items: center; gap: clamp(3px, 0.4vh, 8px);
       }
 
       .ms-flag-row {
-        display: flex; align-items: center; gap: 8px;
+        display: flex; align-items: center; gap: clamp(6px, 0.6vw, 14px);
       }
       .ms-flag {
-        width: 28px; height: auto;
-        border-radius: 3px;
+        width: clamp(20px, 2.5vw, 48px); height: auto;
+        border-radius: clamp(2px, 0.2vw, 5px);
         border: 1px solid rgba(255,255,255,0.2);
         box-shadow: 0 1px 4px rgba(0,0,0,0.4);
       }
       .ms-country {
         font-family: Impact, 'Arial Black', sans-serif;
-        font-size: 20px;
-        color: #fff; letter-spacing: 2px;
+        font-size: clamp(14px, 1.8vw, 36px);
+        color: #fff; letter-spacing: clamp(1px, 0.2vw, 4px);
         text-shadow: 0 1px 4px rgba(0,0,0,0.6);
         transition: color 0.3s;
       }
       .ms-card.active .ms-country { color: var(--accent, #fff); }
 
       .ms-subtitle {
-        font-size: 12px;
+        font-size: clamp(9px, 1vw, 20px);
         color: rgba(255,255,255,0.4);
         font-style: italic;
         transition: color 0.3s;

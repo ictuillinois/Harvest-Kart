@@ -1,27 +1,73 @@
 import { PLATES_TO_FILL_BAR, TOTAL_LAMP_POSTS } from '../utils/constants.js';
-import { gameRoot } from '../utils/base.js';
 
-const SP_SEGS = 20;   // speedometer LED segments
-const EN_SEGS = 16;   // energy bar LED segments
+const EN_SEGS = 12;  // energy gauge segments
+
+// ── SVG arc helpers ──
+const ARC_CX = 100, ARC_CY = 100, ARC_R = 78;
+const ARC_START_DEG = 160, ARC_SWEEP_DEG = 220;
+const ARC_LENGTH = (ARC_SWEEP_DEG / 360) * 2 * Math.PI * ARC_R; // ≈ 299.4
+
+function polarToXY(cx, cy, r, deg) {
+  const rad = (deg - 90) * Math.PI / 180;
+  return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
+}
+
+function describeArc(cx, cy, r, startDeg, sweepDeg) {
+  const s = polarToXY(cx, cy, r, startDeg);
+  const e = polarToXY(cx, cy, r, startDeg + sweepDeg);
+  const large = sweepDeg > 180 ? 1 : 0;
+  return `M ${s.x},${s.y} A ${r},${r} 0 ${large},1 ${e.x},${e.y}`;
+}
+
+const ARC_D = describeArc(ARC_CX, ARC_CY, ARC_R, ARC_START_DEG, ARC_SWEEP_DEG);
+
+// ── Build minor tick marks (every 5 MPH) ──
+function buildMinorTicks() {
+  const ticks = [];
+  for (let mph = 20; mph <= 70; mph += 5) {
+    if (mph % 10 === 0) continue; // skip major ticks
+    const frac = (mph - 20) / 50;
+    const deg = ARC_START_DEG + frac * ARC_SWEEP_DEG;
+    const inner = polarToXY(ARC_CX, ARC_CY, ARC_R - 10, deg);
+    const outer = polarToXY(ARC_CX, ARC_CY, ARC_R - 5, deg);
+    ticks.push(`<line x1="${inner.x}" y1="${inner.y}" x2="${outer.x}" y2="${outer.y}" stroke="rgba(255,255,255,0.15)" stroke-width="1" stroke-linecap="round"/>`);
+  }
+  return ticks.join('');
+}
+
+// ── Build major tick marks (every 10 MPH) ──
+function buildTicks() {
+  const ticks = [];
+  for (let mph = 20; mph <= 70; mph += 10) {
+    const frac = (mph - 20) / 50;
+    const deg = ARC_START_DEG + frac * ARC_SWEEP_DEG;
+    const inner = polarToXY(ARC_CX, ARC_CY, ARC_R - 14, deg);
+    const outer = polarToXY(ARC_CX, ARC_CY, ARC_R - 4, deg);
+    const label = polarToXY(ARC_CX, ARC_CY, ARC_R - 22, deg);
+    ticks.push(`<line x1="${inner.x}" y1="${inner.y}" x2="${outer.x}" y2="${outer.y}" stroke="rgba(255,255,255,0.35)" stroke-width="1.5" stroke-linecap="round"/>`);
+    ticks.push(`<text x="${label.x}" y="${label.y}" text-anchor="middle" dominant-baseline="central" fill="rgba(255,255,255,0.3)" font-family="var(--hud-font)" font-size="7">${mph}</text>`);
+  }
+  return ticks.join('');
+}
 
 export class HUD {
   constructor(onHome, onPause) {
     this._charge = 0;
     this._lamps  = 0;
+    this._prevLit = 0;
 
-    // ── Speedometer segments ──
-    const spHTML = Array.from({ length: SP_SEGS }, (_, i) =>
-      `<div class="sp-seg" data-i="${i}"></div>`).join('');
-
-    // ── Energy bar segments (rendered bottom-to-top via flex-direction:column-reverse) ──
+    // ── Energy segments HTML ──
     const enHTML = Array.from({ length: EN_SEGS }, (_, i) =>
       `<div class="en-seg" data-i="${i}"></div>`).join('');
 
-    // ── Minimap lamp post markers ──
+    // ── Minimap lamp markers ──
     const lampHTML = Array.from({ length: TOTAL_LAMP_POSTS }, (_, i) => {
-      const pct = ((i + 1) / TOTAL_LAMP_POSTS) * 92 + 4; // 4%..96% within road strip
+      const pct = ((i + 1) / TOTAL_LAMP_POSTS) * 92 + 4;
       return `<div class="mm-lamp" data-lamp="${i}" style="bottom:${pct.toFixed(1)}%"></div>`;
     }).join('');
+
+    // ── Needle initial angle ──
+    const needleEnd = polarToXY(ARC_CX, ARC_CY, ARC_R - 18, ARC_START_DEG);
 
     // ── Main HUD element ──
     this.el = document.createElement('div');
@@ -29,8 +75,11 @@ export class HUD {
     this.el.innerHTML = `
       <!-- Top-left: HOME + minimap -->
       <div class="hud-tl">
-        <button class="hud-btn" id="hud-home" aria-label="Home">&#9664; HOME</button>
-        <div class="hud-panel mm-panel">
+        <button class="hud-btn hud-glass" id="hud-home" aria-label="Home">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg>
+          HOME
+        </button>
+        <div class="hud-glass mm-panel">
           <div class="mm-label">MAP</div>
           <div class="mm-road">
             <div class="mm-stripe"></div>
@@ -46,29 +95,81 @@ export class HUD {
         <div class="hud-combo" id="hud-combo"></div>
       </div>
 
-      <!-- Top-right: PAUSE + speedometer -->
+      <!-- Top-right: Timer + Pause -->
       <div class="hud-tr">
-        <button class="hud-btn" id="hud-pause" aria-label="Pause">&#9646;&#9646; PAUSE</button>
-        <div class="hud-panel sp-panel">
-          <div class="sp-bar" id="sp-bar">${spHTML}</div>
-          <div class="sp-readout">
-            <span class="sp-num" id="sp-num">20</span>
-            <span class="sp-unit">MPH</span>
-            <span class="sp-time" id="sp-time">00'00"00</span>
+        <div class="hud-timer-panel hud-glass">
+          <svg class="timer-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="var(--hud-warning)" stroke-width="2" stroke-linecap="round">
+            <circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 1.5"/><path d="M9 2h6"/><path d="M12 2v2"/>
+          </svg>
+          <span class="hud-timer" id="sp-time">00'00"00</span>
+        </div>
+        <button class="hud-btn hud-glass hud-pause-btn" id="hud-pause" aria-label="Pause">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>
+        </button>
+      </div>
+
+      <!-- Right edge: energy gauge -->
+      <div class="hud-re">
+        <div class="hud-glass en-panel">
+          <svg class="en-bolt" viewBox="0 0 24 24" fill="var(--hud-accent)" width="16" height="16"><path d="M13 2L3 14h9l-1 10 10-12h-9l1-10z"/></svg>
+          <div class="en-bar" id="en-bar">${enHTML}</div>
+          <div class="en-label">ENERGY</div>
+          <div class="en-lamps">
+            <span class="en-lamp-count" id="en-lamp-count">0/${TOTAL_LAMP_POSTS}</span>
           </div>
         </div>
       </div>
 
-      <!-- Right edge: energy bar -->
-      <div class="hud-re">
-        <div class="hud-panel en-panel">
-          <div class="en-label-top">E</div>
-          <div class="en-bar" id="en-bar">${enHTML}</div>
-          <div class="en-label-bot">0</div>
-          <div class="en-lamps">
-            <span class="en-lamp-icon">&#128161;</span>
-            <span class="en-lamp-count" id="en-lamp-count">0/${TOTAL_LAMP_POSTS}</span>
-          </div>
+      <!-- Bottom-right: Speedometer -->
+      <div class="hud-br">
+        <div class="speedo-wrap">
+          <svg class="speedo-svg" viewBox="0 0 200 140">
+            <defs>
+              <linearGradient id="speedo-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stop-color="#00ff88"/>
+                <stop offset="45%" stop-color="#ffdd00"/>
+                <stop offset="100%" stop-color="#ff3333"/>
+              </linearGradient>
+              <filter id="speedo-glow" x="-20%" y="-20%" width="140%" height="140%">
+                <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="blur"/>
+                <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+              </filter>
+              <filter id="needle-glow" x="-50%" y="-50%" width="200%" height="200%">
+                <feGaussianBlur in="SourceGraphic" stdDeviation="2" result="blur"/>
+                <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+              </filter>
+              <radialGradient id="speedo-bg-grad" cx="50%" cy="70%" r="55%">
+                <stop offset="0%" stop-color="rgba(0,255,136,0.04)"/>
+                <stop offset="100%" stop-color="rgba(0,0,0,0)"/>
+              </radialGradient>
+            </defs>
+            <!-- Subtle background radial glow -->
+            <circle cx="${ARC_CX}" cy="${ARC_CY}" r="90" fill="url(#speedo-bg-grad)"/>
+            <!-- Outer decorative ring -->
+            <path d="${describeArc(ARC_CX, ARC_CY, ARC_R + 6, ARC_START_DEG, ARC_SWEEP_DEG)}" fill="none" stroke="rgba(255,255,255,0.04)" stroke-width="1.5" stroke-linecap="round"/>
+            <!-- Arc track (thicker) -->
+            <path d="${ARC_D}" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="14" stroke-linecap="round"/>
+            <!-- Arc fill (animated, thicker) -->
+            <path id="speedo-fill" d="${ARC_D}" fill="none" stroke="url(#speedo-grad)" stroke-width="14" stroke-linecap="round"
+                  stroke-dasharray="${ARC_LENGTH}" stroke-dashoffset="${ARC_LENGTH}" filter="url(#speedo-glow)"
+                  style="transition: stroke-dashoffset 150ms ease-out;"/>
+            <!-- Minor tick marks -->
+            ${buildMinorTicks()}
+            <!-- Major tick marks + labels -->
+            ${buildTicks()}
+            <!-- Needle with glow -->
+            <line id="speedo-needle" x1="${ARC_CX}" y1="${ARC_CY}" x2="${needleEnd.x}" y2="${needleEnd.y}"
+                  stroke="#fff" stroke-width="2.5" stroke-linecap="round" filter="url(#needle-glow)"/>
+            <!-- Center cap (layered rings) -->
+            <circle cx="${ARC_CX}" cy="${ARC_CY}" r="8" fill="rgba(0,0,0,0.5)" stroke="rgba(255,255,255,0.1)" stroke-width="1"/>
+            <circle cx="${ARC_CX}" cy="${ARC_CY}" r="4.5" fill="var(--hud-accent)" opacity="0.9"/>
+            <!-- Speed number -->
+            <text id="speedo-num" x="${ARC_CX}" y="${ARC_CY - 12}" text-anchor="middle" dominant-baseline="central"
+                  fill="#fff" font-family="var(--hud-font)" font-size="36" font-weight="900">20</text>
+            <!-- MPH label -->
+            <text x="${ARC_CX}" y="${ARC_CY + 10}" text-anchor="middle" dominant-baseline="central"
+                  fill="rgba(255,255,255,0.35)" font-family="var(--hud-font)" font-size="10" font-weight="700" letter-spacing="3">MPH</text>
+          </svg>
         </div>
       </div>
     `;
@@ -77,7 +178,7 @@ export class HUD {
     this.pauseOverlay = document.createElement('div');
     this.pauseOverlay.id = 'pause-overlay';
     this.pauseOverlay.innerHTML = `
-      <div class="pause-card">
+      <div class="pause-card hud-glass">
         <h2 class="pause-title">PAUSED</h2>
         <button class="pause-btn pause-resume" id="pause-resume">&#9654; RESUME</button>
         <button class="pause-btn pause-quit"   id="pause-quit">&#9664; QUIT</button>
@@ -88,241 +189,301 @@ export class HUD {
     const style = document.createElement('style');
     style.textContent = `
       /* ══════════════════════════════════════════
-         ROOT CONTAINER
+         DESIGN TOKENS
+         ══════════════════════════════════════════ */
+      :root {
+        --hud-bg: rgba(10, 10, 15, 0.6);
+        --hud-border: rgba(0, 255, 136, 0.2);
+        --hud-accent: #00ff88;
+        --hud-accent-glow: rgba(0, 255, 136, 0.35);
+        --hud-warning: #ffdd00;
+        --hud-danger: #ff3333;
+        --hud-text: #ffffff;
+        --hud-text-muted: rgba(255, 255, 255, 0.45);
+        --hud-segment-empty: #1a1a2e;
+        --hud-blur: blur(8px);
+        --hud-font: 'Orbitron', 'Courier New', monospace;
+        --hud-transition: 150ms ease-out;
+        --hud-radius: 12px;
+        --hud-radius-sm: 8px;
+      }
+
+      /* ══════════════════════════════════════════
+         ROOT + SHARED
          ══════════════════════════════════════════ */
       #hud {
         position: fixed; inset: 0; z-index: 50;
         display: none;
         pointer-events: none;
-        font-family: 'Press Start 2P', 'VT323', monospace;
+        font-family: var(--hud-font);
       }
       #hud * { box-sizing: border-box; }
       #hud button { pointer-events: all; cursor: pointer; }
 
-      /* ── Shared dark panel ── */
-      .hud-panel {
-        background: rgba(0,0,0,0.82);
-        border: 1px solid #3a3a3a;
-        border-radius: 5px;
+      .hud-glass {
+        background: var(--hud-bg);
+        backdrop-filter: var(--hud-blur);
+        -webkit-backdrop-filter: var(--hud-blur);
+        border: 1px solid var(--hud-border);
+        border-radius: var(--hud-radius);
       }
-
-      /* ── Shared small button ── */
-      .hud-btn {
-        font-family: 'Press Start 2P', monospace;
-        font-size: 7px;
-        color: rgba(255,255,255,0.65);
-        background: rgba(0,0,0,0.78);
-        border: 1px solid #3a3a3a;
-        border-radius: 4px;
-        padding: 7px 10px;
-        letter-spacing: 1px;
-        transition: background 0.15s, color 0.15s;
-        white-space: nowrap;
-      }
-      .hud-btn:hover  { background: rgba(255,255,255,0.1); color: #fff; }
-      .hud-btn:active { transform: scale(0.93); }
 
       /* ══════════════════════════════════════════
-         TOP-LEFT  —  HOME button + minimap
+         BUTTONS (HOME, PAUSE)
+         ══════════════════════════════════════════ */
+      .hud-btn {
+        font-family: var(--hud-font);
+        font-size: clamp(6px, 0.7vw, 12px);
+        font-weight: 700;
+        color: var(--hud-text-muted);
+        padding: clamp(5px, 0.6vh, 10px) clamp(8px, 0.8vw, 14px);
+        letter-spacing: 1px;
+        display: flex; align-items: center; gap: clamp(4px, 0.4vw, 8px);
+        border: none;
+        transition: background var(--hud-transition), color var(--hud-transition);
+        white-space: nowrap;
+      }
+      .hud-btn:hover { background: rgba(255,255,255,0.08); color: #fff; }
+      .hud-btn:active { transform: scale(0.93); }
+
+      .hud-pause-btn {
+        width: clamp(32px, 3.5vw, 52px);
+        height: clamp(32px, 3.5vw, 52px);
+        border-radius: 50%;
+        padding: 0;
+        justify-content: center;
+      }
+
+      /* ══════════════════════════════════════════
+         TOP-LEFT — HOME + MINIMAP
          ══════════════════════════════════════════ */
       .hud-tl {
         position: absolute;
-        top: 12px; left: 12px;
+        top: clamp(8px, 1.5vh, 20px); left: clamp(8px, 1vw, 20px);
         display: flex; flex-direction: column;
-        align-items: flex-start; gap: 8px;
+        align-items: flex-start; gap: clamp(6px, 0.8vh, 12px);
       }
 
-      /* Minimap panel */
-      .mm-panel { padding: 7px 8px 8px; width: 80px; }
+      .mm-panel {
+        padding: clamp(8px, 1vh, 18px) clamp(8px, 0.9vw, 18px);
+        width: clamp(90px, 10vw, 210px);
+      }
       .mm-label {
-        font-size: 6px; color: rgba(255,255,255,0.35);
-        letter-spacing: 3px; text-align: center;
-        margin-bottom: 6px;
+        font-size: clamp(6px, 0.7vw, 13px);
+        font-weight: 700;
+        color: var(--hud-text-muted);
+        letter-spacing: 3px;
+        text-align: center;
+        margin-bottom: clamp(4px, 0.5vh, 8px);
       }
-
-      /* Road strip */
       .mm-road {
         position: relative;
-        width: 24px; height: 100px;
+        width: clamp(28px, 3.5vw, 54px);
+        height: clamp(100px, 20vh, 240px);
         margin: 0 auto;
-        background: rgba(50,50,50,0.9);
-        border: 1px solid #3a3a3a;
-        border-radius: 3px;
+        background: rgba(255,255,255,0.05);
+        border: 1px solid rgba(255,255,255,0.08);
+        border-radius: 4px;
         overflow: hidden;
       }
       .mm-stripe {
         position: absolute; left: 50%; top: 0; bottom: 0; width: 1px;
-        background: repeating-linear-gradient(
-          to bottom,
-          rgba(255,255,255,0.35) 0, rgba(255,255,255,0.35) 4px,
-          transparent 4px, transparent 8px
-        );
+        background: repeating-linear-gradient(to bottom, rgba(255,255,255,0.2) 0, rgba(255,255,255,0.2) 4px, transparent 4px, transparent 8px);
         transform: translateX(-50%);
       }
-
-      /* Lamp post dots on minimap */
       .mm-lamp {
         position: absolute; left: 50%;
-        width: 7px; height: 7px; border-radius: 50%;
-        border: 1.5px solid rgba(255,190,0,0.45);
-        background: transparent;
+        width: clamp(7px, 0.7vw, 14px); height: clamp(7px, 0.7vw, 14px); border-radius: 50%;
+        background: var(--hud-segment-empty);
+        border: 1.5px solid rgba(255,190,0,0.3);
         transform: translate(-50%, 50%);
-        transition: background 0.35s, border-color 0.35s, box-shadow 0.35s;
+        transition: background 0.4s, border-color 0.4s, box-shadow 0.4s;
       }
       .mm-lamp.lit {
-        background: #ffcc00;
-        border-color: #ffcc00;
-        box-shadow: 0 0 5px 2px rgba(255,200,0,0.75);
+        background: var(--hud-warning);
+        border-color: var(--hud-warning);
+        box-shadow: 0 0 6px 2px rgba(255,220,0,0.7);
       }
-
-      /* Player dot */
       .mm-player {
         position: absolute; left: 50%; bottom: 4%;
-        width: 8px; height: 8px; border-radius: 50%;
-        background: #39ff14;
-        box-shadow: 0 0 5px 2px rgba(57,255,20,0.85);
+        width: clamp(8px, 0.9vw, 18px); height: clamp(8px, 0.9vw, 18px); border-radius: 50%;
+        background: var(--hud-accent);
+        box-shadow: 0 0 6px 3px var(--hud-accent-glow);
         transform: translate(-50%, 50%);
         transition: bottom 0.28s ease-out;
+        animation: dotPulse 1.5s ease-in-out infinite;
+      }
+      @keyframes dotPulse {
+        0%, 100% { transform: translate(-50%, 50%) scale(1); box-shadow: 0 0 6px 3px var(--hud-accent-glow); }
+        50% { transform: translate(-50%, 50%) scale(1.25); box-shadow: 0 0 10px 5px var(--hud-accent-glow); }
       }
 
       /* ══════════════════════════════════════════
-         TOP-CENTER  —  score + combo
+         TOP-CENTER — SCORE + COMBO
          ══════════════════════════════════════════ */
       .hud-tc {
         position: absolute;
-        top: 12px; left: 50%; transform: translateX(-50%);
-        display: flex; flex-direction: column; align-items: center; gap: 5px;
+        top: clamp(8px, 1.5vh, 20px); left: 50%; transform: translateX(-50%);
+        display: flex; flex-direction: column; align-items: center; gap: clamp(2px, 0.4vh, 6px);
         pointer-events: none;
       }
       .hud-score {
-        font-size: 10px; color: rgba(255,255,255,0.7);
-        text-shadow: 0 0 5px rgba(255,255,255,0.25);
-        letter-spacing: 2px;
+        font-size: clamp(16px, 2vw, 40px);
+        font-weight: 700;
+        color: var(--hud-text);
+        text-shadow: 0 0 12px var(--hud-accent-glow);
+        letter-spacing: 3px;
       }
       .hud-combo {
-        font-size: 9px; color: #ffaa00;
-        text-shadow: 0 0 6px #ffaa00, 0 0 14px rgba(255,170,0,0.45);
-        letter-spacing: 1px;
+        font-size: clamp(14px, 1.6vw, 32px);
+        font-weight: 900;
+        color: var(--hud-accent);
+        text-shadow:
+          0 0 12px var(--hud-accent-glow),
+          0 0 28px rgba(0,255,136,0.2);
+        letter-spacing: 2px;
         transition: transform 0.12s;
-        min-height: 14px;
+        min-height: clamp(16px, 2vh, 36px);
       }
-      .hud-combo.pop { transform: scale(1.4); }
+      .hud-combo.pop { transform: scale(1.5); }
 
       /* ── Floating score popup ── */
       .hud-float-score {
         position: fixed; z-index: 55;
-        font-family: 'Press Start 2P', monospace;
-        font-size: 11px; color: #39ff14;
-        text-shadow: 0 0 6px #39ff14, 0 0 14px rgba(57,255,20,0.5);
+        font-family: var(--hud-font);
+        font-size: clamp(14px, 1.6vw, 30px);
+        font-weight: 900;
+        color: var(--hud-accent);
+        text-shadow: 0 0 10px var(--hud-accent-glow), 0 0 24px rgba(0,255,136,0.2);
         pointer-events: none;
         animation: floatUp 0.9s ease-out forwards;
       }
       @keyframes floatUp {
         0%   { opacity: 1; transform: translateX(-50%) translateY(0); }
-        100% { opacity: 0; transform: translateX(-50%) translateY(-50px); }
+        100% { opacity: 0; transform: translateX(-50%) translateY(-30px); }
       }
 
       /* ══════════════════════════════════════════
-         TOP-RIGHT  —  PAUSE button + speedometer
+         TOP-RIGHT — TIMER + PAUSE
          ══════════════════════════════════════════ */
       .hud-tr {
         position: absolute;
-        top: 12px; right: 12px;
-        display: flex; flex-direction: column;
-        align-items: flex-end; gap: 8px;
+        top: clamp(8px, 1.5vh, 20px); right: clamp(8px, 1vw, 20px);
+        display: flex; align-items: center; gap: clamp(6px, 0.6vw, 12px);
       }
-
-      /* Speedometer panel */
-      .sp-panel { padding: 8px 10px; width: 220px; }
-
-      /* LED segment bar */
-      .sp-bar {
-        display: flex; gap: 2px;
-        margin-bottom: 7px;
+      .hud-timer-panel {
+        display: flex; align-items: center; gap: clamp(5px, 0.5vw, 10px);
+        padding: clamp(5px, 0.6vh, 10px) clamp(8px, 0.8vw, 16px);
+        border-color: rgba(255,221,0,0.2);
       }
-      .sp-seg {
-        flex: 1; height: 16px;
-        border-radius: 2px;
-        background: #0e0e0e;
-        border: 1px solid #2a2a2a;
-        transition: background 0.06s, box-shadow 0.06s;
+      .timer-icon {
+        width: clamp(14px, 1.3vw, 24px); height: clamp(14px, 1.3vw, 24px);
+        opacity: 0.7;
+        filter: drop-shadow(0 0 3px rgba(255,221,0,0.4));
       }
-      .sp-seg.on-g { background:#00cc22; border-color:#00cc22; box-shadow:0 0 4px #00cc22; }
-      .sp-seg.on-y { background:#ccbb00; border-color:#ccbb00; box-shadow:0 0 4px #ccbb00; }
-      .sp-seg.on-o { background:#ff7700; border-color:#ff7700; box-shadow:0 0 4px #ff7700; }
-      .sp-seg.on-r { background:#ff1a1a; border-color:#ff1a1a; box-shadow:0 0 4px #ff1a1a; }
-
-      /* Speed number + unit + time on one row */
-      .sp-readout {
-        display: flex; align-items: baseline; gap: 5px;
-      }
-      .sp-num {
-        font-size: 26px; color: #ff3333; line-height: 1;
-        text-shadow: 0 0 8px #ff3333, 0 0 18px rgba(255,50,50,0.4);
-        min-width: 48px; text-align: right;
-        transition: color 0.2s, text-shadow 0.2s;
-      }
-      .sp-unit {
-        font-size: 6px; color: rgba(255,255,255,0.35);
-        letter-spacing: 1px; padding-bottom: 3px;
-      }
-      .sp-time {
-        font-size: 8px; color: #ffaa00;
-        text-shadow: 0 0 6px #ffaa00, 0 0 14px rgba(255,170,0,0.4);
-        margin-left: auto;
-        letter-spacing: 0.5px;
-      }
-
-      /* ══════════════════════════════════════════
-         RIGHT EDGE  —  vertical energy bar
-         ══════════════════════════════════════════ */
-      .hud-re {
-        position: absolute;
-        right: 12px; top: 50%; transform: translateY(-50%);
-      }
-      .en-panel {
-        display: flex; flex-direction: column;
-        align-items: center; gap: 4px;
-        padding: 8px 7px;
-        width: 38px;
-      }
-      .en-label-top, .en-label-bot {
-        font-size: 7px; color: rgba(255,255,255,0.35);
+      .hud-timer {
+        font-family: var(--hud-font);
+        font-variant-numeric: tabular-nums;
+        font-size: clamp(14px, 1.5vw, 30px);
+        font-weight: 700;
+        color: var(--hud-warning);
+        text-shadow:
+          0 0 10px rgba(255,221,0,0.4),
+          0 0 24px rgba(255,221,0,0.15);
         letter-spacing: 1px;
       }
 
-      /* Vertical LED bar — flex column-reverse so data-i=0 sits at bottom */
+      /* ══════════════════════════════════════════
+         RIGHT EDGE — ENERGY GAUGE
+         ══════════════════════════════════════════ */
+      .hud-re {
+        position: absolute;
+        right: clamp(8px, 1vw, 20px); top: 50%; transform: translateY(-50%);
+      }
+      .en-panel {
+        display: flex; flex-direction: column;
+        align-items: center; gap: clamp(4px, 0.6vh, 9px);
+        padding: clamp(8px, 1vh, 18px) clamp(7px, 0.7vw, 15px);
+        width: clamp(48px, 5vw, 84px);
+      }
+      .en-bolt {
+        opacity: 0.4;
+        transition: opacity 0.3s, filter 0.3s;
+        width: clamp(16px, 1.8vw, 30px); height: clamp(16px, 1.8vw, 30px);
+      }
+      .en-bolt.charged {
+        opacity: 1;
+        filter: drop-shadow(0 0 4px var(--hud-accent));
+      }
       .en-bar {
-        display: flex; flex-direction: column-reverse; gap: 2px;
+        display: flex; flex-direction: column-reverse; gap: clamp(2px, 0.25vh, 3px);
       }
       .en-seg {
-        width: 20px; height: 8px; border-radius: 2px;
-        background: #0e0e0e; border: 1px solid #2a2a2a;
-        transition: background 0.1s, box-shadow 0.1s;
+        width: clamp(26px, 3vw, 48px); height: clamp(8px, 1.3vh, 18px);
+        border-radius: 3px;
+        background: var(--hud-segment-empty);
+        border: 1px solid rgba(255,255,255,0.05);
+        transition: background 0.15s, box-shadow 0.15s;
       }
-      .en-seg.on-r { background:#ff1a1a; border-color:#ff1a1a; box-shadow:0 0 3px #ff1a1a; }
-      .en-seg.on-o { background:#ff7700; border-color:#ff7700; box-shadow:0 0 3px #ff7700; }
-      .en-seg.on-y { background:#ccbb00; border-color:#ccbb00; box-shadow:0 0 3px #ccbb00; }
-      .en-seg.on-g { background:#00cc22; border-color:#00cc22; box-shadow:0 0 3px #00cc22; }
+      .en-seg.on-r { background: var(--hud-danger); box-shadow: 0 0 4px rgba(255,51,51,0.5); animation: segPulse 2s ease-in-out infinite; }
+      .en-seg.on-o { background: #ff8800; box-shadow: 0 0 4px rgba(255,136,0,0.5); animation: segPulse 2s ease-in-out infinite; }
+      .en-seg.on-y { background: var(--hud-warning); box-shadow: 0 0 4px rgba(255,221,0,0.5); animation: segPulse 2s ease-in-out infinite; }
+      .en-seg.on-g { background: var(--hud-accent); box-shadow: 0 0 4px var(--hud-accent-glow); animation: segPulse 2s ease-in-out infinite; }
 
-      .en-seg.flash { animation: segFlash 0.3s ease-out; }
-      @keyframes segFlash {
-        0%   { filter: brightness(1);   }
+      @keyframes segPulse {
+        0%, 100% { opacity: 0.8; }
+        50% { opacity: 1; }
+      }
+      .en-seg.seg-flash {
+        background: #fff !important;
+        box-shadow: 0 0 10px rgba(255,255,255,0.8) !important;
+        animation: none !important;
+      }
+      .en-seg.flash { animation: segCelebrate 0.3s ease-out !important; }
+      @keyframes segCelebrate {
+        0%   { filter: brightness(1); }
         40%  { filter: brightness(2.8); }
-        100% { filter: brightness(1);   }
+        100% { filter: brightness(1); }
       }
 
-      /* Lamp counter below the bar */
+      .en-label {
+        font-size: clamp(5px, 0.6vw, 10px);
+        font-weight: 700;
+        color: var(--hud-text-muted);
+        letter-spacing: 2px;
+      }
       .en-lamps {
         display: flex; flex-direction: column;
-        align-items: center; gap: 3px;
-        margin-top: 3px;
+        align-items: center; gap: 2px;
       }
-      .en-lamp-icon { font-size: 13px; }
       .en-lamp-count {
-        font-size: 6px; color: #ffcc00;
-        text-shadow: 0 0 5px rgba(255,200,0,0.7);
-        text-align: center; letter-spacing: 0;
+        font-size: clamp(7px, 0.7vw, 13px);
+        font-weight: 700;
+        color: var(--hud-warning);
+        text-shadow: 0 0 5px rgba(255,200,0,0.5);
+      }
+
+      /* ══════════════════════════════════════════
+         BOTTOM-RIGHT — SPEEDOMETER
+         ══════════════════════════════════════════ */
+      .hud-br {
+        position: absolute;
+        bottom: clamp(8px, 1.5vh, 20px); right: clamp(8px, 1.5vw, 24px);
+      }
+      .speedo-wrap {
+        width: clamp(200px, 28vw, 520px);
+        position: relative;
+      }
+      .speedo-svg {
+        width: 100%; height: auto;
+        filter: drop-shadow(0 4px 16px rgba(0,0,0,0.5));
+      }
+      #speedo-needle {
+        transform-origin: ${ARC_CX}px ${ARC_CY}px;
+        transition: transform 150ms cubic-bezier(0.34, 1.56, 0.64, 1);
+      }
+      #speedo-fill {
+        transition: stroke-dashoffset 150ms ease-out;
       }
 
       /* ══════════════════════════════════════════
@@ -331,68 +492,91 @@ export class HUD {
       #pause-overlay {
         position: fixed; inset: 0; z-index: 200;
         display: none; align-items: center; justify-content: center;
-        background: rgba(0,0,0,0.78); backdrop-filter: blur(6px);
+        background: rgba(0,0,0,0.7);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
       }
       .pause-card {
         text-align: center;
-        background: rgba(0,0,0,0.55);
-        border: 2px solid #3a3a3a;
-        border-radius: 6px;
-        padding: 36px 44px;
-        min-width: 250px;
+        padding: clamp(28px, 4vh, 52px) clamp(36px, 4vw, 64px);
+        min-width: clamp(220px, 22vw, 400px);
       }
       .pause-title {
-        font-family: 'Press Start 2P', monospace;
-        font-size: 18px; color: #fff; letter-spacing: 4px;
-        margin-bottom: 30px;
-        text-shadow: 0 0 10px rgba(255,255,255,0.3);
+        font-family: var(--hud-font);
+        font-size: clamp(18px, 2vw, 36px);
+        font-weight: 900;
+        color: var(--hud-text);
+        letter-spacing: 4px;
+        margin-bottom: clamp(20px, 3vh, 40px);
+        text-shadow: 0 0 20px rgba(255,255,255,0.2);
       }
       .pause-btn {
         display: block; width: 100%;
-        font-family: 'Press Start 2P', monospace;
-        font-size: 9px; letter-spacing: 2px;
+        font-family: var(--hud-font);
+        font-size: clamp(8px, 0.9vw, 16px);
+        font-weight: 700;
+        letter-spacing: 2px;
         text-transform: uppercase;
-        padding: 14px 0; margin-bottom: 12px;
-        border: none; border-radius: 4px;
-        pointer-events: all;
+        padding: clamp(12px, 1.5vh, 22px) 0;
+        margin-bottom: clamp(8px, 1vh, 16px);
+        border: none; border-radius: var(--hud-radius-sm);
+        pointer-events: all; cursor: pointer;
         transition: transform 0.12s, box-shadow 0.12s;
       }
       .pause-btn:last-child { margin-bottom: 0; }
       .pause-btn:active { transform: scale(0.95); }
       .pause-resume {
-        background: linear-gradient(135deg, #39ff14, #7fff00);
-        color: #061206;
-        box-shadow: 0 0 14px rgba(57,255,20,0.35);
+        background: linear-gradient(135deg, var(--hud-accent), #7fff00);
+        color: #0a1a0e;
+        box-shadow: 0 0 18px var(--hud-accent-glow);
       }
-      .pause-resume:hover { box-shadow: 0 0 24px rgba(57,255,20,0.6); }
+      .pause-resume:hover { box-shadow: 0 0 28px var(--hud-accent-glow); }
       .pause-quit {
-        background: rgba(255,255,255,0.07);
-        color: rgba(255,255,255,0.55);
-        border: 1px solid #3a3a3a;
+        background: rgba(255,255,255,0.06);
+        color: var(--hud-text-muted);
+        border: 1px solid rgba(255,255,255,0.1);
       }
-      .pause-quit:hover { background: rgba(255,255,255,0.13); }
+      .pause-quit:hover { background: rgba(255,255,255,0.12); }
 
-      /* ── Toast notification ── */
+      /* ══════════════════════════════════════════
+         TOAST
+         ══════════════════════════════════════════ */
       .hud-toast {
         position: fixed; z-index: 120;
         left: 50%; top: 38%;
         transform: translate(-50%, -50%);
-        font-family: 'Press Start 2P', monospace;
-        font-size: clamp(12px, 2.5vw, 18px);
-        color: #fff;
-        text-shadow: 0 0 12px rgba(255,255,255,0.6), 0 0 24px rgba(255,255,255,0.3);
+        font-family: var(--hud-font);
+        font-size: clamp(14px, 1.6vw, 28px);
+        font-weight: 700;
+        color: var(--hud-text);
+        text-shadow: 0 0 16px var(--hud-accent-glow);
         letter-spacing: 3px;
         text-align: center;
         pointer-events: none;
+        padding: clamp(8px, 1vh, 16px) clamp(16px, 2vw, 32px);
+        background: var(--hud-bg);
+        backdrop-filter: var(--hud-blur);
+        -webkit-backdrop-filter: var(--hud-blur);
+        border: 1px solid var(--hud-border);
+        border-radius: 100px;
         opacity: 0;
         transition: opacity 0.2s ease;
       }
       .hud-toast.visible { opacity: 1; }
+
+      /* ══════════════════════════════════════════
+         COMPACT VIEWPORT
+         ══════════════════════════════════════════ */
+      @media (max-height: 380px) {
+        .mm-panel { display: none; }
+        .en-panel { padding: 4px; }
+        .hud-tl, .hud-tr { gap: 4px; }
+      }
     `;
     document.head.appendChild(style);
 
-    gameRoot().appendChild(this.el);
-    gameRoot().appendChild(this.pauseOverlay);
+    document.body.appendChild(this.el);
+    document.body.appendChild(this.pauseOverlay);
 
     // ── Wire up buttons ──
     this.el.querySelector('#hud-home').addEventListener('click', () => onHome());
@@ -401,26 +585,23 @@ export class HUD {
     this.pauseOverlay.querySelector('#pause-quit').addEventListener('click', () => onHome());
 
     // ── Cache DOM refs ──
-    this.spSegs      = [...this.el.querySelectorAll('.sp-seg')];
     this.enSegs      = [...this.el.querySelectorAll('.en-seg')];
     this.mmLamps     = [...this.el.querySelectorAll('.mm-lamp')];
     this.mmPlayer    = this.el.querySelector('#mm-player');
-    this.spNum       = this.el.querySelector('#sp-num');
     this.spTime      = this.el.querySelector('#sp-time');
     this.enLampCount = this.el.querySelector('#en-lamp-count');
     this.scoreEl     = this.el.querySelector('#hud-score');
     this.comboEl     = this.el.querySelector('#hud-combo');
+    this.enBolt      = this.el.querySelector('.en-bolt');
+
+    // Speedometer refs
+    this._arcFill   = this.el.querySelector('#speedo-fill');
+    this._needle    = this.el.querySelector('#speedo-needle');
+    this._speedText = this.el.querySelector('#speedo-num');
+    this._arcLength = ARC_LENGTH;
   }
 
   // ── Internal helpers ──
-
-  _spColor(segIndex) {
-    const t = segIndex / SP_SEGS;
-    if (t < 0.40) return 'on-g';
-    if (t < 0.60) return 'on-y';
-    if (t < 0.80) return 'on-o';
-    return 'on-r';
-  }
 
   _enColor(segIndex) {
     const t = segIndex / EN_SEGS;
@@ -433,52 +614,65 @@ export class HUD {
   _updateMinimap() {
     const totalPlates = TOTAL_LAMP_POSTS * PLATES_TO_FILL_BAR;
     const progress = (this._lamps * PLATES_TO_FILL_BAR + this._charge) / totalPlates;
-    // Keep dot 4%..96% inside the strip so it stays visible
     const pct = 4 + Math.min(92, progress * 92);
     this.mmPlayer.style.bottom = pct.toFixed(1) + '%';
   }
 
-  // ── Public update methods ──
+  // ── Public API ──
 
   updateSpeed(mph) {
-    const display = Math.round(mph);
-    this.spNum.textContent = display;
-
     const frac = Math.max(0, Math.min(1, (mph - 20) / 50));
-    const lit  = Math.round(frac * SP_SEGS);
-    this.spSegs.forEach((seg, i) => {
-      seg.className = 'sp-seg' + (i < lit ? ' ' + this._spColor(i) : '');
-    });
 
-    // Speed-number color tracks the gauge
-    const col = frac > 0.78 ? '#ff1a1a' : frac > 0.5 ? '#ff8800' : '#ff3333';
-    this.spNum.style.color = col;
-    this.spNum.style.textShadow = `0 0 8px ${col}, 0 0 18px ${col}60`;
+    // Arc fill
+    this._arcFill.style.strokeDashoffset = String(this._arcLength * (1 - frac));
+
+    // Needle rotation: 160° (min) → 380° (max, wraps to 20°)
+    const angle = ARC_START_DEG + frac * ARC_SWEEP_DEG;
+    const nEnd = polarToXY(ARC_CX, ARC_CY, ARC_R - 18, angle);
+    this._needle.setAttribute('x2', nEnd.x);
+    this._needle.setAttribute('y2', nEnd.y);
+
+    // Speed number
+    this._speedText.textContent = Math.round(mph);
+
+    // Color the number based on speed
+    let col = 'var(--hud-accent)';
+    if (frac > 0.8) col = 'var(--hud-danger)';
+    else if (frac > 0.5) col = 'var(--hud-warning)';
+    this._speedText.setAttribute('fill', col);
   }
 
   updateTime(elapsed) {
-    const mm = Math.floor(elapsed / 60).toString().padStart(2, '0');
-    const ss = Math.floor(elapsed % 60).toString().padStart(2, '0');
-    const cs = Math.floor((elapsed % 1) * 100).toString().padStart(2, '0');
-    this.spTime.textContent = `${mm}'${ss}"${cs}`;
+    const m = Math.floor(elapsed / 60);
+    const s = Math.floor(elapsed % 60);
+    const cs = Math.floor((elapsed * 100) % 100);
+    this.spTime.textContent =
+      String(m).padStart(2, '0') + "'" +
+      String(s).padStart(2, '0') + '"' +
+      String(cs).padStart(2, '0');
   }
 
   updateCharge(charge) {
     this._charge = charge;
     const lit = Math.round((charge / PLATES_TO_FILL_BAR) * EN_SEGS);
-    this.enSegs.forEach((seg, i) => {
-      seg.className = 'en-seg' + (i < lit ? ' ' + this._enColor(i) : '');
-    });
-    this._updateMinimap();
-  }
 
-  celebrateCharge() {
-    // All segments light up bright green, then flash 3×
     this.enSegs.forEach((seg, i) => {
-      seg.className = 'en-seg on-g flash';
-      // Stagger removal so the flash cascades slightly
-      setTimeout(() => seg.classList.remove('flash'), 320 + i * 8);
+      seg.classList.remove('on-r', 'on-o', 'on-y', 'on-g', 'seg-flash');
+      if (i < lit) {
+        seg.classList.add(this._enColor(i));
+        // Flash newly filled segments
+        if (i >= this._prevLit) {
+          seg.classList.add('seg-flash');
+          setTimeout(() => seg.classList.remove('seg-flash'), 200);
+        }
+      }
     });
+
+    // Bolt glow when > 60%
+    this.enBolt.classList.toggle('charged', lit / EN_SEGS > 0.6);
+
+    this._prevLit = lit;
+    this._updateMinimap();
   }
 
   updateLamps(lit) {
@@ -502,8 +696,16 @@ export class HUD {
     }
   }
 
-  // Kept for backwards-compatibility — lamp count covers this now
+  // Kept for backwards-compatibility
   updateStage() {}
+
+  celebrateCharge() {
+    this.enSegs.forEach((seg, i) => {
+      seg.classList.remove('on-r', 'on-o', 'on-y', 'seg-flash');
+      seg.classList.add('on-g', 'flash');
+      setTimeout(() => seg.classList.remove('flash'), 320 + i * 8);
+    });
+  }
 
   showFloatingScore(points) {
     const el = document.createElement('div');
@@ -511,22 +713,17 @@ export class HUD {
     el.textContent = `+${points}`;
     el.style.left = '50%';
     el.style.top  = '42%';
-    gameRoot().appendChild(el);
+    document.body.appendChild(el);
     setTimeout(() => el.remove(), 900);
   }
 
-  /** Show a center-screen toast that fades in, holds, then fades out. */
   showToast(text) {
     const el = document.createElement('div');
     el.className = 'hud-toast';
     el.textContent = text;
-    gameRoot().appendChild(el);
-
-    // fade-in
+    document.body.appendChild(el);
     void el.offsetWidth;
     el.classList.add('visible');
-
-    // hold 1s, then fade-out
     setTimeout(() => el.classList.remove('visible'), 1200);
     setTimeout(() => el.remove(), 1500);
   }
@@ -537,6 +734,7 @@ export class HUD {
   reset() {
     this._charge = 0;
     this._lamps  = 0;
+    this._prevLit = 0;
     this.updateCharge(0);
     this.updateLamps(0);
     this.updateSpeed(20);
@@ -548,8 +746,8 @@ export class HUD {
 
   show() {
     clearTimeout(this._hideTimer);
-    this.el.style.opacity = '0';
     this.el.style.display = 'block';
+    this.el.style.opacity = '0';
     void this.el.offsetWidth;
     this.el.style.transition = 'opacity 0.4s ease';
     this.el.style.opacity = '1';

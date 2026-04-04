@@ -135,19 +135,40 @@ export class Kart {
 
     // ── Vehicle lighting rig (ensures car is visible on all maps) ──
     // Overhead fill — illuminates roof and top surfaces
-    const fillTop = new THREE.PointLight(0xfff5ee, 0.6, 10, 1.5);
+    const fillTop = new THREE.PointLight(0xfff5ee, 0.8, 12, 1.5);
     fillTop.position.set(0, 3, -0.5);
     this.group.add(fillTop);
 
     // Rear fill — illuminates the back of the car (visible from chase cam)
-    const fillRear = new THREE.PointLight(0xffffff, 0.5, 8, 1.5);
+    const fillRear = new THREE.PointLight(0xffffff, 0.7, 10, 1.5);
     fillRear.position.set(0, 2, 3);
     this.group.add(fillRear);
 
     // Low rim — catches wheel arches, side panels, and underbody
-    const fillLow = new THREE.PointLight(0xddeeff, 0.3, 6, 2);
+    const fillLow = new THREE.PointLight(0xddeeff, 0.4, 8, 2);
     fillLow.position.set(0, 0.5, -1);
     this.group.add(fillLow);
+
+    // ── Underglow — colored pool beneath vehicle ──
+    // For very dark karts, use the accent color instead and boost intensity
+    const bodyLum = ((driver.carBody >> 16) & 0xff) + ((driver.carBody >> 8) & 0xff) + (driver.carBody & 0xff);
+    const underglowColor = bodyLum < 120 ? driver.carAccent : driver.carBody;
+    const underglowIntensity = bodyLum < 120 ? 2.0 : 1.5;
+    this._underglow = new THREE.PointLight(underglowColor, underglowIntensity, 8, 1.5);
+    this._underglow.position.set(0, 0.25, 0);
+    this.group.add(this._underglow);
+
+    // ── Taillight point lights — red glow visible from chase cam ──
+    const tailL = new THREE.PointLight(0xff2200, 0.8, 6, 1.5);
+    tailL.position.set(-0.4, 0.35, this._exhaustZ - 0.2);
+    this.group.add(tailL);
+    const tailR = new THREE.PointLight(0xff2200, 0.8, 6, 1.5);
+    tailR.position.set(0.4, 0.35, this._exhaustZ - 0.2);
+    this.group.add(tailR);
+    this._tailLights = [tailL, tailR];
+
+    // Store driver color for theme adjustments
+    this._driverColor = driver.carBody;
   }
 
   // ═══════════════════════════════════════════

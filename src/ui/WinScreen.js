@@ -45,58 +45,58 @@ export class WinScreen {
       .win-content {
         position: relative; z-index: 1;
         text-align: center;
-        padding: clamp(24px, 5vw, 44px);
+        padding: clamp(20px, 3vw, 60px);
         background: rgba(0,0,0,0.25);
-        border-radius: 20px;
+        border-radius: clamp(14px, 1.5vw, 28px);
         backdrop-filter: blur(10px);
         -webkit-backdrop-filter: blur(10px);
-        max-width: clamp(300px, 80vw, 480px);
+        max-width: clamp(280px, 40vw, 700px);
         animation: fadeIn 0.5s ease-out;
       }
       .win-title {
         font-family: Impact, 'Arial Black', sans-serif;
-        font-size: clamp(1.8rem, 6vw, 3rem);
+        font-size: clamp(1.6rem, 3.5vw, 5rem);
         font-weight: 900;
         color: #39ff14;
         text-shadow: 0 0 40px rgba(57,255,20,0.7), 0 0 80px rgba(57,255,20,0.3);
-        margin-bottom: 10px;
-        letter-spacing: 3px;
+        margin-bottom: clamp(6px, 1vh, 16px);
+        letter-spacing: clamp(2px, 0.3vw, 6px);
       }
       .win-subtitle {
         color: rgba(255,255,255,0.8);
-        font-size: clamp(0.85rem, 2.5vw, 1.1rem);
-        margin-bottom: clamp(18px, 3vh, 30px);
+        font-size: clamp(0.8rem, 1.4vw, 1.6rem);
+        margin-bottom: clamp(14px, 2.5vh, 36px);
         line-height: 1.5;
       }
       .win-stats {
-        display: flex; justify-content: center; gap: 20px;
-        margin-bottom: clamp(18px, 3vh, 30px);
+        display: flex; justify-content: center; gap: clamp(12px, 1.5vw, 32px);
+        margin-bottom: clamp(14px, 2.5vh, 36px);
       }
       .win-stat {
         display: flex; flex-direction: column; align-items: center;
         background: rgba(255,255,255,0.06);
-        padding: clamp(10px, 2vw, 16px) clamp(16px, 3vw, 24px);
-        border-radius: 12px;
+        padding: clamp(8px, 1.2vw, 22px) clamp(12px, 2vw, 36px);
+        border-radius: clamp(8px, 0.8vw, 18px);
         border: 1px solid rgba(255,255,255,0.1);
       }
-      .win-stat-icon { font-size: 1.8rem; margin-bottom: 4px; }
+      .win-stat-icon { font-size: clamp(1.4rem, 2.2vw, 3rem); margin-bottom: clamp(2px, 0.3vh, 8px); }
       .win-stat-value {
         font-family: 'Courier New', monospace;
-        font-size: clamp(1.6rem, 5vw, 2.4rem);
+        font-size: clamp(1.4rem, 3vw, 4rem);
         font-weight: 900; color: #fff;
       }
       .win-stat-label {
-        font-size: 0.78rem; color: rgba(255,255,255,0.5);
+        font-size: clamp(0.6rem, 0.8vw, 1.2rem); color: rgba(255,255,255,0.5);
         text-transform: uppercase; letter-spacing: 1px;
       }
       .win-btn {
         font-family: Impact, 'Arial Black', sans-serif;
-        padding: clamp(12px, 2vh, 16px) clamp(32px, 6vw, 48px);
-        font-size: clamp(1rem, 2.5vw, 1.3rem);
+        padding: clamp(10px, 1.5vh, 24px) clamp(24px, 4vw, 64px);
+        font-size: clamp(0.9rem, 1.5vw, 2rem);
         font-weight: 700;
         background: linear-gradient(135deg, #39ff14, #7fff00);
         color: #1a2e18; border: none; border-radius: 50px;
-        cursor: pointer; text-transform: uppercase; letter-spacing: 3px;
+        cursor: pointer; text-transform: uppercase; letter-spacing: clamp(2px, 0.3vw, 6px);
         box-shadow: 0 0 20px rgba(57,255,20,0.4);
         transition: transform 0.2s, box-shadow 0.2s;
       }
@@ -105,10 +105,6 @@ export class WinScreen {
         box-shadow: 0 0 30px rgba(57,255,20,0.7);
       }
       .win-btn:active { transform: scale(0.97); }
-
-      @media (max-width: 500px) {
-        .win-content { border-radius: 14px; }
-      }
     `;
     document.head.appendChild(style);
     gameRoot().appendChild(this.el);

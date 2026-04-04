@@ -1,6 +1,5 @@
 import { Tween, Easing } from '@tweenjs/tween.js';
 import { tweenGroup } from '../utils/tweenGroup.js';
-import { gameRoot } from '../utils/base.js';
 
 /**
  * Top Gear SNES-inspired race start countdown.
@@ -58,12 +57,12 @@ export class RaceStartSequence {
       opacity: '1',
       transition: 'none',
     });
-    gameRoot().appendChild(this._overlay);
+    document.body.appendChild(this._overlay);
 
     // ── Countdown container ──
     this._countdownEl = document.createElement('div');
     this._countdownEl.id = 'countdown-display';
-    gameRoot().appendChild(this._countdownEl);
+    document.body.appendChild(this._countdownEl);
 
     // Inject styles once
     if (!document.getElementById('race-start-styles')) {

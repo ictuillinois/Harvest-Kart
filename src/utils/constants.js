@@ -45,7 +45,7 @@ export const DRIVER_TYPES = [
   {
     name: 'Ethan',
     description: 'The Balanced Pro',
-    avatar: asset('characters/ethan.png'),
+    avatar: asset('characters/ethan.webp'),
     accentColor: '#2a2a2a',
     carBody: 0x1a1a1a,
     carAccent: 0x444444,
@@ -55,7 +55,7 @@ export const DRIVER_TYPES = [
   {
     name: 'Kate',
     description: 'The Quick Starter',
-    avatar: asset('characters/kate.png'),
+    avatar: asset('characters/kate.webp'),
     accentColor: '#d44a7a',
     carBody: 0xd44a7a,
     carAccent: 0xff6b9d,
@@ -65,7 +65,7 @@ export const DRIVER_TYPES = [
   {
     name: 'Destiny',
     description: 'The Speed Demon',
-    avatar: asset('characters/destiny.png'),
+    avatar: asset('characters/destiny.webp'),
     accentColor: '#3a6adf',
     carBody: 0x3a6adf,
     carAccent: 0x5a8aff,
@@ -75,7 +75,7 @@ export const DRIVER_TYPES = [
   {
     name: 'Luke',
     description: 'The Eco Racer',
-    avatar: asset('characters/luke.png'),
+    avatar: asset('characters/luke.webp'),
     accentColor: '#2aaa4a',
     carBody: 0x2aaa4a,
     carAccent: 0x4acc6a,
