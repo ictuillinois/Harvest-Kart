@@ -51,6 +51,20 @@ export function getModel(url) {
     return new THREE.Group(); // Return empty group instead of crashing
   }
   const clone = gltf.scene.clone(true);
+
+  // Deep-clone all materials so modifications don't contaminate other instances.
+  // This prevents color bleeding when one model is tinted (e.g. kart color
+  // leaking to every building that shares the same material).
+  clone.traverse((child) => {
+    if (child.isMesh && child.material) {
+      if (Array.isArray(child.material)) {
+        child.material = child.material.map(m => m.clone());
+      } else {
+        child.material = child.material.clone();
+      }
+    }
+  });
+
   // Apply target height from registry
   const targetHeight = MODEL_HEIGHTS[url];
   if (targetHeight) {
@@ -94,13 +108,50 @@ export const MODEL_URLS = {
   mailbox: asset('models/usa/mailbox.glb'),
   trashcan: asset('models/usa/trashcan.glb'),
   // Peru props
-  llama: asset('models/peru/llama.glb'),
   stoneWall: asset('models/peru/stone_wall.glb'),
   flowers: asset('models/peru/flowers.glb'),
   hut: asset('models/peru/hut.glb'),
   // Racing
   tires: asset('models/racing/tires.glb'),
   raceBarrier: asset('models/racing/barrier.glb'),
+  // Brazil scenery (Kenney — CC0)
+  brazilE: asset('models/scenery/brazil/building-e.glb'),
+  brazilF: asset('models/scenery/brazil/building-f.glb'),
+  brazilG: asset('models/scenery/brazil/building-g.glb'),
+  brazilI: asset('models/scenery/brazil/building-i.glb'),
+  brazilJ: asset('models/scenery/brazil/building-j.glb'),
+  brazilL: asset('models/scenery/brazil/building-l.glb'),
+  brazilM: asset('models/scenery/brazil/building-m.glb'),
+  brazilN: asset('models/scenery/brazil/building-n.glb'),
+  // Chicago scenery (Kenney — CC0)
+  chicagoSkyscraperA: asset('models/scenery/chicago/building-skyscraper-a.glb'),
+  chicagoSkyscraperB: asset('models/scenery/chicago/building-skyscraper-b.glb'),
+  chicagoSkyscraperC: asset('models/scenery/chicago/building-skyscraper-c.glb'),
+  chicagoSkyscraperD: asset('models/scenery/chicago/building-skyscraper-d.glb'),
+  chicagoSkyscraperE: asset('models/scenery/chicago/building-skyscraper-e.glb'),
+  chicagoLowA: asset('models/scenery/chicago/low-detail-building-a.glb'),
+  chicagoLowB: asset('models/scenery/chicago/low-detail-building-b.glb'),
+  chicagoLowE: asset('models/scenery/chicago/low-detail-building-e.glb'),
+  chicagoLowL: asset('models/scenery/chicago/low-detail-building-l.glb'),
+  chicagoLowM: asset('models/scenery/chicago/low-detail-building-m.glb'),
+  // Peru scenery (Kenney — CC0)
+  peruBuildingA: asset('models/scenery/peru/building-type-a.glb'),
+  peruBuildingB: asset('models/scenery/peru/building-type-b.glb'),
+  peruBuildingC: asset('models/scenery/peru/building-type-c.glb'),
+  peruBuildingD: asset('models/scenery/peru/building-type-d.glb'),
+  peruBuildingE: asset('models/scenery/peru/building-type-e.glb'),
+  peruBuildingF: asset('models/scenery/peru/building-type-f.glb'),
+  peruBuildingR: asset('models/scenery/peru/building-type-r.glb'),
+  peruBuildingS: asset('models/scenery/peru/building-type-s.glb'),
+  peruBuildingT: asset('models/scenery/peru/building-type-t.glb'),
+  peruPlanter: asset('models/scenery/peru/planter.glb'),
+  peruTreeLarge: asset('models/scenery/peru/tree-large.glb'),
+  peruTreeSmall: asset('models/scenery/peru/tree-small.glb'),
+  // Player vehicles (Kenney Car Kit — CC0)
+  vehicleEthan: asset('models/vehicles/ethan.glb'),
+  vehicleKate: asset('models/vehicles/kate.glb'),
+  vehicleDestiny: asset('models/vehicles/destiny.glb'),
+  vehicleLuke: asset('models/vehicles/luke.glb'),
 };
 
 // Target heights in world units (auto-applied by getModel)
@@ -130,7 +181,6 @@ MODEL_HEIGHTS[MODEL_URLS.carHatchback] = 1.2;
 // Nature: tropical/mountain scale
 MODEL_HEIGHTS[MODEL_URLS.palmTree] = 6;
 MODEL_HEIGHTS[MODEL_URLS.flowers] = 0.4;
-MODEL_HEIGHTS[MODEL_URLS.llama] = 1.4;
 MODEL_HEIGHTS[MODEL_URLS.stoneWall] = 1.2;
 MODEL_HEIGHTS[MODEL_URLS.hut] = 2.5;
 
@@ -142,3 +192,45 @@ MODEL_HEIGHTS[MODEL_URLS.trashcan] = 0.8;
 // Racing
 MODEL_HEIGHTS[MODEL_URLS.tires] = 0.8;
 MODEL_HEIGHTS[MODEL_URLS.raceBarrier] = 0.9;
+
+// Brazil scenery — colorful coastal buildings
+MODEL_HEIGHTS[MODEL_URLS.brazilE] = 5;
+MODEL_HEIGHTS[MODEL_URLS.brazilF] = 6;
+MODEL_HEIGHTS[MODEL_URLS.brazilG] = 7;
+MODEL_HEIGHTS[MODEL_URLS.brazilI] = 8;
+MODEL_HEIGHTS[MODEL_URLS.brazilJ] = 9;
+MODEL_HEIGHTS[MODEL_URLS.brazilL] = 6;
+MODEL_HEIGHTS[MODEL_URLS.brazilM] = 7;
+MODEL_HEIGHTS[MODEL_URLS.brazilN] = 8;
+
+// Chicago scenery — night city
+MODEL_HEIGHTS[MODEL_URLS.chicagoSkyscraperA] = 25;
+MODEL_HEIGHTS[MODEL_URLS.chicagoSkyscraperB] = 30;
+MODEL_HEIGHTS[MODEL_URLS.chicagoSkyscraperC] = 22;
+MODEL_HEIGHTS[MODEL_URLS.chicagoSkyscraperD] = 35;
+MODEL_HEIGHTS[MODEL_URLS.chicagoSkyscraperE] = 20;
+MODEL_HEIGHTS[MODEL_URLS.chicagoLowA] = 8;
+MODEL_HEIGHTS[MODEL_URLS.chicagoLowB] = 10;
+MODEL_HEIGHTS[MODEL_URLS.chicagoLowE] = 7;
+MODEL_HEIGHTS[MODEL_URLS.chicagoLowL] = 9;
+MODEL_HEIGHTS[MODEL_URLS.chicagoLowM] = 8;
+
+// Peru scenery — Andean village
+MODEL_HEIGHTS[MODEL_URLS.peruBuildingA] = 4;
+MODEL_HEIGHTS[MODEL_URLS.peruBuildingB] = 5;
+MODEL_HEIGHTS[MODEL_URLS.peruBuildingC] = 4;
+MODEL_HEIGHTS[MODEL_URLS.peruBuildingD] = 5;
+MODEL_HEIGHTS[MODEL_URLS.peruBuildingE] = 5;
+MODEL_HEIGHTS[MODEL_URLS.peruBuildingF] = 4.5;
+MODEL_HEIGHTS[MODEL_URLS.peruBuildingR] = 3.5;
+MODEL_HEIGHTS[MODEL_URLS.peruBuildingS] = 4;
+MODEL_HEIGHTS[MODEL_URLS.peruBuildingT] = 6;
+MODEL_HEIGHTS[MODEL_URLS.peruPlanter] = 0.6;
+MODEL_HEIGHTS[MODEL_URLS.peruTreeLarge] = 5;
+MODEL_HEIGHTS[MODEL_URLS.peruTreeSmall] = 3;
+
+// Player vehicles — heights tuned relative to kart (road-level camera, ~1.2h reference)
+MODEL_HEIGHTS[MODEL_URLS.vehicleEthan] = 1.8;     // Sports GT coupe
+MODEL_HEIGHTS[MODEL_URLS.vehicleKate] = 1.6;       // Compact hatchback
+MODEL_HEIGHTS[MODEL_URLS.vehicleDestiny] = 1.2;    // Formula — low-slung
+MODEL_HEIGHTS[MODEL_URLS.vehicleLuke] = 2.0;       // Rally SUV — tallest

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { ROAD_WIDTH, ROAD_SEGMENT_LENGTH, ROAD_SEGMENT_COUNT, COLORS } from '../utils/constants.js';
+import { ROAD_WIDTH, ROAD_SEGMENT_LENGTH, ROAD_SEGMENT_COUNT, COLORS, ROAD_SURFACE_COLORS } from '../utils/constants.js';
 
 // Generate a procedural asphalt texture via Canvas
 function createAsphaltTexture() {
@@ -9,15 +9,16 @@ function createAsphaltTexture() {
   canvas.height = size;
   const ctx = canvas.getContext('2d');
 
-  // Base dark asphalt
-  ctx.fillStyle = '#2a2a2a';
+  // Base asphalt — light enough that material.color multiplication
+  // still produces visible gray (not near-black)
+  ctx.fillStyle = '#808080';
   ctx.fillRect(0, 0, size, size);
 
   // Noise grain for texture
   for (let i = 0; i < 15000; i++) {
     const x = Math.random() * size;
     const y = Math.random() * size;
-    const brightness = 25 + Math.random() * 30;
+    const brightness = 90 + Math.random() * 50;
     ctx.fillStyle = `rgb(${brightness},${brightness},${brightness})`;
     ctx.fillRect(x, y, 1 + Math.random() * 2, 1 + Math.random() * 2);
   }
@@ -45,13 +46,14 @@ export class Road {
     this.lineGroups = [];
 
     const asphaltTex = createAsphaltTexture();
-    const roadMat = new THREE.MeshStandardMaterial({
+    this.roadMaterial = new THREE.MeshStandardMaterial({
       map: asphaltTex,
       color: COLORS.road,
       roughness: 0.85,
       metalness: 0.05,
     });
     this.roadTexture = asphaltTex;
+    const roadMat = this.roadMaterial;
 
     const lineMat = new THREE.MeshBasicMaterial({ color: COLORS.roadLine });
     const dashedMat = new THREE.MeshBasicMaterial({ color: COLORS.roadLineDashed });
@@ -99,6 +101,12 @@ export class Road {
       scene.add(lineGroup);
       this.lineGroups.push(lineGroup);
     }
+  }
+
+  /** Update road surface color for the active theme. */
+  setThemeColor(themeId) {
+    const color = ROAD_SURFACE_COLORS[themeId] || ROAD_SURFACE_COLORS.brazil;
+    this.roadMaterial.color.set(color);
   }
 
   update(delta, speed) {

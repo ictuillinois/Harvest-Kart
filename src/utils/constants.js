@@ -34,9 +34,18 @@ export const TOTAL_LAMP_POSTS = 4;
 export const PLATE_SPAWN_INTERVAL = 1.0; // slightly faster spawns for 10-plate target
 export const PLATE_COLLISION_Z_THRESHOLD = 2.5;
 
+// ROAD SURFACE COLORS — centralized, per-theme.
+// These are real asphalt gray. Intentionally LIGHT for vehicle contrast.
+// Color multiplies with procedural asphalt texture in Road.js.
+export const ROAD_SURFACE_COLORS = {
+  brazil: 0x777780,   // warm medium gray (bright texture × this = visible gray)
+  usa:    0x606068,   // slightly cooler for night, still visibly gray
+  peru:   0x707078,   // neutral medium gray
+};
+
 // Colors
 export const COLORS = {
-  road: 0x333333,
+  road: 0x777780,     // default road color (used by Road.js at init)
   roadLine: 0xffffff,
   roadLineDashed: 0xcccccc,
   plate: 0x39ff14,

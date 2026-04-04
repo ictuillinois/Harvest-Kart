@@ -1,6 +1,16 @@
+import * as THREE from 'three';
 import { DRIVER_TYPES } from '../utils/constants.js';
 import { gameRoot } from '../utils/base.js';
 import { fadeIn, fadeOut } from '../utils/transition.js';
+import { getModel, MODEL_URLS } from '../utils/assetLoader.js';
+
+// Driver vehicleType → model URL
+const VEHICLE_MODELS = {
+  sportsGT: MODEL_URLS.vehicleEthan,
+  compact:  MODEL_URLS.vehicleKate,
+  formula:  MODEL_URLS.vehicleDestiny,
+  rally:    MODEL_URLS.vehicleLuke,
+};
 
 function starRow(label, filled, total = 5) {
   const stars = Array.from({ length: total }, (_, i) =>
@@ -13,12 +23,18 @@ export class DriverSelect {
   constructor(onSelect, onBack) {
     this.el = document.createElement('div');
     this.el.id = 'driver-select';
+    this._previews = [];     // per-card { scene, camera, model, canvas }
+    this._renderer = null;
+    this._animFrame = null;
+    this._hoveredIdx = -1;
+    this._visible = false;
 
     const cards = DRIVER_TYPES.map((d, i) => `
       <div class="ds-card" data-index="${i}" style="--accent:${d.accentColor}">
         <div class="ds-img-wrap">
           <img class="ds-img" src="${d.avatar}" alt="${d.name}" draggable="false" />
         </div>
+        <div class="ds-vehicle-wrap" data-idx="${i}"></div>
         <div class="ds-info">
           <div class="ds-desc">${d.description}</div>
           <div class="ds-stats">
@@ -140,6 +156,22 @@ export class DriverSelect {
         transform: scale(1.06);
       }
 
+      /* ── Vehicle preview ── */
+      .ds-vehicle-wrap {
+        width: 100%;
+        aspect-ratio: 2 / 1;
+        background: linear-gradient(to bottom, rgba(0,0,0,0), rgba(0,0,0,0.3));
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-bottom: 1px solid rgba(255,255,255,0.06);
+      }
+      .ds-vehicle-wrap canvas {
+        width: 100%;
+        height: 100%;
+        display: block;
+      }
+
       /* ── Info ── */
       .ds-info {
         padding: clamp(6px, 0.8vh, 16px) clamp(8px, 0.8vw, 20px) clamp(8px, 1vh, 20px);
@@ -203,15 +235,290 @@ export class DriverSelect {
           if (c !== card) c.classList.add('dimmed');
         });
         card.classList.add('active');
+        this._hoveredIdx = idx;
         setTimeout(() => onSelect(idx), 400);
       });
+      card.addEventListener('mouseenter', () => {
+        if (!card.classList.contains('dimmed')) {
+          this._hoveredIdx = idx;
+        }
+      });
+      card.addEventListener('mouseleave', () => {
+        if (this._hoveredIdx === idx && !card.classList.contains('active')) {
+          this._hoveredIdx = -1;
+        }
+      });
     });
+
+    // Previews are initialized lazily on first show() after models are preloaded
+    this._previewsReady = false;
+  }
+
+  // ═══════════════════════════════════════════
+  //  3D VEHICLE PREVIEWS
+  // ═══════════════════════════════════════════
+
+  _initPreviews() {
+    const previewW = 256;
+    const previewH = 128;
+
+    this._renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      alpha: true,
+      powerPreference: 'low-power',
+    });
+    this._renderer.setSize(previewW, previewH);
+    this._renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    this._renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this._renderer.toneMappingExposure = 1.3;
+    this._renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+    // Generate a shared showroom environment map for reflections
+    const envMap = this._createShowroomEnvMap();
+
+    DRIVER_TYPES.forEach((driver, i) => {
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x151520);
+      scene.environment = envMap;
+
+      // ── 6-light showroom rig ──
+      // Key light — main illumination, upper-right front
+      const keyLight = new THREE.DirectionalLight(0xffffff, 1.8);
+      keyLight.position.set(4, 6, 3);
+      scene.add(keyLight);
+
+      // Fill light — softer, upper-left, fills shadows
+      const fillLight = new THREE.DirectionalLight(0x8899bb, 0.8);
+      fillLight.position.set(-4, 4, 2);
+      scene.add(fillLight);
+
+      // Rim/back light — bright edge highlights along silhouette
+      const rimLight = new THREE.DirectionalLight(0xaaccff, 1.2);
+      rimLight.position.set(0, 5, -4);
+      scene.add(rimLight);
+
+      // Ground bounce — from below, simulates floor reflection
+      const bounceLight = new THREE.DirectionalLight(0x444455, 0.4);
+      bounceLight.position.set(0, -3, 2);
+      scene.add(bounceLight);
+
+      // Ambient floor
+      const ambient = new THREE.AmbientLight(0x334455, 0.5);
+      scene.add(ambient);
+
+      // Hemisphere — sky/ground color separation
+      const hemi = new THREE.HemisphereLight(0x6688aa, 0x222233, 0.4);
+      scene.add(hemi);
+
+      // Camera: 3/4 front showroom angle
+      const camera = new THREE.PerspectiveCamera(30, previewW / previewH, 0.1, 100);
+      camera.position.set(4.5, 2.5, 4.5);
+      camera.lookAt(0, 0.3, 0);
+
+      // Load vehicle model
+      const modelUrl = VEHICLE_MODELS[driver.vehicleType];
+      let model = null;
+      if (modelUrl) {
+        model = getModel(modelUrl);
+        if (model && model.children.length > 0) {
+          const dark = this._isDark(driver.carBody);
+
+          model.traverse((child) => {
+            if (!child.isMesh) return;
+            const name = (child.name || '').toLowerCase();
+            if (name === 'body' || name === 'spoiler') {
+              child.material = child.material.clone();
+              child.material.color.set(dark ? 0x2a2a30 : driver.carBody);
+              child.material.metalness = dark ? 0.7 : 0.35;
+              child.material.roughness = dark ? 0.08 : 0.25;
+              child.material.emissive = new THREE.Color(dark ? 0x0a0a10 : driver.carBody);
+              child.material.emissiveIntensity = dark ? 0.15 : 0.08;
+              child.material.envMapIntensity = dark ? 1.8 : 1.0;
+            }
+            if (name.includes('wheel')) {
+              child.material = child.material.clone();
+              child.material.color.set(0x2a2a2a);
+              child.material.roughness = 0.7;
+              child.material.metalness = 0.15;
+              child.material.envMapIntensity = 0.3;
+            }
+          });
+
+          // Dark vehicles: extra blue accent SpotLight + boosted rim
+          if (dark) {
+            const accent = new THREE.SpotLight(0x4488ff, 2.0, 20, Math.PI / 4, 0.5);
+            accent.position.set(3, 3, 0);
+            accent.target.position.set(0, 0, 0);
+            scene.add(accent);
+            scene.add(accent.target);
+            rimLight.intensity = 2.0;
+          }
+
+          // Rotate first, then center — so the rotated model is centered
+          model.rotation.y = Math.PI * 0.8;
+
+          // Recalculate bounds after rotation to center properly
+          const bbox = new THREE.Box3().setFromObject(model);
+          const center = bbox.getCenter(new THREE.Vector3());
+          model.position.set(-center.x, -bbox.min.y, -center.z);
+
+          scene.add(model);
+        } else {
+          model = null;
+        }
+      }
+
+      // Reflective showroom floor
+      const ground = new THREE.Mesh(
+        new THREE.CircleGeometry(4, 32),
+        new THREE.MeshStandardMaterial({
+          color: 0x1a1a22, roughness: 0.3, metalness: 0.4,
+        }),
+      );
+      ground.rotation.x = -Math.PI / 2;
+      ground.position.y = -0.01;
+      scene.add(ground);
+
+      // Canvas for this card
+      const canvas = document.createElement('canvas');
+      canvas.width = previewW;
+      canvas.height = previewH;
+      const ctx = canvas.getContext('2d');
+
+      const wrap = this.el.querySelector(`.ds-vehicle-wrap[data-idx="${i}"]`);
+      if (wrap) wrap.appendChild(canvas);
+
+      this._previews.push({ scene, camera, model, canvas, ctx });
+    });
+
+    this._renderAllPreviews();
+  }
+
+  /** Generate a showroom cubemap environment for car reflections. */
+  _createShowroomEnvMap() {
+    const envScene = new THREE.Scene();
+
+    // Ceiling — bright studio overhead
+    const ceiling = new THREE.Mesh(
+      new THREE.PlaneGeometry(100, 100),
+      new THREE.MeshBasicMaterial({ color: 0xccddee }),
+    );
+    ceiling.position.y = 30;
+    ceiling.rotation.x = Math.PI / 2;
+    envScene.add(ceiling);
+
+    // Studio strip lights on ceiling
+    const stripMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+    for (const xPos of [-8, 0, 8]) {
+      const strip = new THREE.Mesh(new THREE.PlaneGeometry(2, 40), stripMat);
+      strip.position.set(xPos, 29.9, 0);
+      strip.rotation.x = Math.PI / 2;
+      envScene.add(strip);
+    }
+
+    // Walls — neutral gray
+    const wallMat = new THREE.MeshBasicMaterial({ color: 0x555566 });
+    for (const [ry, x, z] of [[0, 0, -30], [Math.PI, 0, 30], [Math.PI / 2, -30, 0], [-Math.PI / 2, 30, 0]]) {
+      const wall = new THREE.Mesh(new THREE.PlaneGeometry(100, 60), wallMat);
+      wall.position.set(x, 10, z);
+      wall.rotation.y = ry;
+      envScene.add(wall);
+    }
+
+    // Floor — dark
+    const floor = new THREE.Mesh(
+      new THREE.PlaneGeometry(100, 100),
+      new THREE.MeshBasicMaterial({ color: 0x222233 }),
+    );
+    floor.position.y = -1;
+    floor.rotation.x = -Math.PI / 2;
+    envScene.add(floor);
+
+    const pmrem = new THREE.PMREMGenerator(this._renderer);
+    const envRT = pmrem.fromScene(envScene, 0.04);
+    pmrem.dispose();
+
+    // Clean up temp scene
+    envScene.traverse(c => {
+      if (c.isMesh) {
+        c.geometry.dispose();
+        c.material.dispose();
+      }
+    });
+
+    return envRT.texture;
+  }
+
+  _isDark(hexColor) {
+    const c = new THREE.Color(hexColor);
+    return (0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b) < 0.15;
+  }
+
+  _renderAllPreviews() {
+    const r = this._renderer;
+    if (!r) return;
+
+    for (const preview of this._previews) {
+      if (!preview.model) continue;
+      r.render(preview.scene, preview.camera);
+      // Copy renderer output to this card's canvas
+      preview.ctx.clearRect(0, 0, preview.canvas.width, preview.canvas.height);
+      preview.ctx.drawImage(r.domElement, 0, 0);
+    }
+  }
+
+  _startAnimation() {
+    if (this._animFrame) return;
+    let frameCount = 0;
+    const animate = () => {
+      this._animFrame = requestAnimationFrame(animate);
+      const r = this._renderer;
+      if (!r) return;
+      frameCount++;
+
+      for (let i = 0; i < this._previews.length; i++) {
+        const p = this._previews[i];
+        if (!p.model) continue;
+
+        const isActive = (i === this._hoveredIdx);
+        const speed = isActive ? 0.015 : 0.003;
+        p.model.rotation.y += speed;
+
+        // Active cards render every frame; idle cards render every 6th frame
+        if (isActive || frameCount % 6 === i) {
+          r.render(p.scene, p.camera);
+          p.ctx.clearRect(0, 0, p.canvas.width, p.canvas.height);
+          p.ctx.drawImage(r.domElement, 0, 0);
+        }
+      }
+    };
+    animate();
+  }
+
+  _stopAnimation() {
+    if (this._animFrame) {
+      cancelAnimationFrame(this._animFrame);
+      this._animFrame = null;
+    }
   }
 
   show() {
     this.el.querySelectorAll('.ds-card').forEach(c => c.classList.remove('active', 'dimmed'));
+    this._hoveredIdx = -1;
     fadeIn(this.el);
+    this._visible = true;
+    // Initialize previews on first show (models are preloaded by now)
+    if (!this._previewsReady) {
+      this._initPreviews();
+      this._previewsReady = true;
+    }
+    this._renderAllPreviews();
+    this._startAnimation();
   }
 
-  hide() { fadeOut(this.el); }
+  hide() {
+    fadeOut(this.el);
+    this._visible = false;
+    this._stopAnimation();
+  }
 }

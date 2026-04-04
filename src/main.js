@@ -54,8 +54,13 @@ scene.fog = new THREE.FogExp2(0x1a0533, 0.006);
 // --- Environment map for reflections (glossy/metallic materials) ---
 const pmremGenerator = new THREE.PMREMGenerator(renderer);
 function updateEnvMap() {
+  // Hide kart during env map capture to prevent vehicle color bleeding
+  // into the scene's reflections (underglow, emissive body tint cubemap)
+  const wasVisible = kart.group.visible;
+  kart.group.visible = false;
   const rt = pmremGenerator.fromScene(scene, 0, 0.1, 100);
   scene.environment = rt.texture;
+  kart.group.visible = wasVisible;
 }
 
 const camera = new THREE.PerspectiveCamera(CAMERA_FOV_MIN, window.innerWidth / window.innerHeight, 0.1, 1000);
@@ -171,7 +176,7 @@ function addKartLights(themeId) {
   kartLights.push(headlightTarget);
 
   for (const xOff of [-0.5, 0.5]) {
-    const spot = new THREE.SpotLight(0xfff5e6, cfg.headlights, 80, Math.PI / 5, 0.6, 1.2);
+    const spot = new THREE.SpotLight(0xfff5e6, cfg.headlights, 30, Math.PI / 5, 0.6, 1.5);
     spot.position.set(xOff, 0.8, -1.5);
     spot.target = headlightTarget;
     spot.castShadow = false;
@@ -179,8 +184,8 @@ function addKartLights(themeId) {
     kartLights.push(spot);
   }
 
-  // === CAMERA BACKFILL — ensures kart rear is lit for chase cam ===
-  const backfill = new THREE.PointLight(0xaabbdd, cfg.backfill, 25, 1);
+  // === CAMERA BACKFILL — tight radius, only lights kart rear ===
+  const backfill = new THREE.PointLight(0xaabbdd, cfg.backfill, 12, 2);
   backfill.position.set(0, 6, 6);
   kart.group.add(backfill);
   kartLights.push(backfill);
@@ -283,6 +288,10 @@ const mapSelect = new MapSelect(
     await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
 
     await environment.build(mapIndex);
+
+    // Update road surface color for this theme
+    const themeId = MAP_THEMES[mapIndex]?.id || 'brazil';
+    road.setThemeColor(themeId);
 
     // Generate environment map for reflections (critical for glossy dark vehicles)
     updateEnvMap();
@@ -628,6 +637,7 @@ playMusic('menu');
 
 // Run intro sequence (black → ICT logo → PRESENTS), then reveal start screen.
 (async () => {
+  // environment.preload() loads ALL MODEL_URLS (including vehicle models)
   await environment.preload();
   await environment.build(0);
   updateEnvMap();

@@ -61,7 +61,7 @@ export class MapSelect {
         position: absolute; inset: 0;
         background:
           linear-gradient(rgba(0,0,0,0.68), rgba(0,0,0,0.72)),
-          url('${asset('Start_Screen.png')}') center / cover no-repeat;
+          url('${asset('Start_Screen.webp')}') center / cover no-repeat;
       }
       .ms-bg::after {
         content: '';
