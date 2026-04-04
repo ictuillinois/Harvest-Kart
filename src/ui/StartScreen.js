@@ -1,4 +1,4 @@
-import { asset } from '../utils/base.js';
+import { asset, gameRoot } from '../utils/base.js';
 
 export class StartScreen {
   constructor(onStart) {
@@ -8,7 +8,7 @@ export class StartScreen {
       <div class="ss-prompt">PRESS HERE TO START</div>
     `;
 
-    document.body.appendChild(this.el);
+    gameRoot().appendChild(this.el);
 
     const style = document.createElement('style');
     style.textContent = `
@@ -26,7 +26,7 @@ export class StartScreen {
          *          (sky blue top, wheat gold sides, dark road bottom)
          */
         background:
-          url('${asset('Start_Screen.webp')}') center center / cover no-repeat,
+          url('${asset('Start_Screen.png')}') center center / cover no-repeat,
           radial-gradient(
             ellipse at center 60%,
             rgba(0,0,0,0) 40%,
@@ -87,6 +87,20 @@ export class StartScreen {
     this.el.addEventListener('click', () => onStart());
   }
 
-  show() { this.el.style.display = 'flex'; }
-  hide() { this.el.style.display = 'none'; }
+  show(fade = false) {
+    this.el.style.transition = '';
+    this.el.style.opacity = fade ? '0' : '1';
+    this.el.style.display = 'flex';
+    if (fade) {
+      // Force a reflow so the transition registers from opacity 0
+      void this.el.offsetWidth;
+      this.el.style.transition = 'opacity 0.9s ease';
+      this.el.style.opacity = '1';
+    }
+  }
+  hide() {
+    this.el.style.display = 'none';
+    this.el.style.transition = '';
+    this.el.style.opacity = '1';
+  }
 }

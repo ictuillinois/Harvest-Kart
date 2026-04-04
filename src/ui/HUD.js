@@ -1,4 +1,5 @@
 import { PLATES_TO_FILL_BAR, TOTAL_LAMP_POSTS } from '../utils/constants.js';
+import { gameRoot } from '../utils/base.js';
 
 export class HUD {
   constructor(onHome, onPause) {
@@ -259,9 +260,9 @@ export class HUD {
       .pause-quit:hover { background: rgba(255,255,255,0.15); }
     `;
     document.head.appendChild(style);
-    document.body.appendChild(this.el);
-    document.body.appendChild(this.dashboard);
-    document.body.appendChild(this.pauseOverlay);
+    gameRoot().appendChild(this.el);
+    gameRoot().appendChild(this.dashboard);
+    gameRoot().appendChild(this.pauseOverlay);
 
     this.el.querySelector('#hud-home').addEventListener('click', () => onHome());
     this.el.querySelector('#hud-pause').addEventListener('click', () => onPause());
@@ -345,7 +346,7 @@ export class HUD {
     el.style.left = '50%';
     el.style.top = '45%';
     el.style.transform = 'translateX(-50%)';
-    document.body.appendChild(el);
+    gameRoot().appendChild(el);
     setTimeout(() => el.remove(), 800);
   }
 

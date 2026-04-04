@@ -11,6 +11,7 @@ import { LampPost } from './game/LampPost.js';
 import { Environment } from './game/Environment.js';
 import { GameState } from './game/GameState.js';
 
+import { IntroScreen } from './ui/IntroScreen.js';
 import { StartScreen } from './ui/StartScreen.js';
 import { DriverSelect } from './ui/DriverSelect.js';
 import { MapSelect } from './ui/MapSelect.js';
@@ -18,7 +19,8 @@ import { HUD } from './ui/HUD.js';
 import { WinScreen } from './ui/WinScreen.js';
 
 import { setupControls } from './utils/controls.js';
-import { playPlateHit, playLampLit, playComboBreak, playWinFanfare, playLaneSwitch, haptic } from './utils/audio.js';
+import { playPlateHit, playLampLit, playComboBreak, playWinFanfare, playLaneSwitch, haptic, playMusic, stopMusic } from './utils/audio.js';
+import { gameRoot } from './utils/base.js';
 import {
   MIN_SPEED, MAX_SPEED, MAP_THEMES,
   PEDAL_ACCELERATION, COAST_DECELERATION,
@@ -28,22 +30,25 @@ import {
   CAMERA_FOV_MIN, CAMERA_FOV_MAX, CAMERA_SHAKE_THRESHOLD
 } from './utils/constants.js';
 
-// --- Renderer (with mobile optimization) ---
-const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || window.innerWidth < 768;
-const renderer = new THREE.WebGLRenderer({ antialias: !isMobile });
-renderer.setSize(window.innerWidth, window.innerHeight);
+// --- Renderer ---
+// The game always renders at the native 1024×768 iPad-landscape resolution.
+// CSS scaling in index.html handles fitting to the actual window size.
+const GAME_W = 1024, GAME_H = 768;
+const isMobile = navigator.maxTouchPoints > 0 || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(GAME_W, GAME_H);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, isMobile ? 1.5 : 2));
 renderer.toneMapping = THREE.AgXToneMapping;
 renderer.toneMappingExposure = 1.0;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = isMobile ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
-document.body.appendChild(renderer.domElement);
+gameRoot().appendChild(renderer.domElement);
 
 // --- Scene & Camera ---
 const scene = new THREE.Scene();
 scene.fog = new THREE.FogExp2(0x1a0533, 0.006);
 
-const camera = new THREE.PerspectiveCamera(CAMERA_FOV_MIN, window.innerWidth / window.innerHeight, 0.1, 1000);
+const camera = new THREE.PerspectiveCamera(CAMERA_FOV_MIN, GAME_W / GAME_H, 0.1, 1000);
 camera.position.set(CAMERA_OFFSET.x, CAMERA_OFFSET.y, CAMERA_OFFSET.z);
 camera.lookAt(0, 0.5, -CAMERA_LOOK_AHEAD);
 
@@ -181,6 +186,9 @@ const controls = setupControls((direction) => {
   haptic(15);
 });
 
+// Map index → music key
+const MAP_MUSIC_KEYS = ['brazil', 'usa', 'peru'];
+
 // --- State change handling ---
 gameState.on('stateChange', ({ from, to }) => {
   // Hide everything first
@@ -194,6 +202,7 @@ gameState.on('stateChange', ({ from, to }) => {
   switch (to) {
     case 'menu':
       startScreen.show();
+      playMusic('menu');
       break;
     case 'driverSelect':
       driverSelect.show();
@@ -211,6 +220,7 @@ gameState.on('stateChange', ({ from, to }) => {
         gameState.elapsed = 0;
         hud.updateSpeed(MIN_SPEED_MPH);
         plates.resetSpawnRate();
+        playMusic(MAP_MUSIC_KEYS[gameState.selectedMap] || 'brazil');
       }
       break;
     case 'paused':
@@ -221,7 +231,7 @@ gameState.on('stateChange', ({ from, to }) => {
     case 'complete':
       controls.hideButtons();
       winScreen.show(gameState.platesHit, gameState.score, gameState.maxCombo);
-      playWinFanfare();
+      playMusic('qualified');
       break;
   }
 });
@@ -281,12 +291,9 @@ function speedToMph(speed) {
 }
 
 // --- Resize ---
-window.addEventListener('resize', () => {
-  camera.aspect = window.innerWidth / window.innerHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  composer.setSize(window.innerWidth, window.innerHeight);
-});
+// The renderer is fixed at 1024×768; CSS handles visual scaling.
+// No renderer resize needed — just keep the composer in sync (it was already set).
+
 
 // --- Game loop ---
 const clock = new THREE.Clock();
@@ -349,10 +356,24 @@ function animate() {
 }
 
 // --- Bootstrap ---
-startScreen.show();
 animate();
 
+// Attempt to play title music immediately at launch.
+// Browsers may block autoplay until the first user gesture;
+// playMusic() handles that retry internally.
+playMusic('menu');
+
+// Run intro sequence (black → ICT logo → PRESENTS), then reveal start screen.
 (async () => {
   await environment.preload();
   await environment.build(0);
+
+  // Show the start screen NOW, behind the intro overlay (z-index 100 vs 500).
+  // When the intro fades out it reveals the already-visible start screen,
+  // so the 3D scene is never exposed during the transition.
+  startScreen.show();
+
+  const intro = new IntroScreen();
+  await intro.run();
+  // Start screen is already visible — nothing more to do.
 })();

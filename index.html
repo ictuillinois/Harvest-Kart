@@ -2,16 +2,34 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>Harvest Kart</title>
   <style>
     /* ── Reset ── */
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    html, body {
+
+    html {
+      width: 100%; height: 100%; overflow: hidden; background: #000;
+    }
+
+    body {
       width: 100%; height: 100%; overflow: hidden; background: #000;
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      display: flex; align-items: center; justify-content: center;
     }
-    canvas { display: block; }
+
+    /* ── Game viewport: always 1024×768, CSS-scaled to fit the window ── */
+    #game-wrap {
+      position: relative;
+      width: 1024px;
+      height: 768px;
+      overflow: hidden;
+      flex-shrink: 0;
+      transform-origin: center center;
+      background: #000;
+    }
+
+    #game-wrap canvas { display: block; }
 
     /* ── Z-index tiers ──
        Gameplay:  10-20
@@ -40,7 +58,7 @@
     .nav-btn:active { transform: scale(0.95); }
 
     /* keep old class name working */
-    .nav-back { /* alias */
+    .nav-back {
       position: absolute; top: 14px; left: 14px;
       z-index: 10;
       background: rgba(0,0,0,0.4);
@@ -84,9 +102,91 @@
         transition-duration: 0.01ms !important;
       }
     }
+
+    /* ── Rotate-to-landscape overlay ── */
+    /* Lives outside #game-wrap so it always covers the full device screen */
+    #rotate-overlay {
+      display: none;
+      position: fixed; inset: 0; z-index: 9999;
+      background: #0a0a0a;
+      flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 28px;
+      color: #fff;
+      text-align: center;
+      padding: 32px;
+    }
+    #rotate-overlay.visible { display: flex; }
+    #rotate-overlay svg {
+      width: 80px; height: 80px;
+      opacity: 0.85;
+      animation: rotateHint 2s ease-in-out infinite;
+    }
+    @keyframes rotateHint {
+      0%   { transform: rotate(0deg);   }
+      40%  { transform: rotate(-90deg); }
+      60%  { transform: rotate(-90deg); }
+      100% { transform: rotate(0deg);   }
+    }
+    #rotate-overlay p {
+      font-size: 1.15rem;
+      font-weight: 600;
+      letter-spacing: 1px;
+      color: rgba(255,255,255,0.85);
+      max-width: 260px;
+      line-height: 1.5;
+    }
+    #rotate-overlay small {
+      font-size: 0.78rem;
+      color: rgba(255,255,255,0.4);
+      letter-spacing: 0.5px;
+    }
   </style>
 </head>
 <body>
+  <!-- All Three.js canvas + UI overlays are mounted inside here -->
+  <div id="game-wrap"></div>
+
+  <!-- Rotate prompt: shown on touch devices in portrait mode.
+       Intentionally outside #game-wrap so it covers the full device screen. -->
+  <div id="rotate-overlay" role="alert" aria-live="polite">
+    <svg viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <!-- Phone outline -->
+      <rect x="24" y="8" width="32" height="56" rx="5" stroke="white" stroke-width="3"/>
+      <circle cx="40" cy="57" r="2.5" fill="white"/>
+      <!-- Rotation arrow -->
+      <path d="M14 52 A30 30 0 0 0 52 14" stroke="white" stroke-width="3" stroke-linecap="round" fill="none"/>
+      <polyline points="48,8 52,14 58,10" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+    </svg>
+    <p>Rotate your device for the best experience</p>
+    <small>LANDSCAPE MODE RECOMMENDED</small>
+  </div>
+
+  <script>
+    // Scale #game-wrap (1024×768) to fit the available window, keeping aspect ratio.
+    // Show the rotate overlay on touch devices when in portrait orientation.
+    (function () {
+      var GAME_W = 1024, GAME_H = 768;
+      var wrap = document.getElementById('game-wrap');
+      var overlay = document.getElementById('rotate-overlay');
+      var isTouch = navigator.maxTouchPoints > 0 || 'ontouchstart' in window;
+
+      function fit() {
+        var w = window.innerWidth, h = window.innerHeight;
+        // Always fill the screen, maintaining 4:3 aspect ratio (contain/letterbox)
+        var scale = Math.min(w / GAME_W, h / GAME_H);
+        wrap.style.transform = 'scale(' + scale + ')';
+
+        var portrait = h > w;
+        overlay.classList.toggle('visible', isTouch && portrait);
+      }
+
+      window.addEventListener('resize', fit);
+      window.addEventListener('orientationchange', fit);
+      fit();
+    })();
+  </script>
+
   <script type="module" src="/src/main.js"></script>
 </body>
 </html>

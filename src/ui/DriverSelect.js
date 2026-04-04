@@ -1,4 +1,5 @@
 import { DRIVER_TYPES } from '../utils/constants.js';
+import { gameRoot } from '../utils/base.js';
 
 export class DriverSelect {
   constructor(onSelect, onBack) {
@@ -26,7 +27,7 @@ export class DriverSelect {
       </div>
     `;
 
-    document.body.appendChild(this.el);
+    gameRoot().appendChild(this.el);
 
     const style = document.createElement('style');
     style.textContent = `

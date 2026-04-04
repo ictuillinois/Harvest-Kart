@@ -1,3 +1,5 @@
+import { gameRoot } from './base.js';
+
 export function setupControls(onSwitch) {
   let switching = false;
   const cooldown = 220;
@@ -136,7 +138,7 @@ export function setupControls(onSwitch) {
     }
   `;
   document.head.appendChild(style);
-  document.body.appendChild(container);
+  gameRoot().appendChild(container);
 
   const leftBtn = container.querySelector('#ctrl-left');
   const rightBtn = container.querySelector('#ctrl-right');

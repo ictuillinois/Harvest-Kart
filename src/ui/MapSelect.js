@@ -1,4 +1,5 @@
 import { MAP_THEMES } from '../utils/constants.js';
+import { gameRoot } from '../utils/base.js';
 
 export class MapSelect {
   constructor(onSelect, onBack) {
@@ -29,7 +30,7 @@ export class MapSelect {
       </div>
     `;
 
-    document.body.appendChild(this.el);
+    gameRoot().appendChild(this.el);
 
     const style = document.createElement('style');
     style.textContent = `

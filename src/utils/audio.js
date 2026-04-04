@@ -3,6 +3,69 @@ let ctx = null;
 let masterGain = null;
 let noiseBuffer = null; // reused across all crackle sounds
 
+// --- Background music ---
+let musicEl = null;  // current <audio> element
+let _cancelPendingRetry = null; // cancels a blocked-autoplay retry
+
+const MUSIC_TRACKS = {
+  menu:      'title.mp3',
+  brazil:    'bordeaux.mp3',
+  usa:       'las-vegas.mp3',
+  peru:      'frankfurt.mp3',
+  qualified: 'qualified.mp3',
+};
+
+/** Play a background music track by key. */
+export function playMusic(key) {
+  const file = MUSIC_TRACKS[key];
+  if (!file) return;
+
+  // Cancel any stale retry from a previous blocked playback attempt.
+  // Without this, a retry closure pointing at a dead element fires later
+  // and either plays nothing or races against the current track.
+  if (_cancelPendingRetry) {
+    _cancelPendingRetry();
+    _cancelPendingRetry = null;
+  }
+
+  // Already playing the same track? Do nothing.
+  if (musicEl && !musicEl.paused && musicEl._trackKey === key) return;
+
+  _stopMusic();
+
+  const el = new Audio();
+  el._trackKey = key;
+  el.src = (import.meta.env.BASE_URL || '/') + 'audio/' + file;
+  el.loop = true;
+  el.volume = 0.45;
+  musicEl = el;
+
+  el.play().catch(() => {
+    // Autoplay blocked by browser policy — retry via a full playMusic() call
+    // (not el.play()) so the retry always uses the live element and key.
+    const retry = () => { playMusic(key); };
+    window.addEventListener('pointerdown', retry, { once: true });
+    window.addEventListener('keydown',     retry, { once: true });
+    _cancelPendingRetry = () => {
+      window.removeEventListener('pointerdown', retry);
+      window.removeEventListener('keydown',     retry);
+    };
+  });
+}
+
+/** Stop background music. */
+export function stopMusic() {
+  _stopMusic();
+}
+
+function _stopMusic() {
+  if (musicEl) {
+    musicEl.pause();
+    musicEl.src = '';
+    musicEl = null;
+  }
+}
+
 function getCtx() {
   if (!ctx) {
     ctx = new (window.AudioContext || window.webkitAudioContext)();

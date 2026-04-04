@@ -1,3 +1,5 @@
+import { gameRoot } from '../utils/base.js';
+
 export class WinScreen {
   constructor(onPlayAgain) {
     this.el = document.createElement('div');
@@ -109,7 +111,7 @@ export class WinScreen {
       }
     `;
     document.head.appendChild(style);
-    document.body.appendChild(this.el);
+    gameRoot().appendChild(this.el);
 
     this.el.querySelector('#win-btn').addEventListener('click', () => onPlayAgain());
   }

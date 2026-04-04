@@ -7,3 +7,9 @@ export function asset(path) {
   // Ensure no double slashes: base ends with '/', path starts with '/'
   return base + path.replace(/^\//, '');
 }
+
+/** Returns the game root container (#game-wrap). All DOM elements should be
+ *  appended here so they participate in the viewport scaling transform. */
+export function gameRoot() {
+  return document.getElementById('game-wrap');
+}
