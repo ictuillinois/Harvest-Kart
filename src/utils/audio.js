@@ -213,6 +213,101 @@ export function playLaneSwitch() {
   osc.stop(t + 0.1);
 }
 
+/** Start button press — bright ascending chime */
+export function playStartPress() {
+  const c = getCtx();
+  const t = c.currentTime;
+  const out = getMaster();
+
+  const notes = [523, 659, 784, 1047]; // C5, E5, G5, C6 — major chord arpeggio
+  notes.forEach((freq, i) => {
+    const osc = c.createOscillator();
+    const gain = c.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(0, t + i * 0.06);
+    gain.gain.linearRampToValueAtTime(0.12, t + i * 0.06 + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + i * 0.06 + 0.25);
+    osc.connect(gain).connect(out);
+    osc.start(t + i * 0.06);
+    osc.stop(t + i * 0.06 + 0.25);
+  });
+}
+
+/** Driver selected — confident confirmation tone */
+export function playDriverSelect() {
+  const c = getCtx();
+  const t = c.currentTime;
+  const out = getMaster();
+
+  // Two-note "lock in" — low then high
+  const osc1 = c.createOscillator();
+  const g1 = c.createGain();
+  osc1.type = 'triangle';
+  osc1.frequency.value = 440; // A4
+  g1.gain.setValueAtTime(0.12, t);
+  g1.gain.exponentialRampToValueAtTime(0.001, t + 0.15);
+  osc1.connect(g1).connect(out);
+  osc1.start(t);
+  osc1.stop(t + 0.15);
+
+  const osc2 = c.createOscillator();
+  const g2 = c.createGain();
+  osc2.type = 'triangle';
+  osc2.frequency.value = 660; // E5
+  g2.gain.setValueAtTime(0.14, t + 0.08);
+  g2.gain.exponentialRampToValueAtTime(0.001, t + 0.28);
+  osc2.connect(g2).connect(out);
+  osc2.start(t + 0.08);
+  osc2.stop(t + 0.28);
+
+  // Subtle noise punch for tactile feel
+  const noise = c.createBufferSource();
+  noise.buffer = getNoiseBuffer();
+  const nf = c.createBiquadFilter();
+  nf.type = 'bandpass'; nf.frequency.value = 2000; nf.Q.value = 1;
+  const ng = c.createGain();
+  ng.gain.setValueAtTime(0.06, t + 0.07);
+  ng.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+  noise.connect(nf).connect(ng).connect(out);
+  noise.start(t + 0.07);
+}
+
+/** Map selected — deeper, more resonant confirmation */
+export function playMapSelect() {
+  const c = getCtx();
+  const t = c.currentTime;
+  const out = getMaster();
+
+  // Power-up sweep: low to high
+  const osc = c.createOscillator();
+  const gain = c.createGain();
+  osc.type = 'sawtooth';
+  osc.frequency.setValueAtTime(220, t);
+  osc.frequency.exponentialRampToValueAtTime(880, t + 0.2);
+  const filt = c.createBiquadFilter();
+  filt.type = 'lowpass';
+  filt.frequency.setValueAtTime(600, t);
+  filt.frequency.exponentialRampToValueAtTime(3000, t + 0.15);
+  gain.gain.setValueAtTime(0.08, t);
+  gain.gain.setValueAtTime(0.08, t + 0.15);
+  gain.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
+  osc.connect(filt).connect(gain).connect(out);
+  osc.start(t);
+  osc.stop(t + 0.35);
+
+  // Bright confirmation ping on top
+  const ping = c.createOscillator();
+  const pg = c.createGain();
+  ping.type = 'sine';
+  ping.frequency.value = 1047; // C6
+  pg.gain.setValueAtTime(0.10, t + 0.12);
+  pg.gain.exponentialRampToValueAtTime(0.001, t + 0.4);
+  ping.connect(pg).connect(out);
+  ping.start(t + 0.12);
+  ping.stop(t + 0.4);
+}
+
 // =================================================================
 //  AMERICAN MUSCLE V8 ENGINE — multi-oscillator, speed-reactive
 // =================================================================

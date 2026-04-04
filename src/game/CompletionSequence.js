@@ -8,7 +8,7 @@ import { tweenGroup } from '../utils/tweenGroup.js';
  *   T+0.0  Lock controls, auto-drive max speed, flash lamps to tier 4.
  *   T+0.5  Stop plate spawning.
  *   T+1.0  Camera pulls back + up over 3s.
- *   T+2.0  "MISSION ACCOMPLISHED" rolls up from bottom.
+ *   T+2.0  "ENERGY HARVESTED" rolls up from bottom.
  *   T+5.0  Text fades out. Speed decelerates. Engine fades.
  *   T+6.0  Fade to black overlay.
  *   T+7.0  Black opaque → show win screen.
@@ -63,7 +63,7 @@ export class CompletionSequence {
         .start();
     });
 
-    // ── T+2.0: "MISSION ACCOMPLISHED" roll-up ──
+    // ── T+2.0: "ENERGY HARVESTED" roll-up ──
     this._at(2000, () => {
       this._showMissionText();
     });
@@ -163,8 +163,8 @@ export class CompletionSequence {
     this._textEl = document.createElement('div');
     this._textEl.id = 'mission-text';
     this._textEl.innerHTML = `
-      <div class="mission-line mission-w1">MISSION</div>
-      <div class="mission-line mission-w2">ACCOMPLISHED</div>
+      <div class="mission-line mission-w1">ENERGY</div>
+      <div class="mission-line mission-w2">HARVESTED</div>
     `;
     document.body.appendChild(this._textEl);
   }

@@ -22,15 +22,46 @@ export class Kart {
   }
 
   // ═══════════════════════════════════════════
+  //  DARK VEHICLE DETECTION
+  // ═══════════════════════════════════════════
+  static _isDark(hexColor) {
+    const c = new THREE.Color(hexColor);
+    return (0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b) < 0.15;
+  }
+
+  // ═══════════════════════════════════════════
   //  SHARED MATERIALS (set per build)
   // ═══════════════════════════════════════════
   _makeMats(driver) {
+    const dark = Kart._isDark(driver.carBody);
+
+    const body = dark
+      ? new THREE.MeshStandardMaterial({
+          color: 0x1a1a22, metalness: 0.6, roughness: 0.1,
+          emissive: new THREE.Color(0x111118), emissiveIntensity: 0.3,
+          envMapIntensity: 1.5,
+        })
+      : new THREE.MeshStandardMaterial({
+          color: driver.carBody, metalness: 0.3, roughness: 0.25,
+          emissive: new THREE.Color(driver.carBody), emissiveIntensity: 0.15,
+        });
+
+    const accent = dark
+      ? new THREE.MeshStandardMaterial({
+          color: 0x888899, metalness: 0.7, roughness: 0.2,
+          envMapIntensity: 1.0,
+        })
+      : new THREE.MeshStandardMaterial({
+          color: driver.carAccent, metalness: 0.3, roughness: 0.3,
+          emissive: new THREE.Color(driver.carAccent), emissiveIntensity: 0.12,
+        });
+
     return {
-      body:   new THREE.MeshStandardMaterial({ color: driver.carBody,   metalness: 0.3, roughness: 0.25, emissive: new THREE.Color(driver.carBody), emissiveIntensity: 0.15 }),
-      accent: new THREE.MeshStandardMaterial({ color: driver.carAccent, metalness: 0.3, roughness: 0.3,  emissive: new THREE.Color(driver.carAccent), emissiveIntensity: 0.12 }),
-      dark:   new THREE.MeshStandardMaterial({ color: 0x2a2a2a, metalness: 0.5, roughness: 0.4 }),
+      body,
+      accent,
+      dark:   new THREE.MeshStandardMaterial({ color: dark ? 0x333340 : 0x2a2a2a, metalness: 0.5, roughness: 0.4 }),
       chrome: new THREE.MeshStandardMaterial({ color: 0xcccccc, metalness: 0.9, roughness: 0.15 }),
-      carbon: new THREE.MeshStandardMaterial({ color: 0x333333, metalness: 0.3, roughness: 0.5 }),
+      carbon: new THREE.MeshStandardMaterial({ color: dark ? 0x444450 : 0x333333, metalness: 0.3, roughness: 0.5 }),
       glass:  new THREE.MeshStandardMaterial({ color: 0x112233, metalness: 0.9, roughness: 0.1, transparent: true, opacity: 0.4 }),
     };
   }
@@ -133,69 +164,75 @@ export class Kart {
       default:         this._buildFormula(m); break;
     }
 
-    // ── Vehicle lighting rig (ensures car is ALWAYS visible) ──
-    // Overhead key — main illumination from above, low decay for consistent coverage
-    const fillTop = new THREE.PointLight(0xffffff, 2.0, 20, 1);
+    const dark = Kart._isDark(driver.carBody);
+
+    // ── Vehicle lighting rig ──
+    const fillMul = dark ? 1.5 : 1.0; // dark vehicles get 50% stronger fills
+
+    const fillTop = new THREE.PointLight(0xffffff, 2.0 * fillMul, 20, 1);
     fillTop.position.set(0, 4, 0);
     this.group.add(fillTop);
 
-    // Rear chase-cam fill — the camera is BEHIND, so this is critical
-    const fillRear = new THREE.PointLight(0xffffff, 1.8, 16, 1);
+    const fillRear = new THREE.PointLight(0xffffff, 1.8 * fillMul, 16, 1);
     fillRear.position.set(0, 3, 5);
     this.group.add(fillRear);
 
-    // Low side fill — catches wheel arches, side panels
-    const fillLow = new THREE.PointLight(0xddeeff, 1.0, 12, 1);
+    const fillLow = new THREE.PointLight(0xddeeff, 1.0 * fillMul, 12, 1);
     fillLow.position.set(0, 0.8, -1);
     this.group.add(fillLow);
 
-    // ── Underglow — colored pool beneath vehicle ──
-    const bodyLum = ((driver.carBody >> 16) & 0xff) + ((driver.carBody >> 8) & 0xff) + (driver.carBody & 0xff);
-    const underglowColor = bodyLum < 120 ? driver.carAccent : driver.carBody;
-    const underglowIntensity = bodyLum < 120 ? 4.0 : 3.0;
-    this._underglow = new THREE.PointLight(underglowColor, underglowIntensity, 14, 1);
+    // ── Underglow ──
+    // Dark vehicles: cool blue-white (contrasts with black body). Others: body/accent color.
+    const underglowColor = dark ? 0x4488ff : driver.carBody;
+    const underglowIntensity = dark ? 5.0 : 3.0;
+    this._underglow = new THREE.PointLight(underglowColor, underglowIntensity, dark ? 16 : 14, 1);
     this._underglow.position.set(0, 0.15, 0);
     this.group.add(this._underglow);
 
-    // ── Taillight point lights — red glow visible from chase cam ──
-    const tailL = new THREE.PointLight(0xff2200, 2.0, 10, 1);
+    // ── Taillight point lights ──
+    const tailIntensity = dark ? 3.0 : 2.0;
+    const tailDist = dark ? 13 : 10;
+    const tailL = new THREE.PointLight(0xff2200, tailIntensity, tailDist, 1);
     tailL.position.set(-0.4, 0.4, this._exhaustZ);
     this.group.add(tailL);
-    const tailR = new THREE.PointLight(0xff2200, 2.0, 10, 1);
+    const tailR = new THREE.PointLight(0xff2200, tailIntensity, tailDist, 1);
     tailR.position.set(0.4, 0.4, this._exhaustZ);
     this.group.add(tailR);
     this._tailLights = [tailL, tailR];
 
-    // ── Edge highlight strips (MeshBasicMaterial = always visible, unlit) ──
-    const edgeMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.5 });
-    const accentEdgeMat = new THREE.MeshBasicMaterial({ color: driver.carAccent, transparent: true, opacity: 0.7 });
+    // ── Edge highlight strips (MeshBasicMaterial = always visible) ──
+    const edgeOpacity = dark ? 0.85 : 0.5;
+    const edgeThickness = dark ? 0.05 : 0.03;
+    const edgeMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: edgeOpacity });
 
-    // Bottom edge — separates kart from road at contact line
-    const bottomEdge = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.03, 3.6), edgeMat);
+    // Bottom edge
+    const bottomEdge = new THREE.Mesh(new THREE.BoxGeometry(2.2, edgeThickness, 3.6), edgeMat);
     bottomEdge.position.y = 0.12;
     this.group.add(bottomEdge);
 
-    // Side accent strips (left + right)
+    // Side accent strips — white/silver for dark, accent color for light
+    const sideColor = dark ? 0xccccdd : driver.carAccent;
+    const sideOpacity = dark ? 0.9 : 0.7;
+    const sideThickness = dark ? 0.05 : 0.03;
+    const accentEdgeMat = new THREE.MeshBasicMaterial({ color: sideColor, transparent: true, opacity: sideOpacity });
     for (const xOff of [-0.95, 0.95]) {
-      const side = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.18, 2.4), accentEdgeMat);
+      const side = new THREE.Mesh(new THREE.BoxGeometry(sideThickness, 0.2, 2.4), accentEdgeMat);
       side.position.set(xOff, 0.35, 0);
       this.group.add(side);
     }
 
-    // ── Ground contact ring — colored halo beneath vehicle ──
+    // ── Ground contact ring ──
+    const ringColor = dark ? 0x4488ff : underglowColor;
+    const ringOpacity = dark ? 0.18 : 0.1;
     const ringMat = new THREE.MeshBasicMaterial({
-      color: underglowColor,
-      transparent: true,
-      opacity: 0.1,
-      side: THREE.DoubleSide,
-      depthWrite: false,
+      color: ringColor, transparent: true, opacity: ringOpacity,
+      side: THREE.DoubleSide, depthWrite: false,
     });
     const groundRing = new THREE.Mesh(new THREE.RingGeometry(1.4, 2.4, 32), ringMat);
     groundRing.rotation.x = -Math.PI / 2;
     groundRing.position.y = 0.02;
     this.group.add(groundRing);
 
-    // Store driver color for theme adjustments
     this._driverColor = driver.carBody;
   }
 

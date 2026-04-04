@@ -68,7 +68,11 @@ CSS design tokens in `:root` (via HUD.js style injection): `--hud-bg`, `--hud-ac
 
 ### Vehicle Lighting & Visibility
 
-Kart body has emissive self-glow (intensity 0.15). Vehicle lighting rig in `_buildCar()`: overhead fill, rear chase-cam fill, low side fill, colored underglow, taillight PointLights. Edge highlights: white bottom strip, colored side strips (MeshBasicMaterial, always visible), ground contact ring.
+Kart body has emissive self-glow. Vehicle lighting rig in `_buildCar()`: overhead fill, rear chase-cam fill, low side fill, colored underglow, taillight PointLights. Edge highlights: white bottom strip, colored side strips (MeshBasicMaterial, always visible), ground contact ring.
+
+**Dark vehicle detection**: `Kart._isDark(hexColor)` uses BT.709 luminance (threshold 0.15). Dark vehicles (e.g., Ethan's black kart) get: glossy near-black body (metalness 0.6, roughness 0.1, emissive 0.3), silver-chrome accent material, blue-white underglow (`0x4488ff`), 50% stronger fills, brighter/thicker edge strips, boosted taillights. All automatic — no hardcoded character names.
+
+`scene.environment` set via `PMREMGenerator.fromScene()` after each `environment.build()` for metallic reflections (critical for glossy dark vehicles).
 
 Per-theme SpotLight headlights + PointLight backfill added via `addKartLights(themeId)` in main.js. `THEME_VEHICLE_LIGHT` config scales intensities per map.
 
@@ -99,6 +103,8 @@ V8 engine: 4 layered oscillators (45Hz fundamental, harmonics at 2×/3×/4×), w
 
 `playGearShift(isUpshift, gear)`: Upshift = engine dip + mechanical clunk + turbo whoosh + engagement thump (all gear-scaled). Downshift = rev-match blip + filter spike + exhaust crackle pops.
 
+UI sounds: `playStartPress()` (ascending C-major arpeggio), `playDriverSelect()` (two-note triangle confirmation + noise punch), `playMapSelect()` (sawtooth power-up sweep + ping).
+
 ### Controls
 
 `controls.js` — Glassmorphism arrow buttons + radial-gradient gas pedal. Pointer Events API + keyboard fallback + swipe fallback. `lock()`/`unlock()` gate `isPedalDown()` and lane switches. 220ms cooldown on lane switches.
@@ -115,11 +121,11 @@ V8 engine: 4 layered oscillators (45Hz fundamental, harmonics at 2×/3×/4×), w
 
 `GameState.js` — Observer pattern state machine. `speed` property is MPH (0-100).
 
-`Kart.js` — Vehicle constructor with 4 body types. Emissive body materials, vehicle lighting rig, edge highlights, ground ring. `_underglow` PointLight colored to driver.
+`Kart.js` — Vehicle constructor with 4 body types. Emissive body materials, vehicle lighting rig, edge highlights, ground ring. Dark vehicle auto-detection with glossy/chrome compensations. `_underglow` PointLight colored to driver (blue-white for dark vehicles).
 
 `LampPost.js` — 20 recycling posts, tier system, micro-progression, flash effects.
 
-`audio.js` — Procedural Web Audio: RPM-based V8 engine, gear shift sounds (layered), countdown tones/revs, plate hit, lamp lit, combo break, lane switch, win fanfare. Background music via HTML Audio.
+`audio.js` — Procedural Web Audio: RPM-based V8 engine, gear shift sounds (4-layer upshift, 3-layer downshift), countdown tones/revs, plate hit, lamp lit, combo break, lane switch, win fanfare, UI selection sounds (start/driver/map). Background music via HTML Audio.
 
 `HUD.js` — AAA-quality DOM HUD: SVG speedometer + tachometer dials, segmented energy gauge, glassmorphism minimap, Orbitron font throughout.
 

@@ -24,7 +24,7 @@ import { CompletionSequence } from './game/CompletionSequence.js';
 import { AMBIENT_MULTIPLIERS } from './game/LampPost.js';
 
 import { setupControls } from './utils/controls.js';
-import { playPlateHit, playLampLit, playComboBreak, playWinFanfare, playLaneSwitch, haptic, playMusic, stopMusic, startEngineIdle, stopEngine, updateEngine, playGearShift, playCountdownTone, playCountdownRev, playFinalPowerOn } from './utils/audio.js';
+import { playPlateHit, playLampLit, playComboBreak, playWinFanfare, playLaneSwitch, haptic, playMusic, stopMusic, startEngineIdle, stopEngine, updateEngine, playGearShift, playCountdownTone, playCountdownRev, playFinalPowerOn, playStartPress, playDriverSelect, playMapSelect } from './utils/audio.js';
 import { gameRoot } from './utils/base.js';
 import {
   MIN_SPEED_MPH, MAX_SPEED_MPH, STARTING_SPEED_MPH, SCROLL_FACTOR,
@@ -50,6 +50,13 @@ gameRoot().appendChild(renderer.domElement);
 // --- Scene & Camera ---
 const scene = new THREE.Scene();
 scene.fog = new THREE.FogExp2(0x1a0533, 0.006);
+
+// --- Environment map for reflections (glossy/metallic materials) ---
+const pmremGenerator = new THREE.PMREMGenerator(renderer);
+function updateEnvMap() {
+  const rt = pmremGenerator.fromScene(scene, 0, 0.1, 100);
+  scene.environment = rt.texture;
+}
 
 const camera = new THREE.PerspectiveCamera(CAMERA_FOV_MIN, window.innerWidth / window.innerHeight, 0.1, 1000);
 camera.position.set(CAMERA_OFFSET.x, CAMERA_OFFSET.y, CAMERA_OFFSET.z);
@@ -220,11 +227,13 @@ function togglePause() {
 
 // --- UI ---
 const startScreen = new StartScreen(() => {
+  playStartPress();
   gameState.transition('driverSelect');
 });
 
 const driverSelect = new DriverSelect(
   (driverIndex) => {
+    playDriverSelect();
     gameState.selectedDriver = driverIndex;
     kart.setDriver(driverIndex);
     gameState.transition('mapSelect');
@@ -264,6 +273,7 @@ function clearLoadingOverlay() {
 
 const mapSelect = new MapSelect(
   async (mapIndex) => {
+    playMapSelect();
     gameState.selectedMap = mapIndex;
 
     // Fade to black FIRST so the build happens behind a black screen
@@ -273,6 +283,9 @@ const mapSelect = new MapSelect(
     await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
 
     await environment.build(mapIndex);
+
+    // Generate environment map for reflections (critical for glossy dark vehicles)
+    updateEnvMap();
 
     // Apply per-theme color grading
     const cg = MAP_THEMES[mapIndex]?.colorGrade || { saturation: 1, contrast: 1, brightness: 1 };
@@ -617,6 +630,7 @@ playMusic('menu');
 (async () => {
   await environment.preload();
   await environment.build(0);
+  updateEnvMap();
 
   // Show the start screen NOW, behind the intro overlay (z-index 100 vs 500).
   // When the intro fades out it reveals the already-visible start screen,
