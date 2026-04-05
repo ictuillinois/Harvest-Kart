@@ -421,40 +421,31 @@ export class DriverSelect {
           });
           const applyPaint = (std) => {
             if (dark) {
-              const phys = new THREE.MeshPhysicalMaterial();
-              if (std.map) { phys.map = std.map; phys.map.colorSpace = THREE.SRGBColorSpace; }
-              phys.color.set(meshConfig.hasTexture ? 0x787888 : 0x444454);
-              phys.metalness = 0.60;
-              phys.roughness = 0.10;
-              phys.clearcoat = 1.0;
-              phys.clearcoatRoughness = 0.02;
-              phys.emissive = new THREE.Color(0x1e1e30);
-              phys.emissiveIntensity = 0.55;
-              phys.envMapIntensity = 3.2;
-              phys.reflectivity = 0.95;
-              return phys;
+              if (std.map) std.map.colorSpace = THREE.SRGBColorSpace;
+              std.color.set(meshConfig.hasTexture ? 0x787888 : 0x444454);
+              std.metalness = 0.75;
+              std.roughness = 0.06;
+              std.emissive = new THREE.Color(0x1e1e30);
+              std.emissiveIntensity = 0.55;
+              std.envMapIntensity = 3.2;
+              return std;
             } else if (meshConfig.emissiveOnlyTint) {
-              const phys = new THREE.MeshPhysicalMaterial();
-              if (std.map) { phys.map = std.map; phys.map.colorSpace = THREE.SRGBColorSpace; }
-              phys.emissive = new THREE.Color(driver.carBody);
+              if (std.map) std.map.colorSpace = THREE.SRGBColorSpace;
+              std.emissive = new THREE.Color(driver.carBody);
               if (meshConfig.materialProfile === 'rallySatin') {
-                phys.color.set(0xc8e0cc);
-                phys.metalness = 0.55;
-                phys.roughness = 0.12;
-                phys.clearcoat = 0.6;
-                phys.clearcoatRoughness = 0.10;
-                phys.emissiveIntensity = 0.32;
-                phys.envMapIntensity = 2.2;
+                std.color.set(0xc8e0cc);
+                std.metalness = 0.55;
+                std.roughness = 0.12;
+                std.emissiveIntensity = 0.32;
+                std.envMapIntensity = 2.2;
               } else {
-                phys.color.set(0xc8c8e0);
-                phys.metalness = 0.72;
-                phys.roughness = 0.08;
-                phys.clearcoat = 1.0;
-                phys.clearcoatRoughness = 0.03;
-                phys.emissiveIntensity = 0.28;
-                phys.envMapIntensity = 2.8;
+                std.color.set(0xc8c8e0);
+                std.metalness = 0.72;
+                std.roughness = 0.06;
+                std.emissiveIntensity = 0.28;
+                std.envMapIntensity = 2.8;
               }
-              return phys;
+              return std;
             } else {
               const profile = MATERIAL_PROFILES[meshConfig.materialProfile];
               std.color.set(driver.carBody);

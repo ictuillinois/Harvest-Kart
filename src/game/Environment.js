@@ -952,8 +952,9 @@ export class Environment {
     // ── Deciduous trees — dense along sidewalks + second row behind ──
     const treeTrunkMat = new THREE.MeshStandardMaterial({ color: 0x3a2a18 });
     const canopyColors = [0x3d6b2e, 0x4a7a3a, 0x356328, 0x4d7040, 0x3a5c2a];
+    const canopyMats = canopyColors.map(c => new THREE.MeshStandardMaterial({ color: c, roughness: 0.9, flatShading: true }));
     const trunkGeo = new THREE.CylinderGeometry(0.1, 0.15, 2.5, 5);
-    const canopyGeo = new THREE.SphereGeometry(1, 6, 5);
+    const canopyGeo = new THREE.SphereGeometry(1, 4, 3);
 
     // Front row — close to road (sidewalk trees)
     for (const side of [-1, 1]) {
@@ -963,9 +964,8 @@ export class Environment {
         const trunk = new THREE.Mesh(trunkGeo, treeTrunkMat);
         trunk.position.y = 1.25;
         treeG.add(trunk);
-        const cc = canopyColors[(Math.random() * canopyColors.length) | 0];
         const canopy = new THREE.Mesh(canopyGeo,
-          new THREE.MeshStandardMaterial({ color: cc, roughness: 0.9, flatShading: true }));
+          canopyMats[(Math.random() * canopyMats.length) | 0]);
         canopy.position.y = 3.2 + Math.random() * 0.5;
         canopy.scale.set(0.8 + Math.random() * 0.5, 0.6 + Math.random() * 0.3, 0.8 + Math.random() * 0.5);
         treeG.add(canopy);
@@ -985,9 +985,8 @@ export class Environment {
         const trunk = new THREE.Mesh(trunkGeo, treeTrunkMat);
         trunk.position.y = 1.25;
         treeG.add(trunk);
-        const cc = canopyColors[(Math.random() * canopyColors.length) | 0];
         const canopy = new THREE.Mesh(canopyGeo,
-          new THREE.MeshStandardMaterial({ color: cc, roughness: 0.9, flatShading: true }));
+          canopyMats[(Math.random() * canopyMats.length) | 0]);
         canopy.position.y = 3.5 + Math.random() * 0.5;
         canopy.scale.set(1.0 + Math.random() * 0.6, 0.7 + Math.random() * 0.3, 1.0 + Math.random() * 0.6);
         treeG.add(canopy);
@@ -1046,7 +1045,7 @@ export class Environment {
 
   /** Create a mountain with vertex displacement + altitude gradient colors. */
   _createAndeanMountain(radius, height, segments) {
-    const seg = Math.max(segments || 12, 10); // smoother silhouette
+    const seg = Math.max(segments || 7, 6); // optimized poly count
     const geo = new THREE.ConeGeometry(radius, height, seg);
     const pos = geo.attributes.position;
 
@@ -1136,9 +1135,9 @@ export class Environment {
       new THREE.MeshStandardMaterial({ color: 0x3a5a25, roughness: 0.95 }), // dark grass
       new THREE.MeshStandardMaterial({ color: 0x7a7a6a, roughness: 0.92 }), // rock
     ];
-    for (let z = 15; z > -300; z -= 4 + Math.random() * 6) {
+    for (let z = 15; z > -300; z -= 6 + Math.random() * 8) {
       for (const side of [-1, 1]) {
-        if (Math.random() > 0.4) continue;
+        if (Math.random() > 0.35) continue;
         const patch = new THREE.Mesh(patchGeo, patchMats[(Math.random() * patchMats.length) | 0]);
         patch.rotation.x = -Math.PI / 2;
         patch.position.set(side * (RH + 5 + Math.random() * 18), 0.01 + Math.random() * 0.01, z);
@@ -1158,11 +1157,7 @@ export class Environment {
       { r: 18, h: 38, x: -75, z: -200 },
       { r: 15, h: 32, x: 70, z: -230 },
       { r: 22, h: 42, x: -90, z: -310 },
-      { r: 16, h: 35, x: 85, z: -260 },
-      { r: 12, h: 20, x: -40, z: -150 },
       { r: 14, h: 22, x: 45, z: -160 },
-      { r: 10, h: 16, x: -65, z: -130 },
-      { r: 11, h: 18, x: 70, z: -140 },
     ];
     for (const cfg of mtConfigs) {
       // Main peak
@@ -1174,18 +1169,12 @@ export class Environment {
       this.themeObjects.push(mt);
       this.background.push(mt);
 
-      // 1-2 secondary ridges behind each peak (creates ridgeline)
-      const ridgeCount = cfg.h > 30 ? 2 : 1;
-      for (let ri = 0; ri < ridgeCount; ri++) {
-        const rr = cfg.r * (0.5 + Math.random() * 0.35);
-        const rh = cfg.h * (0.4 + Math.random() * 0.3);
+      // Single ridge behind larger peaks only
+      if (cfg.h > 40) {
+        const rr = cfg.r * 0.6;
+        const rh = cfg.h * 0.5;
         const ridge = this._createAndeanMountain(rr, rh);
-        const angle = (ri / ridgeCount) * Math.PI + Math.random() * 0.5;
-        ridge.position.set(
-          cfg.x + Math.cos(angle) * cfg.r * 0.4,
-          rh / 2 - 4,
-          cfg.z + Math.sin(angle) * cfg.r * 0.4 - 5,
-        );
+        ridge.position.set(cfg.x + cfg.r * 0.3, rh / 2 - 4, cfg.z - 8);
         if (dist > 0.3) this._applyAtmosphere(ridge, dist * 0.35);
         this.scene.add(ridge);
         this.themeObjects.push(ridge);
@@ -1230,9 +1219,9 @@ export class Environment {
     // ══════════════════════════════════════════
     const terrMat = new THREE.MeshStandardMaterial({ color: 0x7a6b4f, roughness: 0.9 });
     const tGrassMat = new THREE.MeshStandardMaterial({ color: 0x5a9a3a, roughness: 0.85 });
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 3; i++) {
       const terrGroup = new THREE.Group();
-      const levels = 5 + Math.floor(Math.random() * 2);
+      const levels = 4 + Math.floor(Math.random() * 2);
       const baseW = 8 + Math.random() * 4;
       for (let level = 0; level < levels; level++) {
         const w = baseW - level * (baseW * 0.12);
@@ -1256,16 +1245,16 @@ export class Environment {
     // ══════════════════════════════════════════
     const wallColors = [0xD4B896, 0xC8A87A, 0xBB9966, 0xE8D5B8, 0xAA8866, 0xCC9955];
     const roofColors = [0x8B4513, 0x7A3B10, 0x6B3A1A, 0x994422];
+    // Pre-create material pools (reuse instead of creating per house)
+    const wallMats = wallColors.map(c => new THREE.MeshStandardMaterial({ color: c, roughness: 0.9 }));
+    const roofMats = roofColors.map(c => new THREE.MeshStandardMaterial({ color: c, roughness: 0.85 }));
     const doorMat = new THREE.MeshBasicMaterial({ color: 0x2a1a0a });
 
     const clusters = [
-      { z: -20, side: -1, count: 6 },
-      { z: -55, side: 1, count: 5 },
-      { z: -95, side: -1, count: 7 },
-      { z: -130, side: 1, count: 4 },
-      { z: -170, side: -1, count: 6 },
-      { z: -210, side: 1, count: 5 },
-      { z: -255, side: -1, count: 4 },
+      { z: -30, side: -1, count: 5 },
+      { z: -95, side: 1, count: 5 },
+      { z: -170, side: -1, count: 5 },
+      { z: -240, side: 1, count: 4 },
     ];
     for (const cl of clusters) {
       for (let j = 0; j < cl.count; j++) {
@@ -1273,18 +1262,15 @@ export class Environment {
         const w = 2 + Math.random() * 2, h = 1.5 + Math.random() * 1.5, d = 2 + Math.random() * 2;
         hg.add((() => {
           const body = new THREE.Mesh(new THREE.BoxGeometry(w, h, d),
-            new THREE.MeshStandardMaterial({ color: wallColors[(Math.random() * wallColors.length) | 0], roughness: 0.9 }));
+            wallMats[(Math.random() * wallMats.length) | 0]);
           body.position.y = h / 2; return body;
         })());
         hg.add((() => {
           const roof = new THREE.Mesh(new THREE.ConeGeometry(Math.max(w, d) * 0.75, h * 0.5, 4),
-            new THREE.MeshStandardMaterial({ color: roofColors[(Math.random() * roofColors.length) | 0], roughness: 0.85 }));
+            roofMats[(Math.random() * roofMats.length) | 0]);
           roof.position.y = h + h * 0.25; roof.rotation.y = Math.PI / 4; return roof;
         })());
-        hg.add((() => {
-          const dr = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.9), doorMat);
-          dr.position.set(0, 0.45, d / 2 + 0.01); return dr;
-        })());
+        // Door mesh removed for performance (invisible from chase cam)
         hg.position.set(
           cl.side * (RH + 14 + Math.random() * 14),
           0, cl.z + (Math.random() - 0.5) * 18,
@@ -1301,19 +1287,20 @@ export class Environment {
     //  LLAMAS (midground)
     // ══════════════════════════════════════════
     const llamaMat = new THREE.MeshStandardMaterial({ color: 0xeeddcc, roughness: 0.9 });
-    const llamaSpots = [{ x: -22, z: -45, n: 3 }, { x: 35, z: -135, n: 2 }, { x: -30, z: -210, n: 3 }];
+    const llamaMat2 = new THREE.MeshStandardMaterial({ color: 0xccbb99, roughness: 0.9 });
+    const llamaSpots = [{ x: -22, z: -45, n: 2 }, { x: 35, z: -170, n: 2 }];
     for (const spot of llamaSpots) {
       for (let j = 0; j < spot.n; j++) {
         const lg = new THREE.Group();
-        const bodyMat = Math.random() > 0.5 ? llamaMat : new THREE.MeshStandardMaterial({ color: 0xccbb99, roughness: 0.9 });
-        lg.add((() => { const b = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.5, 1.2), bodyMat); b.position.y = 0.9; return b; })());
-        lg.add((() => { const n = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.9, 0.25), bodyMat); n.position.set(0, 1.5, -0.4); n.rotation.x = -0.2; return n; })());
-        lg.add((() => { const h = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.25, 0.35), bodyMat); h.position.set(0, 2.0, -0.6); return h; })());
-        for (const [lx, lz] of [[-0.2, -0.4], [0.2, -0.4], [-0.2, 0.4], [0.2, 0.4]]) {
-          const leg = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.65, 0.12), bodyMat);
-          leg.position.set(lx, 0.32, lz);
-          lg.add(leg);
-        }
+        const mat = Math.random() > 0.5 ? llamaMat : llamaMat2;
+        // Simplified: body blob + neck (2 meshes instead of 7)
+        const body = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.7, 1.2), mat);
+        body.position.y = 0.7;
+        lg.add(body);
+        const neck = new THREE.Mesh(new THREE.BoxGeometry(0.2, 1.2, 0.2), mat);
+        neck.position.set(0, 1.4, -0.4);
+        neck.rotation.x = -0.15;
+        lg.add(neck);
         lg.position.set(spot.x + (Math.random() - 0.5) * 6, 0, spot.z + (Math.random() - 0.5) * 8);
         lg.rotation.y = Math.random() * Math.PI * 2;
         lg.scale.setScalar(0.6 + Math.random() * 0.3);
@@ -1328,9 +1315,9 @@ export class Environment {
     // ══════════════════════════════════════════
     const trunkMat = new THREE.MeshStandardMaterial({ color: 0x5c3d1e, roughness: 0.9 });
     const trunkGeo = new THREE.CylinderGeometry(0.1, 0.15, 2, 5);
-    const pineGeo = new THREE.ConeGeometry(1.2, 3.5, 6);
-    const bushGeo = new THREE.SphereGeometry(0.8, 5, 4);
-    const roundGeo = new THREE.SphereGeometry(1.0, 5, 4);
+    const pineGeo = new THREE.ConeGeometry(1.2, 3.5, 5);
+    const bushGeo = new THREE.SphereGeometry(0.8, 4, 3);
+    const roundGeo = new THREE.SphereGeometry(1.0, 4, 3);
     const canopyColors = [0x2d5a1e, 0x3a6a2a, 0x4a7a35, 0x356328, 0x4d7040];
 
     // Pre-create shared canopy materials (5 shades)
@@ -1339,10 +1326,10 @@ export class Environment {
     );
     const pickCanopy = () => canopyMats[(Math.random() * canopyMats.length) | 0];
 
-    // Foreground trees — denser (spacing 3-7 units, 60% fill)
+    // Foreground trees (spacing 5-10 units, 45% fill — optimized density)
     for (const side of [-1, 1]) {
-      for (let z = 15; z > -320; z -= 3 + Math.random() * 4) {
-        if (Math.random() > 0.6) continue;
+      for (let z = 15; z > -320; z -= 5 + Math.random() * 5) {
+        if (Math.random() > 0.45) continue;
         const tg = new THREE.Group();
         const type = Math.random();
         if (type < 0.4) {
@@ -1362,10 +1349,10 @@ export class Environment {
       }
     }
 
-    // Midground trees — dense fill between terraces and houses
+    // Midground trees (spacing 5-10 units, 35% fill — optimized density)
     for (const side of [-1, 1]) {
-      for (let z = 15; z > -320; z -= 2.5 + Math.random() * 4) {
-        if (Math.random() > 0.45) continue;
+      for (let z = 15; z > -320; z -= 5 + Math.random() * 5) {
+        if (Math.random() > 0.35) continue;
         const tg = new THREE.Group();
         tg.add((() => { const t = new THREE.Mesh(trunkGeo, trunkMat); t.position.y = 1; return t; })());
         const geoType = Math.random() > 0.5 ? pineGeo : roundGeo;
@@ -1379,7 +1366,7 @@ export class Environment {
     }
 
     // Hillside trees (background — canopy blobs on mountain bases, no trunk)
-    for (let i = 0; i < 35; i++) {
+    for (let i = 0; i < 18; i++) {
       const canopy = new THREE.Mesh(pineGeo, pickCanopy());
       canopy.position.set(
         (Math.random() > 0.5 ? 1 : -1) * (30 + Math.random() * 45),
@@ -1399,7 +1386,7 @@ export class Environment {
       c => new THREE.MeshStandardMaterial({ color: c, roughness: 0.9 })
     );
     const clumpGeo = new THREE.SphereGeometry(0.3, 4, 3);
-    for (let i = 0; i < 25; i++) {
+    for (let i = 0; i < 15; i++) {
       const side = i % 2 === 0 ? -1 : 1;
       const clump = new THREE.Mesh(clumpGeo, ichuMats[i % ichuMats.length]);
       const s = 0.6 + Math.random() * 0.8;

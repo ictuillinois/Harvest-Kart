@@ -12,6 +12,34 @@ const DRIVER_VEHICLES = {
   rally:    MODEL_URLS.vehicleLuke,
 };
 
+// Cached shared materials (created once, reused across all vehicles)
+const _sharedChrome = new THREE.MeshStandardMaterial({
+  color: 0xccccdd, metalness: 0.92, roughness: 0.06, envMapIntensity: 2.5,
+});
+const _sharedDarkChrome = new THREE.MeshStandardMaterial({
+  color: 0x1a1a22, metalness: 0.7, roughness: 0.25,
+  emissive: 0x050508, emissiveIntensity: 0.08,
+});
+const _sharedHlBulb = new THREE.MeshStandardMaterial({
+  color: 0xffffcc, emissive: 0xffffcc, emissiveIntensity: 1.5,
+});
+const _sharedHlLens = new THREE.MeshStandardMaterial({
+  color: 0xffffff, emissive: 0xffffdd, emissiveIntensity: 2.0, metalness: 0.3, roughness: 0.05,
+});
+const _sharedDRL = new THREE.MeshBasicMaterial({ color: 0xeeeeff });
+const _sharedHalo = new THREE.MeshBasicMaterial({
+  color: 0xeeeeff, transparent: true, opacity: 0.20, depthWrite: false,
+});
+const _sharedLedRed = new THREE.MeshStandardMaterial({
+  color: 0xff0000, emissive: 0xff0000, emissiveIntensity: 1.4, metalness: 0.3, roughness: 0.15,
+});
+const _sharedAmber = new THREE.MeshStandardMaterial({
+  color: 0xff8800, emissive: 0xff6600, emissiveIntensity: 0.8, metalness: 0.2, roughness: 0.3,
+});
+const _sharedRedMarker = new THREE.MeshStandardMaterial({
+  color: 0xff2200, emissive: 0xff1100, emissiveIntensity: 0.6, metalness: 0.2, roughness: 0.3,
+});
+
 // Per-vehicle material finish profiles
 const MATERIAL_PROFILES = {
   candy:     { metalness: 0.25, roughness: 0.30, emissiveIntensity: 0.04, envMapIntensity: 1.0 },
@@ -31,7 +59,7 @@ const VEHICLE_MESH_CONFIG = {
     rotationY: Math.PI,
     hasTexture: true,
     glassTint: 0x0e1a2a,
-    sportsLights: true,        // upgraded headlights + full-width taillights
+    // No custom light meshes — uses standard headlights + taillights for performance
     // Sedan proportions — mid-height lights
     headlightYFrac: 0.30,
     headlightXFrac: 0.52,
@@ -72,9 +100,8 @@ const VEHICLE_MESH_CONFIG = {
     glassIndices: [2],
     glassTint: 0x080810,       // near-black glass — contrasts with blue body
     materialProfile: 'raceMetal',
-    sportsDetails: true,       // triggers _addSportsDetails
-    sportsLights: true,        // upgraded headlights + full-width LED taillight bar
-    emissiveOnlyTint: true,    // don't color-multiply texture; use emissive for color identity
+    emissiveOnlyTint: true,
+    skipExhaust: true,         // exhaust pipes not visible from chase cam
     // Low sports car — headlights low and wide
     headlightYFrac: 0.22,
     headlightXFrac: 0.65,
@@ -141,75 +168,35 @@ export class Kart {
   // ═══════════════════════════════════════════
 
   static _addSportsHeadlights(group, halfW, hlY, hlZ, hlXFrac, height) {
-    // Dark chrome housing
-    const housingMat = new THREE.MeshStandardMaterial({
-      color: 0x111118, metalness: 0.8, roughness: 0.2,
-    });
-    // Chrome bezel
-    const bezelMat = new THREE.MeshStandardMaterial({
-      color: 0xccccdd, metalness: 0.92, roughness: 0.06, envMapIntensity: 2.5,
-    });
-    // Projector lens (bright center)
-    const lensMat = new THREE.MeshStandardMaterial({
-      color: 0xffffff, emissive: 0xffffdd, emissiveIntensity: 2.0,
-      metalness: 0.3, roughness: 0.05,
-    });
-    // Halo glow
-    const haloMat = new THREE.MeshBasicMaterial({
-      color: 0xeeeeff, transparent: true, opacity: 0.20, depthWrite: false,
-    });
-    // DRL strip (integrated)
-    const drlMat = new THREE.MeshBasicMaterial({ color: 0xddeeff });
 
     for (const x of [-halfW * hlXFrac, halfW * hlXFrac]) {
-      // Housing box (wider, sleeker)
+      // Housing
       const housing = new THREE.Mesh(
-        new THREE.BoxGeometry(halfW * 0.42, height * 0.10, 0.08), housingMat);
+        new THREE.BoxGeometry(halfW * 0.42, height * 0.10, 0.08), _sharedDarkChrome);
       housing.position.set(x, hlY, hlZ + 0.03);
       group.add(housing);
 
-      // Chrome bezel ring
-      const bezel = new THREE.Mesh(
-        new THREE.RingGeometry(0.08, 0.13, 10), bezelMat);
-      bezel.position.set(x, hlY, hlZ - 0.01);
-      group.add(bezel);
-
-      // Projector lens (bright sphere)
+      // Projector lens
       const lens = new THREE.Mesh(
-        new THREE.SphereGeometry(0.07, 8, 6), lensMat);
+        new THREE.SphereGeometry(0.07, 6, 4), _sharedHlLens);
       lens.position.set(x, hlY, hlZ);
       group.add(lens);
 
-      // Halo glow disc
+      // Halo glow
       const halo = new THREE.Mesh(
-        new THREE.CircleGeometry(0.28, 10), haloMat);
+        new THREE.CircleGeometry(0.25, 8), _sharedHalo);
       halo.position.set(x, hlY, hlZ - 0.03);
       group.add(halo);
 
-      // Integrated DRL strip (below projector)
+      // DRL strip
       const drl = new THREE.Mesh(
-        new THREE.BoxGeometry(halfW * 0.32, 0.018, 0.012), drlMat);
+        new THREE.BoxGeometry(halfW * 0.32, 0.018, 0.012), _sharedDRL);
       drl.position.set(x, hlY - height * 0.045, hlZ);
       group.add(drl);
     }
   }
 
   static _addSportsTaillights(group, halfW, tlY, tlZ, height) {
-    // Full-width LED bar material
-    const ledBarMat = new THREE.MeshStandardMaterial({
-      color: 0xff0000, emissive: 0xff0000, emissiveIntensity: 1.4,
-      metalness: 0.3, roughness: 0.15,
-    });
-    // Chrome surround
-    const chromeMat = new THREE.MeshStandardMaterial({
-      color: 0xccccdd, metalness: 0.92, roughness: 0.06, envMapIntensity: 2.5,
-    });
-    // Darker red segments within the bar
-    const segmentMat = new THREE.MeshStandardMaterial({
-      color: 0xcc0000, emissive: 0xaa0000, emissiveIntensity: 0.8,
-      metalness: 0.4, roughness: 0.2,
-    });
-    // Red glow plane
     const glowMat = new THREE.MeshBasicMaterial({
       color: 0xff2200, transparent: true, opacity: 0.15, depthWrite: false,
     });
@@ -218,33 +205,33 @@ export class Kart {
     const barW = halfW * 1.6;
     const barH = height * 0.035;
     const bar = new THREE.Mesh(
-      new THREE.BoxGeometry(barW, barH, 0.02), ledBarMat);
+      new THREE.BoxGeometry(barW, barH, 0.02), _sharedLedRed);
     bar.position.set(0, tlY, tlZ);
     group.add(bar);
 
-    // LED segments within the bar (6 segments)
-    for (let si = 0; si < 6; si++) {
-      const segX = (si - 2.5) * (barW / 6);
+    // LED segments within the bar (3 segments)
+    for (let si = 0; si < 3; si++) {
+      const segX = (si - 1) * (barW / 3);
       const seg = new THREE.Mesh(
-        new THREE.BoxGeometry(barW / 7.5, barH * 0.7, 0.025), segmentMat);
+        new THREE.BoxGeometry(barW / 4, barH * 0.7, 0.025), _sharedLedRed);
       seg.position.set(segX, tlY, tlZ + 0.005);
       group.add(seg);
     }
 
-    // Chrome surround frame (top + bottom rails)
+    // Chrome frame (top + bottom only, skip end caps)
     const frameTop = new THREE.Mesh(
-      new THREE.BoxGeometry(barW * 1.05, 0.012, 0.012), chromeMat);
+      new THREE.BoxGeometry(barW * 1.05, 0.012, 0.012), _sharedChrome);
     frameTop.position.set(0, tlY + barH * 0.6, tlZ);
     group.add(frameTop);
     const frameBot = new THREE.Mesh(
-      new THREE.BoxGeometry(barW * 1.05, 0.012, 0.012), chromeMat);
+      new THREE.BoxGeometry(barW * 1.05, 0.012, 0.012), _sharedChrome);
     frameBot.position.set(0, tlY - barH * 0.6, tlZ);
     group.add(frameBot);
 
-    // Chrome end caps
-    for (const side of [-1, 1]) {
+    // Skip end caps for performance
+    for (const side of []) {
       const cap = new THREE.Mesh(
-        new THREE.BoxGeometry(0.012, barH * 1.2, 0.015), chromeMat);
+        new THREE.BoxGeometry(0.012, barH * 1.2, 0.015), _sharedChrome);
       cap.position.set(side * barW * 0.525, tlY, tlZ);
       group.add(cap);
     }
@@ -258,14 +245,8 @@ export class Kart {
   }
 
   static _addSUVTaillights(group, halfW, tlY, tlZ, tlXFrac, height) {
-    // Vertical LED bars on each side (SUV style)
-    const ledMat = new THREE.MeshStandardMaterial({
-      color: 0xff0000, emissive: 0xff0000, emissiveIntensity: 1.3,
-      metalness: 0.3, roughness: 0.15,
-    });
-    const chromeMat = new THREE.MeshStandardMaterial({
-      color: 0xccccdd, metalness: 0.92, roughness: 0.06, envMapIntensity: 2.5,
-    });
+    const ledMat = _sharedLedRed;
+    const chromeMat = _sharedChrome;
     const glowMat = new THREE.MeshBasicMaterial({
       color: 0xff2200, transparent: true, opacity: 0.14, depthWrite: false,
     });
@@ -280,10 +261,7 @@ export class Kart {
       group.add(bar);
 
       // Inner LED segments (3 stacked)
-      const segMat = new THREE.MeshStandardMaterial({
-        color: 0xcc0000, emissive: 0xaa0000, emissiveIntensity: 0.9,
-        metalness: 0.4, roughness: 0.2,
-      });
+      const segMat = _sharedLedRed;
       for (let si = -1; si <= 1; si++) {
         const seg = new THREE.Mesh(
           new THREE.BoxGeometry(halfW * 0.08, height * 0.03, 0.025), segMat);
@@ -318,34 +296,19 @@ export class Kart {
     }
 
     // Connecting strip between the two vertical bars
-    const connectMat = new THREE.MeshStandardMaterial({
-      color: 0xaa0000, emissive: 0x880000, emissiveIntensity: 0.5,
-      metalness: 0.3, roughness: 0.25,
-    });
     const connect = new THREE.Mesh(
-      new THREE.BoxGeometry(halfW * (tlXFrac * 1.6), 0.018, 0.015), connectMat);
+      new THREE.BoxGeometry(halfW * (tlXFrac * 1.6), 0.018, 0.015), _sharedLedRed);
     connect.position.set(0, tlY - height * 0.06, tlZ);
     group.add(connect);
   }
 
   static _addCompactHeadlights(group, halfW, hlY, hlZ, hlXFrac, height) {
-    // Round headlight housings (compact/cute style)
-    const housingMat = new THREE.MeshStandardMaterial({
-      color: 0x181820, metalness: 0.75, roughness: 0.2,
-    });
-    const chromeMat = new THREE.MeshStandardMaterial({
-      color: 0xccccdd, metalness: 0.92, roughness: 0.06, envMapIntensity: 2.5,
-    });
-    const lensMat = new THREE.MeshStandardMaterial({
-      color: 0xffffff, emissive: 0xffffdd, emissiveIntensity: 2.0,
-      metalness: 0.3, roughness: 0.05,
-    });
-    const drlMat = new THREE.MeshBasicMaterial({ color: 0xffeeff });
+    const chromeMat = _sharedChrome;
 
     for (const x of [-halfW * hlXFrac, halfW * hlXFrac]) {
-      // Round housing (sphere cutout look)
+      // Round housing
       const housing = new THREE.Mesh(
-        new THREE.SphereGeometry(height * 0.065, 8, 6), housingMat);
+        new THREE.SphereGeometry(height * 0.065, 6, 4), _sharedDarkChrome);
       housing.position.set(x, hlY, hlZ + 0.02);
       housing.scale.z = 0.5;
       group.add(housing);
@@ -358,35 +321,26 @@ export class Kart {
 
       // Bright projector lens
       const lens = new THREE.Mesh(
-        new THREE.SphereGeometry(0.06, 8, 6), lensMat);
+        new THREE.SphereGeometry(0.06, 6, 4), _sharedHlLens);
       lens.position.set(x, hlY, hlZ);
       group.add(lens);
 
-      // DRL arc (small curved strip below lens)
+      // DRL arc
       const drl = new THREE.Mesh(
-        new THREE.BoxGeometry(halfW * 0.22, 0.015, 0.012), drlMat);
+        new THREE.BoxGeometry(halfW * 0.22, 0.015, 0.012), _sharedDRL);
       drl.position.set(x, hlY - height * 0.04, hlZ);
       group.add(drl);
 
       // Halo glow
-      const haloMat = new THREE.MeshBasicMaterial({
-        color: 0xffeeff, transparent: true, opacity: 0.20, depthWrite: false,
-      });
-      const halo = new THREE.Mesh(new THREE.CircleGeometry(0.20, 10), haloMat);
+      const halo = new THREE.Mesh(new THREE.CircleGeometry(0.20, 8), _sharedHalo);
       halo.position.set(x, hlY, hlZ - 0.03);
       group.add(halo);
     }
   }
 
   static _addCompactTaillights(group, halfW, tlY, tlZ, tlXFrac, height) {
-    // Round taillights with chrome ring (compact car style)
-    const ledMat = new THREE.MeshStandardMaterial({
-      color: 0xff0044, emissive: 0xff0033, emissiveIntensity: 1.3,
-      metalness: 0.3, roughness: 0.15,
-    });
-    const chromeMat = new THREE.MeshStandardMaterial({
-      color: 0xccccdd, metalness: 0.92, roughness: 0.06, envMapIntensity: 2.5,
-    });
+    const ledMat = _sharedLedRed;
+    const chromeMat = _sharedChrome;
     const glowMat = new THREE.MeshBasicMaterial({
       color: 0xff2244, transparent: true, opacity: 0.15, depthWrite: false,
     });
@@ -415,13 +369,9 @@ export class Kart {
       group.add(glow);
     }
 
-    // Connecting strip (thin pink bar between the two round lights)
-    const stripMat = new THREE.MeshStandardMaterial({
-      color: 0xcc0033, emissive: 0xaa0022, emissiveIntensity: 0.6,
-      metalness: 0.3, roughness: 0.25,
-    });
+    // Connecting strip
     const strip = new THREE.Mesh(
-      new THREE.BoxGeometry(halfW * (tlXFrac * 1.4), 0.015, 0.012), stripMat);
+      new THREE.BoxGeometry(halfW * (tlXFrac * 1.4), 0.015, 0.012), _sharedLedRed);
     strip.position.set(0, tlY - height * 0.04, tlZ);
     group.add(strip);
   }
@@ -521,48 +471,34 @@ export class Kart {
     // Apply paint material properties — returns the material (may replace input)
     const applyPaint = (std) => {
       if (dark) {
-        // ── Dark vehicle (Ethan) — dark gray shiny clearcoat ──
-        const phys = new THREE.MeshPhysicalMaterial();
-        if (std.map) { phys.map = std.map; phys.map.colorSpace = THREE.SRGBColorSpace; }
-        phys.color.set(meshConfig.hasTexture ? 0x787888 : 0x444454);
-        phys.metalness = 0.60;
-        phys.roughness = 0.10;
-        phys.clearcoat = 1.0;
-        phys.clearcoatRoughness = 0.02;
-        phys.emissive = new THREE.Color(0x1e1e30);
-        phys.emissiveIntensity = 0.55;
-        phys.envMapIntensity = 3.2;
-        phys.reflectivity = 0.95;
-        return phys;
+        // ── Dark vehicle (Ethan) — high-gloss dark metallic ──
+        if (std.map) std.map.colorSpace = THREE.SRGBColorSpace;
+        std.color.set(meshConfig.hasTexture ? 0x787888 : 0x444454);
+        std.metalness = 0.75;
+        std.roughness = 0.06;
+        std.emissive = new THREE.Color(0x1e1e30);
+        std.emissiveIntensity = 0.55;
+        std.envMapIntensity = 3.2;
+        return std;
       } else if (meshConfig.emissiveOnlyTint) {
-        // ── Automotive clearcoat — MeshPhysicalMaterial ──
-        // Preserves texture palette (windows stay dark), adds color via emissive.
-        const phys = new THREE.MeshPhysicalMaterial();
-        if (std.map) { phys.map = std.map; phys.map.colorSpace = THREE.SRGBColorSpace; }
-        phys.emissive = new THREE.Color(driver.carBody);
+        // ── Emissive-only tint (Destiny/Luke) — preserves texture palette ──
+        if (std.map) std.map.colorSpace = THREE.SRGBColorSpace;
+        std.emissive = new THREE.Color(driver.carBody);
 
         if (meshConfig.materialProfile === 'rallySatin') {
-          // Luke — Lamborghini satin clearcoat: green-tinted, moderate gloss
-          phys.color.set(0xc8e0cc);          // light green-gray
-          phys.metalness = 0.55;
-          phys.roughness = 0.12;
-          phys.clearcoat = 0.6;              // satin clearcoat (less than race)
-          phys.clearcoatRoughness = 0.10;    // slightly textured topcoat
-          phys.emissiveIntensity = 0.32;
-          phys.envMapIntensity = 2.2;
-          phys.reflectivity = 0.7;
+          std.color.set(0xc8e0cc);
+          std.metalness = 0.55;
+          std.roughness = 0.12;
+          std.emissiveIntensity = 0.32;
+          std.envMapIntensity = 2.2;
         } else {
-          // Destiny — race metallic: blue-tinted, full gloss
-          phys.color.set(0xc8c8e0);          // light blue-gray
-          phys.metalness = 0.72;
-          phys.roughness = 0.08;
-          phys.clearcoat = 1.0;
-          phys.clearcoatRoughness = 0.03;
-          phys.emissiveIntensity = 0.28;
-          phys.envMapIntensity = 2.8;
-          phys.reflectivity = 0.9;
+          std.color.set(0xc8c8e0);
+          std.metalness = 0.72;
+          std.roughness = 0.06;
+          std.emissiveIntensity = 0.28;
+          std.envMapIntensity = 2.8;
         }
-        return phys;
+        return std;
       } else {
         // ── Light vehicle path — use material profile if available ──
         const profile = MATERIAL_PROFILES[meshConfig.materialProfile];
@@ -630,18 +566,14 @@ export class Kart {
             // Accent panels (Destiny secondary) — lighter tint using accent color
             if (accentIdxSet.has(idx)) {
               if (meshConfig.emissiveOnlyTint) {
-                // Automotive clearcoat accent — slightly different finish from primary
-                const phys = new THREE.MeshPhysicalMaterial();
-                if (m.map) { const std2 = upgradeMat(m); phys.map = std2.map; }
-                phys.color.set(0xbbbbdd);
-                phys.metalness = 0.65;
-                phys.roughness = 0.12;
-                phys.clearcoat = 0.8;
-                phys.clearcoatRoughness = 0.06;
-                phys.emissive = new THREE.Color(driver.carAccent);
-                phys.emissiveIntensity = 0.25;
-                phys.envMapIntensity = 2.2;
-                return phys;
+                const std = upgradeMat(m);
+                std.color.set(0xbbbbdd);
+                std.metalness = 0.65;
+                std.roughness = 0.10;
+                std.emissive = new THREE.Color(driver.carAccent);
+                std.emissiveIntensity = 0.25;
+                std.envMapIntensity = 2.2;
+                return std;
               }
               const std = upgradeMat(m);
               std.color.set(dark ? 0x444450 : driver.carAccent);
@@ -801,24 +733,17 @@ export class Kart {
       if (meshConfig.compactLights) {
         // ── Compact headlights — round housings, cute style ──
         Kart._addCompactHeadlights(this.group, halfW, hlY, hlZ, hlXFrac, height);
-      } else if (meshConfig.sportsLights) {
-        // ── Sports headlights — aggressive housing + projector + integrated DRL ──
+      } else if (meshConfig.sportsLights === true) {
+        // ── Sports headlights — full housing + projector + DRL ──
         Kart._addSportsHeadlights(this.group, halfW, hlY, hlZ, hlXFrac, height);
+      } else if (meshConfig.sportsLights) {
+        // ── sportsLights='tailOnly' — skip headlight meshes, keep PointLight only ──
       } else {
-        // ── Standard headlights — bulb + glow ──
-        const hlBulbMat = new THREE.MeshStandardMaterial({
-          color: 0xffffcc, emissive: 0xffffcc, emissiveIntensity: 1.5,
-        });
-        const hlGlowMat = new THREE.MeshBasicMaterial({
-          color: 0xffffdd, transparent: true, opacity: 0.25, depthWrite: false,
-        });
+        // ── Standard headlights — bulbs only (glow removed for perf) ──
         for (const x of [-halfW * hlXFrac, halfW * hlXFrac]) {
-          const hl = new THREE.Mesh(new THREE.SphereGeometry(0.08, 6, 4), hlBulbMat);
+          const hl = new THREE.Mesh(new THREE.SphereGeometry(0.08, 4, 3), _sharedHlLens);
           hl.position.set(x, hlY, hlZ);
           this.group.add(hl);
-          const glow = new THREE.Mesh(new THREE.CircleGeometry(0.22, 8), hlGlowMat);
-          glow.position.set(x, hlY, hlZ - 0.03);
-          this.group.add(glow);
         }
       }
     }
@@ -859,25 +784,20 @@ export class Kart {
     this.group.add(tailLight);
     this._tailLights = [tailLight];
 
-    // ── Exhaust tips — chrome pipes with inner heat glow ──
-    const exY = height * 0.15;
-    const exZ = halfL + 0.02;
-    const chromeMat = new THREE.MeshStandardMaterial({ color: 0xcccccc, metalness: 0.9, roughness: 0.12 });
-    const heatMat = new THREE.MeshStandardMaterial({ color: 0xff4400, emissive: 0xff2200, emissiveIntensity: 0.5 });
-    for (const x of [-halfW * 0.22, halfW * 0.22]) {
-      const pipe = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.05, 0.2, 8), chromeMat);
-      pipe.rotation.x = Math.PI / 2;
-      pipe.position.set(x, exY, exZ);
-      this.group.add(pipe);
-
-      const heat = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.03, 8), heatMat);
-      heat.rotation.x = Math.PI / 2;
-      heat.position.set(x, exY, exZ + 0.11);
-      this.group.add(heat);
+    // ── Exhaust tips (skip for vehicles with skipExhaust flag) ──
+    if (!meshConfig.skipExhaust) {
+      const exY = height * 0.15;
+      const exZ = halfL + 0.02;
+      for (const x of [-halfW * 0.22, halfW * 0.22]) {
+        const pipe = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.05, 0.2, 6), _sharedChrome);
+        pipe.rotation.x = Math.PI / 2;
+        pipe.position.set(x, exY, exZ);
+        this.group.add(pipe);
+      }
     }
 
-    // ── Body highlight light for clearcoat vehicles (single consolidated) ──
-    if (meshConfig.emissiveOnlyTint || dark) {
+    // ── Body highlight light (dark vehicles only — emissiveOnlyTint uses fill light) ──
+    if (dark) {
       const hlColor = dark ? 0xddeeff : 0xeeffee;
       const keyLight = new THREE.PointLight(hlColor, dark ? 5.0 : 2.5, 14, 2);
       keyLight.position.set(halfW * 0.3, height + 2, -(halfL * 0.1));
@@ -1018,49 +938,30 @@ export class Kart {
     const halfL = size.z / 2;
     const height = size.y;
 
-    // ── Chrome material ──
-    const chromeMat = new THREE.MeshStandardMaterial({
-      color: 0xccccdd, metalness: 0.92, roughness: 0.06, envMapIntensity: 2.5,
-    });
-
-    // ── Chrome beltline strips (left + right) ──
+    // Beltline chrome (visible from chase cam)
     for (const side of [-1, 1]) {
       const belt = new THREE.Mesh(
-        new THREE.BoxGeometry(0.018, 0.020, size.z * 0.50), chromeMat);
+        new THREE.BoxGeometry(0.018, 0.020, size.z * 0.50), _sharedChrome);
       belt.position.set(side * (halfW + 0.01), height * 0.50, -(halfL * 0.03));
       this.group.add(belt);
     }
 
-    // ── Rear chrome strip ──
+    // Rear chrome strip
     const rearStrip = new THREE.Mesh(
-      new THREE.BoxGeometry(halfW * 1.0, 0.018, 0.018), chromeMat);
+      new THREE.BoxGeometry(halfW * 1.0, 0.018, 0.018), _sharedChrome);
     rearStrip.position.set(0, height * 0.28, halfL - 0.01);
     this.group.add(rearStrip);
 
-    // ── Side marker lights (front amber, rear red) ──
-    const markerMat = new THREE.MeshStandardMaterial({
-      color: 0xff8800, emissive: 0xff6600, emissiveIntensity: 0.8,
-      metalness: 0.2, roughness: 0.3,
-    });
-    const rearMarkerMat = new THREE.MeshStandardMaterial({
-      color: 0xff2200, emissive: 0xff1100, emissiveIntensity: 0.6,
-      metalness: 0.2, roughness: 0.3,
-    });
+    // Rear markers only (front invisible from chase cam)
     for (const side of [-1, 1]) {
-      const fm = new THREE.Mesh(new THREE.SphereGeometry(0.03, 5, 3), markerMat);
-      fm.position.set(side * (halfW + 0.01), height * 0.26, -(halfL * 0.50));
-      this.group.add(fm);
-
-      const rm = new THREE.Mesh(new THREE.SphereGeometry(0.03, 5, 3), rearMarkerMat);
+      const rm = new THREE.Mesh(new THREE.SphereGeometry(0.03, 4, 3), _sharedRedMarker);
       rm.position.set(side * (halfW + 0.01), height * 0.26, halfL * 0.42);
       this.group.add(rm);
     }
-
   }
 
   // ═══════════════════════════════════════════
-  //  SPORTS DETAIL PACKAGE — Destiny's AMG GT
-  //  Chrome, DRLs, splitter, diffuser, markers
+  //  SPORTS DETAIL PACKAGE — Destiny's AMG GT (optimized: 15 meshes)
   // ═══════════════════════════════════════════
 
   _addSportsDetails(bbox, driver) {
@@ -1069,237 +970,37 @@ export class Kart {
     const halfL = size.z / 2;
     const height = size.y;
 
-    // ── Shared materials ──
-    const chromeMat = new THREE.MeshStandardMaterial({
-      color: 0xccccdd, metalness: 0.92, roughness: 0.06, envMapIntensity: 2.5,
-    });
-    const darkChromeMat = new THREE.MeshStandardMaterial({
-      color: 0x1a1a22, metalness: 0.7, roughness: 0.25,
-      emissive: 0x050508, emissiveIntensity: 0.08,
-    });
-    const carbonMat = new THREE.MeshStandardMaterial({
-      color: 0x111118, metalness: 0.4, roughness: 0.5,
-    });
-
-    // ═══════════════════════════════════════
-    //  FRONT — grille, splitter, DRLs
-    // ═══════════════════════════════════════
-
-    // Front grille (dark mesh with chrome surround)
-    const grilleW = halfW * 1.2;
-    const grilleH = height * 0.18;
-    const grille = new THREE.Mesh(
-      new THREE.PlaneGeometry(grilleW, grilleH), darkChromeMat);
-    grille.position.set(0, height * 0.18, -(halfL + 0.01));
-    this.group.add(grille);
-
-    // Grille chrome borders (top + bottom)
-    const grilleBorderTop = new THREE.Mesh(
-      new THREE.BoxGeometry(grilleW * 1.05, 0.015, 0.015), chromeMat);
-    grilleBorderTop.position.set(0, height * 0.18 + grilleH * 0.5, -(halfL + 0.01));
-    this.group.add(grilleBorderTop);
-    const grilleBorderBot = new THREE.Mesh(
-      new THREE.BoxGeometry(grilleW * 0.95, 0.012, 0.012), chromeMat);
-    grilleBorderBot.position.set(0, height * 0.18 - grilleH * 0.5, -(halfL + 0.01));
-    this.group.add(grilleBorderBot);
-
-    // Front splitter (carbon fiber, extends forward below bumper)
-    const splitter = new THREE.Mesh(
-      new THREE.BoxGeometry(halfW * 1.8, 0.02, halfL * 0.08), carbonMat);
-    splitter.position.set(0, height * 0.04, -(halfL + 0.02));
-    this.group.add(splitter);
-
-    // DRL strips (bright blue-white signature LEDs below headlights)
-    const drlMat = new THREE.MeshBasicMaterial({ color: 0xddeeff });
-    const drlY = height * 0.18;
-    const drlZ = -(halfL - 0.01);
-    for (const x of [-halfW * 0.65, halfW * 0.65]) {
-      const drl = new THREE.Mesh(
-        new THREE.BoxGeometry(halfW * 0.30, 0.025, 0.015), drlMat);
-      drl.position.set(x, drlY, drlZ);
-      this.group.add(drl);
-
-      // DRL glow bloom
-      const glowMat = new THREE.MeshBasicMaterial({
-        color: 0xaaccff, transparent: true, opacity: 0.15, depthWrite: false,
-      });
-      const bloom = new THREE.Mesh(
-        new THREE.PlaneGeometry(halfW * 0.45, height * 0.10), glowMat);
-      bloom.position.set(x, drlY, drlZ - 0.02);
-      this.group.add(bloom);
-    }
-
-    // Headlight housings (dark chrome recessed)
-    for (const x of [-halfW * 0.65, halfW * 0.65]) {
-      const housing = new THREE.Mesh(
-        new THREE.BoxGeometry(halfW * 0.35, height * 0.08, 0.05), darkChromeMat);
-      housing.position.set(x, height * 0.22, drlZ + 0.02);
-      this.group.add(housing);
-    }
-
-    // ═══════════════════════════════════════
-    //  SIDES — beltline, air intakes, markers
-    // ═══════════════════════════════════════
-
-    // Chrome beltline strips
-    const beltY = height * 0.48;
+    // Beltline chrome (visible from chase cam)
     for (const side of [-1, 1]) {
       const belt = new THREE.Mesh(
-        new THREE.BoxGeometry(0.018, 0.022, size.z * 0.50), chromeMat);
-      belt.position.set(side * (halfW + 0.01), beltY, 0);
+        new THREE.BoxGeometry(0.018, 0.022, size.z * 0.50), _sharedChrome);
+      belt.position.set(side * (halfW + 0.01), height * 0.48, 0);
       this.group.add(belt);
     }
 
-    // Side air intakes (behind front wheels, sports car signature)
-    for (const side of [-1, 1]) {
-      const intakeMat = darkChromeMat.clone();
-      const intake = new THREE.Mesh(
-        new THREE.PlaneGeometry(halfL * 0.12, height * 0.10), intakeMat);
-      intake.position.set(side * (halfW + 0.01), height * 0.25, -(halfL * 0.25));
-      intake.rotation.y = side * Math.PI / 2;
-      this.group.add(intake);
-
-      // Chrome intake border (top edge)
-      const intakeBorder = new THREE.Mesh(
-        new THREE.BoxGeometry(0.015, 0.012, halfL * 0.12), chromeMat);
-      intakeBorder.position.set(side * (halfW + 0.01), height * 0.30, -(halfL * 0.25));
-      this.group.add(intakeBorder);
-    }
-
-    // Side marker lights — front (amber)
-    const markerMat = new THREE.MeshStandardMaterial({
-      color: 0xff8800, emissive: 0xff6600, emissiveIntensity: 0.8,
-      metalness: 0.2, roughness: 0.3,
-    });
-    for (const side of [-1, 1]) {
-      const fm = new THREE.Mesh(new THREE.SphereGeometry(0.035, 5, 3), markerMat);
-      fm.position.set(side * (halfW + 0.01), height * 0.20, -(halfL * 0.50));
-      this.group.add(fm);
-    }
-
-    // Side marker lights — rear (red)
-    const rearMarkerMat = new THREE.MeshStandardMaterial({
-      color: 0xff2200, emissive: 0xff1100, emissiveIntensity: 0.6,
-      metalness: 0.2, roughness: 0.3,
-    });
-    for (const side of [-1, 1]) {
-      const rm = new THREE.Mesh(new THREE.SphereGeometry(0.035, 5, 3), rearMarkerMat);
-      rm.position.set(side * (halfW + 0.01), height * 0.22, halfL * 0.40);
-      this.group.add(rm);
-    }
-
-    // Side sill accent strips (driver color, bright for contrast)
-    const sillMat = new THREE.MeshBasicMaterial({
-      color: driver.carAccent, transparent: true, opacity: 0.30, depthWrite: false,
-    });
-    for (const side of [-1, 1]) {
-      const sill = new THREE.Mesh(
-        new THREE.BoxGeometry(0.015, 0.03, size.z * 0.65), sillMat);
-      sill.position.set(side * halfW, 0.06, 0);
-      this.group.add(sill);
-    }
-
-    // ═══════════════════════════════════════
-    //  REAR — diffuser, chrome strip, wing hint
-    // ═══════════════════════════════════════
-
-    // Rear chrome strip (between taillights)
+    // Rear chrome strip (visible from chase cam)
     const rearStrip = new THREE.Mesh(
-      new THREE.BoxGeometry(halfW * 1.2, 0.018, 0.018), chromeMat);
+      new THREE.BoxGeometry(halfW * 1.2, 0.018, 0.018), _sharedChrome);
     rearStrip.position.set(0, height * 0.23, halfL - 0.01);
     this.group.add(rearStrip);
 
-    // Rear diffuser (carbon, between exhaust pipes)
-    const diffuser = new THREE.Mesh(
-      new THREE.PlaneGeometry(halfW * 1.0, height * 0.12), carbonMat);
-    diffuser.position.set(0, height * 0.08, halfL + 0.01);
-    diffuser.rotation.y = Math.PI;
-    this.group.add(diffuser);
-
-    // Diffuser chrome borders (left + right vertical)
-    for (const side of [-1, 1]) {
-      const diffBorder = new THREE.Mesh(
-        new THREE.BoxGeometry(0.012, height * 0.12, 0.012), chromeMat);
-      diffBorder.position.set(side * halfW * 0.50, height * 0.08, halfL + 0.01);
-      this.group.add(diffBorder);
-    }
-
-    // Taillight housings (dark recessed)
-    for (const x of [-halfW * 0.55, halfW * 0.55]) {
-      const tlHousing = new THREE.Mesh(
-        new THREE.BoxGeometry(halfW * 0.35, height * 0.07, 0.04), darkChromeMat);
-      tlHousing.position.set(x, height * 0.25, halfL - 0.005);
-      this.group.add(tlHousing);
-    }
-
-    // Rear lip spoiler (subtle, sits on trunk edge)
+    // Rear spoiler (visible from chase cam)
     const spoiler = new THREE.Mesh(
-      new THREE.BoxGeometry(halfW * 1.5, 0.018, 0.04), carbonMat);
+      new THREE.BoxGeometry(halfW * 1.5, 0.018, 0.04), _sharedDarkChrome);
     spoiler.position.set(0, height * 0.42, halfL * 0.75);
     this.group.add(spoiler);
 
-    // ═══════════════════════════════════════
-    //  ROOF + BODY LINES
-    // ═══════════════════════════════════════
-
-    // Shoulder character lines (mid-body)
-    const shoulderMat = new THREE.MeshBasicMaterial({
-      color: driver.carAccent, transparent: true, opacity: 0.15, depthWrite: false,
-    });
+    // Side markers — rear only (front not visible from chase cam)
     for (const side of [-1, 1]) {
-      const shoulder = new THREE.Mesh(
-        new THREE.BoxGeometry(0.012, 0.012, size.z * 0.70), shoulderMat);
-      shoulder.position.set(side * (halfW * 0.98), height * 0.38, 0);
-      this.group.add(shoulder);
+      const rm = new THREE.Mesh(new THREE.SphereGeometry(0.035, 4, 3), _sharedRedMarker);
+      rm.position.set(side * (halfW + 0.01), height * 0.22, halfL * 0.40);
+      this.group.add(rm);
     }
-
-    // Door panel seams
-    const seamMat = new THREE.MeshBasicMaterial({
-      color: 0x151520, transparent: true, opacity: 0.30, depthWrite: false,
-    });
-    for (const side of [-1, 1]) {
-      const door = new THREE.Mesh(
-        new THREE.BoxGeometry(0.008, height * 0.22, 0.008), seamMat);
-      door.position.set(side * halfW * 0.98, height * 0.32, -(halfL * 0.05));
-      this.group.add(door);
-    }
-
-    // ═══════════════════════════════════════
-    //  CONTRAST — road separation + visibility
-    // ═══════════════════════════════════════
-
-    // Edge rim — front lip
-    const rimMat = new THREE.MeshBasicMaterial({
-      color: driver.carAccent, transparent: true, opacity: 0.28, depthWrite: false,
-    });
-    const frontLip = new THREE.Mesh(
-      new THREE.BoxGeometry(halfW * 1.6, 0.015, 0.015), rimMat);
-    frontLip.position.set(0, height * 0.06, -(size.z * 0.48));
-    this.group.add(frontLip);
-
-    // Edge rim — rear lip
-    const rearLipMat = rimMat.clone();
-    rearLipMat.opacity = 0.22;
-    const rearLip = new THREE.Mesh(
-      new THREE.BoxGeometry(halfW * 1.5, 0.015, 0.015), rearLipMat);
-    rearLip.position.set(0, height * 0.08, size.z * 0.48);
-    this.group.add(rearLip);
-
-    // Rear accent glow (blue strip behind taillights — visible to camera)
-    const rearGlowMat = new THREE.MeshBasicMaterial({
-      color: driver.carAccent, transparent: true, opacity: 0.20, depthWrite: false,
-    });
-    const rearGlow = new THREE.Mesh(
-      new THREE.PlaneGeometry(halfW * 1.3, height * 0.06), rearGlowMat);
-    rearGlow.position.set(0, height * 0.25, halfL + 0.02);
-    rearGlow.rotation.y = Math.PI;
-    this.group.add(rearGlow);
-
   }
 
+
   // ═══════════════════════════════════════════
-  //  RALLY DETAIL PACKAGE — Luke's SUV
-  //  Roof rails, bull bar, side steps, arch flares
+  //  RALLY DETAIL PACKAGE — Luke's SUV (optimized: 12 meshes)
   // ═══════════════════════════════════════════
 
   _addRallyDetails(bbox, driver) {
@@ -1308,204 +1009,51 @@ export class Kart {
     const halfL = size.z / 2;
     const height = size.y;
 
-    // ── Shared materials ──
-    const chromeMat = new THREE.MeshStandardMaterial({
-      color: 0xccccdd, metalness: 0.92, roughness: 0.06, envMapIntensity: 2.5,
-    });
-    const darkPlasticMat = new THREE.MeshStandardMaterial({
-      color: 0x1a1a1a, metalness: 0.1, roughness: 0.7,
-    });
-    const carbonMat = new THREE.MeshStandardMaterial({
-      color: 0x111118, metalness: 0.4, roughness: 0.5,
-    });
-
-    // ═══════════════════════════════════════
-    //  ROOF — rails + rack hint
-    // ═══════════════════════════════════════
-
-    // Roof rails (left + right, chrome bars running front-to-back)
+    // Roof rails
     for (const side of [-1, 1]) {
       const rail = new THREE.Mesh(
-        new THREE.BoxGeometry(0.025, 0.025, size.z * 0.50), chromeMat);
+        new THREE.BoxGeometry(0.025, 0.025, size.z * 0.50), _sharedChrome);
       rail.position.set(side * halfW * 0.75, height + 0.02, -(halfL * 0.05));
       this.group.add(rail);
-
-      // Rail support posts (front + rear)
-      for (const zFrac of [-0.22, 0.18]) {
-        const post = new THREE.Mesh(
-          new THREE.BoxGeometry(0.02, 0.04, 0.02), chromeMat);
-        post.position.set(side * halfW * 0.75, height + 0.005, halfL * zFrac);
-        this.group.add(post);
-      }
     }
 
-    // ═══════════════════════════════════════
-    //  FRONT — bull bar, skid plate, DRLs
-    // ═══════════════════════════════════════
-
-    // Bull bar (chrome, arched across front bumper)
+    // Bull bar
     const bullBar = new THREE.Mesh(
-      new THREE.BoxGeometry(halfW * 1.4, 0.04, 0.04), chromeMat);
+      new THREE.BoxGeometry(halfW * 1.4, 0.04, 0.04), _sharedChrome);
     bullBar.position.set(0, height * 0.22, -(halfL + 0.03));
     this.group.add(bullBar);
 
-    // Bull bar vertical supports
-    for (const side of [-1, 1]) {
-      const support = new THREE.Mesh(
-        new THREE.BoxGeometry(0.03, height * 0.12, 0.03), chromeMat);
-      support.position.set(side * halfW * 0.55, height * 0.16, -(halfL + 0.03));
-      this.group.add(support);
-    }
-
-    // Skid plate (carbon/dark, underbody protection)
-    const skid = new THREE.Mesh(
-      new THREE.BoxGeometry(halfW * 1.5, 0.02, halfL * 0.12), carbonMat);
-    skid.position.set(0, height * 0.03, -(halfL * 0.92));
-    this.group.add(skid);
-
-    // DRL strips (green-white LEDs flanking the bull bar)
-    const drlMat = new THREE.MeshBasicMaterial({ color: 0xddffdd });
-    const drlY = height * 0.30;
-    const drlZ = -(halfL - 0.01);
+    // DRL strips
     for (const x of [-halfW * 0.50, halfW * 0.50]) {
       const drl = new THREE.Mesh(
-        new THREE.BoxGeometry(halfW * 0.25, 0.022, 0.015), drlMat);
-      drl.position.set(x, drlY, drlZ);
+        new THREE.BoxGeometry(halfW * 0.25, 0.022, 0.015), _sharedDRL);
+      drl.position.set(x, height * 0.30, -(halfL - 0.01));
       this.group.add(drl);
-
-      // Glow bloom
-      const glowMat = new THREE.MeshBasicMaterial({
-        color: 0x88ee88, transparent: true, opacity: 0.12, depthWrite: false,
-      });
-      const bloom = new THREE.Mesh(
-        new THREE.PlaneGeometry(halfW * 0.38, height * 0.08), glowMat);
-      bloom.position.set(x, drlY, drlZ - 0.02);
-      this.group.add(bloom);
     }
 
-
-    // ═══════════════════════════════════════
-    //  SIDES — steps, arch flares, beltline, markers
-    // ═══════════════════════════════════════
-
+    // Beltline chrome
     for (const side of [-1, 1]) {
-      // Side steps (chrome running boards)
-      const step = new THREE.Mesh(
-        new THREE.BoxGeometry(0.06, 0.02, size.z * 0.55), chromeMat);
-      step.position.set(side * (halfW + 0.03), height * 0.08, 0);
-      this.group.add(step);
-
-      // Wheel arch flares (dark plastic, widebody look)
-      const archPositions = [-(halfL * 0.50), halfL * 0.38];
-      for (const zPos of archPositions) {
-        const flare = new THREE.Mesh(
-          new THREE.TorusGeometry(height * 0.20, 0.025, 4, 8, Math.PI), darkPlasticMat);
-        flare.position.set(side * (halfW + 0.02), height * 0.20, zPos);
-        flare.rotation.y = side > 0 ? Math.PI / 2 : -Math.PI / 2;
-        flare.rotation.z = Math.PI;
-        this.group.add(flare);
-      }
-
-      // Chrome beltline strip
       const belt = new THREE.Mesh(
-        new THREE.BoxGeometry(0.018, 0.022, size.z * 0.45), chromeMat);
+        new THREE.BoxGeometry(0.018, 0.022, size.z * 0.45), _sharedChrome);
       belt.position.set(side * (halfW + 0.01), height * 0.50, -(halfL * 0.02));
       this.group.add(belt);
+    }
 
-      // Side marker — front (amber)
-      const fmMat = new THREE.MeshStandardMaterial({
-        color: 0xff8800, emissive: 0xff6600, emissiveIntensity: 0.8,
-        metalness: 0.2, roughness: 0.3,
-      });
-      const fm = new THREE.Mesh(new THREE.SphereGeometry(0.035, 5, 3), fmMat);
+    // Side markers
+    for (const side of [-1, 1]) {
+      const fm = new THREE.Mesh(new THREE.SphereGeometry(0.035, 4, 3), _sharedAmber);
       fm.position.set(side * (halfW + 0.01), height * 0.25, -(halfL * 0.50));
       this.group.add(fm);
-
-      // Side marker — rear (red)
-      const rmMat = new THREE.MeshStandardMaterial({
-        color: 0xff2200, emissive: 0xff1100, emissiveIntensity: 0.6,
-        metalness: 0.2, roughness: 0.3,
-      });
-      const rm = new THREE.Mesh(new THREE.SphereGeometry(0.035, 5, 3), rmMat);
+      const rm = new THREE.Mesh(new THREE.SphereGeometry(0.035, 4, 3), _sharedRedMarker);
       rm.position.set(side * (halfW + 0.01), height * 0.28, halfL * 0.40);
       this.group.add(rm);
     }
 
-    // ═══════════════════════════════════════
-    //  REAR — bumper guard, chrome strip
-    // ═══════════════════════════════════════
-
     // Rear chrome strip
     const rearStrip = new THREE.Mesh(
-      new THREE.BoxGeometry(halfW * 1.1, 0.018, 0.018), chromeMat);
+      new THREE.BoxGeometry(halfW * 1.1, 0.018, 0.018), _sharedChrome);
     rearStrip.position.set(0, height * 0.35, halfL - 0.01);
     this.group.add(rearStrip);
-
-    // Rear bumper guard (chrome bar)
-    const bumperGuard = new THREE.Mesh(
-      new THREE.BoxGeometry(halfW * 1.3, 0.03, 0.03), chromeMat);
-    bumperGuard.position.set(0, height * 0.10, halfL + 0.02);
-    this.group.add(bumperGuard);
-
-    // Rear diffuser/skid
-    const rearSkid = new THREE.Mesh(
-      new THREE.BoxGeometry(halfW * 1.2, 0.02, halfL * 0.08), carbonMat);
-    rearSkid.position.set(0, height * 0.03, halfL * 0.92);
-    this.group.add(rearSkid);
-
-    // ═══════════════════════════════════════
-    //  BODY LINES + CONTRAST
-    // ═══════════════════════════════════════
-
-    // Shoulder character lines
-    const shoulderMat = new THREE.MeshBasicMaterial({
-      color: driver.carAccent, transparent: true, opacity: 0.15, depthWrite: false,
-    });
-    for (const side of [-1, 1]) {
-      const shoulder = new THREE.Mesh(
-        new THREE.BoxGeometry(0.012, 0.012, size.z * 0.70), shoulderMat);
-      shoulder.position.set(side * (halfW * 0.98), height * 0.40, 0);
-      this.group.add(shoulder);
-    }
-
-    // Door panel seams
-    const seamMat = new THREE.MeshBasicMaterial({
-      color: 0x151520, transparent: true, opacity: 0.30, depthWrite: false,
-    });
-    for (const side of [-1, 1]) {
-      for (const zFrac of [-0.18, 0.08]) {
-        const door = new THREE.Mesh(
-          new THREE.BoxGeometry(0.008, height * 0.28, 0.008), seamMat);
-        door.position.set(side * halfW * 0.98, height * 0.33, halfL * zFrac);
-        this.group.add(door);
-      }
-    }
-
-    // Edge rim — front + rear lips (green accent)
-    const rimMat = new THREE.MeshBasicMaterial({
-      color: driver.carAccent, transparent: true, opacity: 0.25, depthWrite: false,
-    });
-    const frontLip = new THREE.Mesh(
-      new THREE.BoxGeometry(halfW * 1.5, 0.015, 0.015), rimMat);
-    frontLip.position.set(0, height * 0.06, -(size.z * 0.48));
-    this.group.add(frontLip);
-    const rearLip = new THREE.Mesh(
-      new THREE.BoxGeometry(halfW * 1.4, 0.015, 0.015), rimMat.clone());
-    rearLip.material.opacity = 0.20;
-    rearLip.position.set(0, height * 0.08, size.z * 0.48);
-    this.group.add(rearLip);
-
-    // Sill accent strips
-    const sillMat = new THREE.MeshBasicMaterial({
-      color: driver.carAccent, transparent: true, opacity: 0.22, depthWrite: false,
-    });
-    for (const side of [-1, 1]) {
-      const sill = new THREE.Mesh(
-        new THREE.BoxGeometry(0.012, 0.03, size.z * 0.65), sillMat);
-      sill.position.set(side * halfW, 0.05, 0);
-      this.group.add(sill);
-    }
-
   }
 
   // ═══════════════════════════════════════════
@@ -1519,6 +1067,52 @@ export class Kart {
     this.isSwitching = false;
     this.group.position.x = LANE_POSITIONS[1];
     this.group.traverse(c => { if (c.isMesh) c.castShadow = true; });
+  }
+
+  /** Pre-create particle pools so they don't lazy-init during gameplay */
+  warmUp() {
+    if (!this._exhaustParticles && this.group.parent) {
+      this._exhaustParticles = [];
+      const geo = new THREE.BoxGeometry(0.1, 0.1, 0.1);
+      const mat = new THREE.MeshBasicMaterial({ color: 0x888888, transparent: true, opacity: 0.4 });
+      for (let i = 0; i < 6; i++) {
+        const p = new THREE.Mesh(geo, mat.clone());
+        p.visible = false;
+        p.userData = { life: 0, vy: 0 };
+        this.group.parent.add(p);
+        this._exhaustParticles.push(p);
+      }
+    }
+    if (!this._flameParticles && this.group.parent) {
+      this._flameParticles = [];
+      const flameColors = [0xff6600, 0xff2200, 0xffaa00, 0xff4400, 0xffcc00, 0xff8800];
+      const geo = new THREE.BoxGeometry(0.08, 0.08, 0.08);
+      for (let i = 0; i < 12; i++) {
+        const color = flameColors[i % flameColors.length];
+        const mat = new THREE.MeshBasicMaterial({
+          color, transparent: true, opacity: 0.9, depthWrite: false,
+        });
+        const p = new THREE.Mesh(geo, mat);
+        p.visible = false;
+        p.userData = { life: 0, vx: 0, vy: 0, vz: 0 };
+        this.group.parent.add(p);
+        this._flameParticles.push(p);
+      }
+    }
+    // Pre-create flame glow PointLight (avoids shader recompile on first turbo)
+    if (!this._flameGlow) {
+      this._flameGlow = new THREE.PointLight(0xff5500, 0, 8, 2);
+      this._flameGlow.position.set(0, 0.3, this._exhaustZ + 0.3);
+      this.group.add(this._flameGlow);
+    }
+    // Briefly make all particles visible so renderer.compile() picks them up,
+    // then hide them again (they'll be made visible during actual gameplay)
+    const allParticles = [...(this._exhaustParticles || []), ...(this._flameParticles || [])];
+    for (const p of allParticles) p.visible = true;
+    // Schedule hide after next frame (warm-up render happens between these)
+    requestAnimationFrame(() => {
+      for (const p of allParticles) p.visible = false;
+    });
   }
 
   switchLane(direction) {
@@ -1664,7 +1258,7 @@ export class Kart {
       this._flameParticles = [];
       const flameColors = [0xff6600, 0xff2200, 0xffaa00, 0xff4400, 0xffcc00, 0xff8800];
       const geo = new THREE.BoxGeometry(0.08, 0.08, 0.08);
-      for (let i = 0; i < 24; i++) {
+      for (let i = 0; i < 12; i++) {
         const color = flameColors[i % flameColors.length];
         const mat = new THREE.MeshBasicMaterial({
           color, transparent: true, opacity: 0.9, depthWrite: false,

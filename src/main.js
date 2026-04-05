@@ -266,54 +266,110 @@ const driverSelect = new DriverSelect(
   () => gameState.transition('menu')
 );
 
-// Loading overlay — masks synchronous environment.build() with a smooth fade-to-black
+// ══════════════════════════════════════════
+//  LOADING SCREEN — styled overlay with progress bar
+// ══════════════════════════════════════════
 const loadingOverlay = document.createElement('div');
+loadingOverlay.id = 'loading-overlay';
+loadingOverlay.innerHTML = `
+  <div class="lo-content">
+    <div class="lo-title">PREPARING TRACK</div>
+    <div class="lo-bar-wrap">
+      <div class="lo-bar-track">
+        <div class="lo-bar-fill" id="lo-bar-fill"></div>
+        <div class="lo-bar-glow"></div>
+      </div>
+    </div>
+    <div class="lo-hint" id="lo-hint">Loading environment...</div>
+  </div>
+`;
 Object.assign(loadingOverlay.style, {
   position: 'fixed', inset: '0', zIndex: '200',
   background: '#000', opacity: '0', pointerEvents: 'none',
   transition: 'opacity 0.5s ease', display: 'none',
 });
-// Loading hint text (pulsing, visible during scene build)
-const loadingHint = document.createElement('div');
-Object.assign(loadingHint.style, {
-  position: 'absolute', bottom: '15%', left: '50%',
-  transform: 'translateX(-50%)',
-  fontFamily: "'Orbitron', sans-serif",
-  fontSize: 'clamp(10px, 1.2vw, 16px)',
-  fontWeight: '500',
-  color: 'rgba(255,255,255,0.35)',
-  letterSpacing: '4px',
-  animation: 'loadPulse 1.5s ease-in-out infinite',
-});
-loadingHint.textContent = 'LOADING';
-loadingHint.style.display = 'none';
-loadingOverlay.appendChild(loadingHint);
 
-// Inject the pulse animation
-const loadStyle = document.createElement('style');
-loadStyle.textContent = `@keyframes loadPulse {
-  0%,100% { opacity: 0.3; } 50% { opacity: 0.7; }
-}`;
-document.head.appendChild(loadStyle);
+const loStyle = document.createElement('style');
+loStyle.textContent = `
+  @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&display=swap');
+  .lo-content {
+    position: absolute; left: 50%; bottom: 18%;
+    transform: translateX(-50%);
+    display: flex; flex-direction: column; align-items: center;
+    gap: clamp(10px, 1.5vh, 20px);
+    width: clamp(200px, 40vw, 500px);
+  }
+  .lo-title {
+    font-family: 'Orbitron', sans-serif;
+    font-size: clamp(11px, 1.3vw, 20px);
+    font-weight: 700;
+    color: #22ffaa;
+    letter-spacing: clamp(3px, 0.5vw, 8px);
+    text-shadow: 0 0 12px rgba(34,255,170,0.4);
+    animation: loPulse 1.5s ease-in-out infinite;
+  }
+  .lo-bar-wrap {
+    width: 100%;
+    padding: 0 4px;
+  }
+  .lo-bar-track {
+    position: relative;
+    width: 100%; height: clamp(4px, 0.6vh, 8px);
+    background: rgba(255,255,255,0.08);
+    border-radius: 10px;
+    overflow: hidden;
+    border: 1px solid rgba(34,255,170,0.15);
+  }
+  .lo-bar-fill {
+    position: absolute; left: 0; top: 0; bottom: 0;
+    width: 0%;
+    background: linear-gradient(90deg, #00cc66, #22ffaa, #00ff88);
+    border-radius: 10px;
+    transition: width 0.3s ease;
+    box-shadow: 0 0 10px rgba(34,255,170,0.5);
+  }
+  .lo-bar-glow {
+    position: absolute; inset: -2px;
+    border-radius: 12px;
+    box-shadow: 0 0 12px rgba(34,255,170,0.1);
+    pointer-events: none;
+  }
+  .lo-hint {
+    font-family: 'Orbitron', sans-serif;
+    font-size: clamp(7px, 0.8vw, 12px);
+    font-weight: 500;
+    color: rgba(255,255,255,0.3);
+    letter-spacing: 2px;
+  }
+  @keyframes loPulse {
+    0%,100% { opacity: 0.7; } 50% { opacity: 1; }
+  }
+`;
+document.head.appendChild(loStyle);
 document.body.appendChild(loadingOverlay);
+
+const loBarFill = loadingOverlay.querySelector('#lo-bar-fill');
+const loHint = loadingOverlay.querySelector('#lo-hint');
+
+function setLoadProgress(pct, hint) {
+  loBarFill.style.width = Math.min(100, pct) + '%';
+  if (hint) loHint.textContent = hint;
+}
 
 function fadeToBlack() {
   return new Promise(resolve => {
+    setLoadProgress(0, 'Initializing...');
     loadingOverlay.style.display = 'block';
     loadingOverlay.style.opacity = '0';
     loadingOverlay.style.pointerEvents = 'all';
-    loadingHint.style.display = 'none';
     void loadingOverlay.offsetWidth;
     loadingOverlay.style.opacity = '1';
-    setTimeout(() => {
-      loadingHint.style.display = 'block';
-      resolve();
-    }, 520);
+    setTimeout(resolve, 520);
   });
 }
 
 function clearLoadingOverlay() {
-  loadingHint.style.display = 'none';
+  setLoadProgress(100, 'Ready!');
   // Don't hide overlay — RaceStartSequence reuses it for seamless fade-out
 }
 
@@ -329,28 +385,98 @@ const mapSelect = new MapSelect(
     const musicKey = MAP_MUSIC_KEYS[mapIndex] || 'brazil';
     playMusic(musicKey);
 
-    // Yield to browser so the black frame paints before heavy build work
+    // Yield to browser so the black screen paints before heavy work
     await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
 
-    // Build kart model now (deferred from driver select for instant UI response)
+    // ── Stage 1: Build vehicle ──
+    setLoadProgress(10, 'Building vehicle...');
+    await new Promise(r => requestAnimationFrame(r));
     kart.setDriver(gameState.selectedDriver);
 
+    // ── Stage 2: Build environment ──
+    setLoadProgress(25, 'Loading scenery...');
+    await new Promise(r => requestAnimationFrame(r));
     await environment.build(mapIndex);
 
-    // Update road surface color for this theme
+    // ── Stage 3: Road + env map ──
+    setLoadProgress(50, 'Generating reflections...');
+    await new Promise(r => requestAnimationFrame(r));
     const themeId = MAP_THEMES[mapIndex]?.id || 'brazil';
     road.setThemeColor(themeId);
-
-    // Generate environment map for reflections (critical for glossy dark vehicles)
     updateEnvMap();
 
-    // Apply per-theme color grading
+    // ── Stage 4: Post-processing + color grading ──
+    setLoadProgress(65, 'Applying effects...');
     const cg = MAP_THEMES[mapIndex]?.colorGrade || { saturation: 1, contrast: 1, brightness: 1 };
     colorGradePass.uniforms.saturation.value = cg.saturation;
     colorGradePass.uniforms.contrast.value = cg.contrast;
     colorGradePass.uniforms.brightness.value = cg.brightness;
 
-    // Hide loading hint before transition
+    // ── Stage 5: Pre-build gameplay objects (before warm-up so shaders compile) ──
+    setLoadProgress(70, 'Building gameplay...');
+    await new Promise(r => requestAnimationFrame(r));
+
+    // Add kart lights NOW (normally done in 'playing' state handler)
+    removeKartLights();
+    addKartLights(themeId);
+
+    // Build start line NOW
+    removeStartLine();
+    buildStartLine();
+
+    // Reset lamp posts + plates to gameplay state
+    lampPosts.resetAll();
+    lampPosts.setTier(0, false);
+    plates.resetSpawnRate();
+
+    // Pre-create particles + turbo glow light
+    kart.warmUp();
+    // Pre-spawn a plate to compile plate materials
+    plates.spawnPlate(-50);
+
+    // ── Stage 6: Position camera at gameplay view for warm-up ──
+    setLoadProgress(78, 'Compiling shaders...');
+    await new Promise(r => requestAnimationFrame(r));
+
+    // Save camera state, move to gameplay position so correct objects are in frustum
+    const savedCamY = camera.position.y;
+    const savedCamZ = camera.position.z;
+    camera.position.y = CAMERA_OFFSET.y;
+    camera.position.z = CAMERA_OFFSET.z;
+    camera.lookAt(0, 0, -CAMERA_LOOK_AHEAD);
+    camera.updateProjectionMatrix();
+
+    renderer.compile(scene, camera);
+
+    // ── Stage 7: Warm-up renders from gameplay + pre-race cameras ──
+    setLoadProgress(85, 'Warming up GPU...');
+    await new Promise(r => requestAnimationFrame(r));
+    // Gameplay camera renders
+    for (let i = 0; i < 3; i++) {
+      composer.render();
+      await new Promise(r => requestAnimationFrame(r));
+    }
+    // Pre-race elevated camera renders
+    camera.position.y = CAMERA_OFFSET.y + 3;
+    camera.position.z = CAMERA_OFFSET.z + 2;
+    camera.lookAt(0, 0.5, -CAMERA_LOOK_AHEAD);
+    camera.updateProjectionMatrix();
+    composer.render();
+    await new Promise(r => requestAnimationFrame(r));
+
+    // ── Stage 8: Game loop dry run to warm JIT ──
+    setLoadProgress(95, 'Finalizing...');
+    const fakeDelta = 0.016;
+    const fakeSpeed = 40 * SCROLL_FACTOR;
+    road.update(fakeDelta, fakeSpeed);
+    kart.update(fakeDelta, fakeSpeed, false);
+    plates.update(fakeDelta, fakeSpeed);
+    lampPosts.update(fakeDelta, fakeSpeed);
+    environment.update(fakeDelta, fakeSpeed);
+    composer.render();
+    await new Promise(r => requestAnimationFrame(r));
+
+    // ── Done ──
     clearLoadingOverlay();
 
     // Transition to playing — RaceStartSequence reuses loadingOverlay
@@ -514,26 +640,18 @@ gameState.on('stateChange', ({ from, to }) => {
         controls.showButtons();
       } else {
         // Fresh game start — run countdown sequence
+        // NOTE: kart lights, start line, lamp posts, plates already set up
+        // during the loading screen (before warm-up renders)
         gameState.speed = 0;
         gameState.elapsed = 0;
         hud.reset();
-        hud.show(); // show but keep opacity 0 (sequence controls fade-in)
-        plates.resetSpawnRate();
-        lampPosts.resetAll();
-        lampPosts.setTier(0, false);
+        hud.show();
 
         // Store base ambient and dim it to tier-0 level
         if (environment.ambientLight) {
           baseAmbientIntensity = MAP_THEMES[gameState.selectedMap]?.ambientIntensity || 0.6;
           environment.ambientLight.intensity = baseAmbientIntensity * AMBIENT_MULTIPLIERS[0];
         }
-
-        // All maps get kart-attached lights (scaled per theme)
-        const themeId = MAP_THEMES[gameState.selectedMap]?.id;
-        addKartLights(themeId);
-
-        // Start line decoration
-        buildStartLine();
 
         raceStart = new RaceStartSequence({
           camera,
@@ -869,6 +987,9 @@ playMusic('menu');
   await environment.preload();
   await environment.build(0);
   updateEnvMap();
+  // Pre-compile shaders during intro (user never sees this render)
+  renderer.compile(scene, camera);
+  renderer.render(scene, camera);
 
   // Show the start screen NOW, behind the intro overlay (z-index 100 vs 500).
   // When the intro fades out it reveals the already-visible start screen,
