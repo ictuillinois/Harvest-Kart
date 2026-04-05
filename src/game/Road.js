@@ -54,7 +54,7 @@ export class Road {
     // Shared materials (one instance for all segments)
     const lineMat = new THREE.MeshBasicMaterial({ color: COLORS.roadLine });
     const dashedMat = new THREE.MeshBasicMaterial({ color: COLORS.roadLineDashed });
-    const curbMat = new THREE.MeshStandardMaterial({ color: 0x555555, roughness: 0.9 });
+    const curbMat = new THREE.MeshStandardMaterial({ color: 0x6a6a6a, roughness: 0.9 });
 
     for (let i = 0; i < ROAD_SEGMENT_COUNT; i++) {
       const road = new THREE.Mesh(

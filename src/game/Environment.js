@@ -1485,21 +1485,28 @@ export class Environment {
     }
 
     const move = speed * delta;
+    this._parFrame = (this._parFrame || 0) + 1;
 
-    // Parallax: 3 layers at different scroll speeds
-    const layers = [
-      [this.foreground, 1.0],   // 100% — bushes, props near road
-      [this.midground, 0.6],    // 60%  — buildings, palms
-      [this.background, 0.2],   // 20%  — mountains, distant
-    ];
+    // Foreground: every frame (closest to camera, most visible motion)
+    const fgMove = move * 1.0;
+    for (const obj of this.foreground) {
+      obj.position.z += fgMove;
+      if (obj.position.z > 60) obj.position.z -= 400;
+    }
 
-    for (const [layer, factor] of layers) {
-      const layerMove = move * factor;
-      for (const obj of layer) {
-        obj.position.z += layerMove;
-        if (obj.position.z > 60) {
-          obj.position.z -= 400;
-        }
+    // Midground: every frame (still visible)
+    const mgMove = move * 0.6;
+    for (const obj of this.midground) {
+      obj.position.z += mgMove;
+      if (obj.position.z > 60) obj.position.z -= 400;
+    }
+
+    // Background: every other frame (distant, 20% speed, imperceptible difference)
+    if ((this._parFrame & 1) === 0) {
+      const bgMove = move * 0.2 * 2; // 2x to compensate for half-rate
+      for (const obj of this.background) {
+        obj.position.z += bgMove;
+        if (obj.position.z > 60) obj.position.z -= 400;
       }
     }
   }

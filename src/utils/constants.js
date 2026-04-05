@@ -1,7 +1,7 @@
 import { asset } from './base.js';
 
 // Lane positions (X coordinates)
-export const LANE_POSITIONS = [-3, 0, 3];
+export const LANE_POSITIONS = [-3.5, 0, 3.5];
 export const LANE_COUNT = 3;
 
 // Road dimensions
@@ -68,15 +68,15 @@ export const DRIVER_PHYSICS = {
     laneSwitchMs: 250,                     // heavier at high speed
     chargeMultiplier: 1.1,
   },
-  // Luke — The Eco Racer (SPD 3, ACC 4, EFF 5)
+  // Luke — The Raging Bull (SPD 5, ACC 4, EFF 2)
   luke: {
-    topSpeed: 84,
+    topSpeed: 100,
     gearAccel: calcGearAccel(4),          // [14, 11.2, 8.4, 5.6, 3.5]
-    gearThresholds: calcGearThresholds(84),
-    decelRate: 4,                          // barely slows down
-    coastFloor: 32,
-    laneSwitchMs: 180,
-    chargeMultiplier: 1.2,
+    gearThresholds: calcGearThresholds(100),
+    decelRate: 12,                         // heavy SUV, loses speed fast
+    coastFloor: 20,
+    laneSwitchMs: 230,                     // heavy but capable AWD
+    chargeMultiplier: 0.9,                // 2★ EFF — raw power over efficiency
   },
 };
 
@@ -104,14 +104,14 @@ export const PLATE_COLLISION_Z_THRESHOLD = 2.5;
 // These are real asphalt gray. Intentionally LIGHT for vehicle contrast.
 // Color multiplies with procedural asphalt texture in Road.js.
 export const ROAD_SURFACE_COLORS = {
-  brazil: 0x777780,   // warm medium gray (bright texture × this = visible gray)
-  usa:    0x666660,   // warm neutral gray for sunset
-  peru:   0x707078,   // neutral medium gray
+  brazil: 0xababb5,   // light gray — strong contrast with dark vehicles
+  usa:    0x9a9a92,   // warm light gray
+  peru:   0xa3a3ab,   // neutral light gray
 };
 
 // Colors
 export const COLORS = {
-  road: 0x777780,     // default road color (used by Road.js at init)
+  road: 0xababb5,     // default road color (used by Road.js at init)
   roadLine: 0xffffff,
   roadLineDashed: 0xcccccc,
   plate: 0x39ff14,
@@ -157,13 +157,13 @@ export const DRIVER_TYPES = [
   },
   {
     name: 'Luke',
-    description: 'The Eco Racer',
+    description: 'The Raging Bull',
     avatar: asset('characters/luke.webp'),
     accentColor: '#2aaa4a',
     carBody: 0x2aaa4a,
     carAccent: 0x4acc6a,
     vehicleType: 'rally',
-    stats: { topSpeed: 3, acceleration: 4, efficiency: 5 },
+    stats: { topSpeed: 5, acceleration: 4, efficiency: 2 },
   },
 ];
 

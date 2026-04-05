@@ -27,7 +27,7 @@ export class RaceStartSequence {
     const {
       camera, controls, hud, normalCam,
       playMusic, playCountdownTone, playCountdownRev,
-      startEngine, onComplete,
+      startEngine, onComplete, existingOverlay,
     } = this._opts;
 
     // Lock controls during countdown (inputs blocked, but buttons visible)
@@ -38,15 +38,24 @@ export class RaceStartSequence {
     camera.position.y = normalCam.y + 3;
     camera.position.z = normalCam.z + 2;
 
-    // ── Black overlay ──
-    this._overlay = document.createElement('div');
-    this._overlay.id = 'race-start-overlay';
-    Object.assign(this._overlay.style, {
-      position: 'fixed', inset: '0',
-      background: '#000', zIndex: '200',
-      opacity: '1', transition: 'none',
-    });
-    document.body.appendChild(this._overlay);
+    // ── Reuse existing loading overlay if provided, otherwise create one ──
+    if (existingOverlay) {
+      this._overlay = existingOverlay;
+      this._overlay.style.zIndex = '200';
+      this._overlay.style.opacity = '1';
+      this._overlay.style.transition = 'none';
+      this._overlayReused = true;
+    } else {
+      this._overlay = document.createElement('div');
+      this._overlay.id = 'race-start-overlay';
+      Object.assign(this._overlay.style, {
+        position: 'fixed', inset: '0',
+        background: '#000', zIndex: '200',
+        opacity: '1', transition: 'none',
+      });
+      document.body.appendChild(this._overlay);
+      this._overlayReused = false;
+    }
 
     // ── Countdown container (number below traffic light) ──
     this._countdownEl = document.createElement('div');
@@ -239,7 +248,7 @@ export class RaceStartSequence {
       });
     };
 
-    // ── T+0.0: start music ──
+    // ── T+0.0: start music (skip if already playing from loading screen) ──
     playMusic();
 
     // ── T+0.5: begin fade out of black overlay ──
@@ -249,9 +258,14 @@ export class RaceStartSequence {
       startEngine();
     });
 
-    // ── T+2.0: remove overlay, show traffic light ──
+    // ── T+2.0: hide overlay, show traffic light ──
     this._at(2000, () => {
-      this._overlay.remove();
+      if (this._overlayReused) {
+        this._overlay.style.display = 'none';
+        this._overlay.style.pointerEvents = 'none';
+      } else {
+        this._overlay.remove();
+      }
       this._overlay = null;
       this._trafficEl.classList.add('visible');
     });

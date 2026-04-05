@@ -828,6 +828,79 @@ export function playFinalPowerOn() {
   noise.start(t);
 }
 
+/** Turbo boost — dramatic whoosh + turbo whistle + power surge */
+export function playTurboBoost() {
+  const c = getCtx();
+  const t = c.currentTime;
+  const out = getMaster();
+
+  // 1. Whoosh — filtered noise burst rising in pitch
+  const noise = c.createBufferSource();
+  noise.buffer = getNoiseBuffer();
+  noise.loop = true;
+  const whooshBP = c.createBiquadFilter();
+  whooshBP.type = 'bandpass';
+  whooshBP.frequency.setValueAtTime(400, t);
+  whooshBP.frequency.exponentialRampToValueAtTime(3000, t + 0.3);
+  whooshBP.frequency.exponentialRampToValueAtTime(1500, t + 0.8);
+  whooshBP.Q.value = 1.5;
+  const whooshG = c.createGain();
+  whooshG.gain.setValueAtTime(0, t);
+  whooshG.gain.linearRampToValueAtTime(0.15, t + 0.08);
+  whooshG.gain.setValueAtTime(0.15, t + 0.25);
+  whooshG.gain.exponentialRampToValueAtTime(0.001, t + 0.8);
+  noise.connect(whooshBP).connect(whooshG).connect(out);
+  noise.start(t);
+  noise.stop(t + 0.9);
+
+  // 2. Turbo whistle — rising sine tone
+  const whistle = c.createOscillator();
+  whistle.type = 'sine';
+  whistle.frequency.setValueAtTime(600, t);
+  whistle.frequency.exponentialRampToValueAtTime(2200, t + 0.4);
+  whistle.frequency.exponentialRampToValueAtTime(1800, t + 1.0);
+  const whistleG = c.createGain();
+  whistleG.gain.setValueAtTime(0, t);
+  whistleG.gain.linearRampToValueAtTime(0.08, t + 0.1);
+  whistleG.gain.setValueAtTime(0.08, t + 0.4);
+  whistleG.gain.exponentialRampToValueAtTime(0.001, t + 1.2);
+  whistle.connect(whistleG).connect(out);
+  whistle.start(t);
+  whistle.stop(t + 1.3);
+
+  // 3. Power thump — deep bass hit
+  const thump = c.createOscillator();
+  thump.type = 'sine';
+  thump.frequency.setValueAtTime(80, t);
+  thump.frequency.exponentialRampToValueAtTime(30, t + 0.2);
+  const thumpG = c.createGain();
+  thumpG.gain.setValueAtTime(0.20, t);
+  thumpG.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
+  thump.connect(thumpG).connect(out);
+  thump.start(t);
+  thump.stop(t + 0.35);
+
+  // 4. Turbo flutter — rapid pulsing at tail end
+  const flutter = c.createOscillator();
+  flutter.type = 'sawtooth';
+  flutter.frequency.setValueAtTime(1200, t + 0.3);
+  flutter.frequency.exponentialRampToValueAtTime(400, t + 0.8);
+  const flutterG = c.createGain();
+  flutterG.gain.setValueAtTime(0, t + 0.3);
+  flutterG.gain.linearRampToValueAtTime(0.05, t + 0.35);
+  flutterG.gain.exponentialRampToValueAtTime(0.001, t + 0.9);
+  const flutterLFO = c.createOscillator();
+  flutterLFO.frequency.value = 25;
+  const lfoGain = c.createGain();
+  lfoGain.gain.value = 0.05;
+  flutterLFO.connect(lfoGain).connect(flutterG.gain);
+  flutter.connect(flutterG).connect(out);
+  flutterLFO.start(t + 0.3);
+  flutterLFO.stop(t + 1.0);
+  flutter.start(t + 0.3);
+  flutter.stop(t + 1.0);
+}
+
 /** Haptic feedback (mobile vibration) */
 export function haptic(ms = 15) {
   if (navigator.vibrate) navigator.vibrate(ms);

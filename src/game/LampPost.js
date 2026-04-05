@@ -361,11 +361,12 @@ export class LampPost {
       }
     }
 
-    // Only enable nearest PointLights for performance
-    const sorted = [...this.posts].sort(
-      (a, b) => Math.abs(a.group.position.z) - Math.abs(b.group.position.z));
-    for (let i = 0; i < sorted.length; i++) {
-      sorted[i].light.visible = i < MAX_ACTIVE_LIGHTS;
+    // Only enable nearest PointLights for performance (no alloc/sort)
+    let activeCount = 0;
+    for (const p of this.posts) {
+      const near = Math.abs(p.group.position.z) < 60;
+      p.light.visible = near && activeCount < MAX_ACTIVE_LIGHTS;
+      if (p.light.visible) activeCount++;
     }
   }
 

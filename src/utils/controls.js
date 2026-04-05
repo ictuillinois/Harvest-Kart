@@ -1,8 +1,10 @@
-export function setupControls(onSwitch) {
+export function setupControls(onSwitch, onRelease) {
   let switching = false;
   const cooldown = 220;
   let _pedalDown = false;
   let _locked = false;
+  let _leftHeld = false;
+  let _rightHeld = false;
 
   function triggerSwitch(direction) {
     if (_locked) return;
@@ -151,18 +153,36 @@ export function setupControls(onSwitch) {
   leftBtn.addEventListener('pointerdown', (e) => {
     e.preventDefault(); e.stopPropagation();
     leftBtn.classList.add('active');
+    _leftHeld = true;
     triggerSwitch('left');
   });
-  leftBtn.addEventListener('pointerup', () => leftBtn.classList.remove('active'));
-  leftBtn.addEventListener('pointerleave', () => leftBtn.classList.remove('active'));
+  leftBtn.addEventListener('pointerup', () => {
+    leftBtn.classList.remove('active');
+    _leftHeld = false;
+    if (onRelease) onRelease();
+  });
+  leftBtn.addEventListener('pointerleave', () => {
+    leftBtn.classList.remove('active');
+    _leftHeld = false;
+    if (onRelease) onRelease();
+  });
 
   rightBtn.addEventListener('pointerdown', (e) => {
     e.preventDefault(); e.stopPropagation();
     rightBtn.classList.add('active');
+    _rightHeld = true;
     triggerSwitch('right');
   });
-  rightBtn.addEventListener('pointerup', () => rightBtn.classList.remove('active'));
-  rightBtn.addEventListener('pointerleave', () => rightBtn.classList.remove('active'));
+  rightBtn.addEventListener('pointerup', () => {
+    rightBtn.classList.remove('active');
+    _rightHeld = false;
+    if (onRelease) onRelease();
+  });
+  rightBtn.addEventListener('pointerleave', () => {
+    rightBtn.classList.remove('active');
+    _rightHeld = false;
+    if (onRelease) onRelease();
+  });
 
   // =================================================================
   //  Pointer events — pedal (hold to accelerate)
@@ -202,10 +222,12 @@ export function setupControls(onSwitch) {
 
     if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
       leftBtn.classList.add('active');
+      _leftHeld = true;
       triggerSwitch('left');
     }
     if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
       rightBtn.classList.add('active');
+      _rightHeld = true;
       triggerSwitch('right');
     }
     if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W' || e.key === ' ') {
@@ -219,9 +241,13 @@ export function setupControls(onSwitch) {
 
     if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
       leftBtn.classList.remove('active');
+      _leftHeld = false;
+      if (onRelease) onRelease();
     }
     if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
       rightBtn.classList.remove('active');
+      _rightHeld = false;
+      if (onRelease) onRelease();
     }
     if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W' || e.key === ' ') {
       if (!keysDown.has('ArrowUp') && !keysDown.has('w') && !keysDown.has('W') && !keysDown.has(' ')) {
@@ -271,6 +297,8 @@ export function setupControls(onSwitch) {
     },
     hideButtons() { container.style.display = 'none'; },
     isPedalDown() { return !_locked && _pedalDown; },
+    isLeftHeld()  { return !_locked && _leftHeld; },
+    isRightHeld() { return !_locked && _rightHeld; },
     lock()   { _locked = true; },
     unlock() { _locked = false; },
   };

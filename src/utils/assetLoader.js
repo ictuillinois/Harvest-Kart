@@ -1,9 +1,16 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 import { asset } from './base.js';
 
-const loader = new GLTFLoader();
+const gltfLoader = new GLTFLoader();
+const fbxLoader = new FBXLoader();
+const textureLoader = new THREE.TextureLoader();
 const cache = new Map();
+
+function isFBX(url) {
+  return /\.fbx$/i.test(url);
+}
 
 /**
  * Normalize a loaded model to a target height using its bounding box.
@@ -28,8 +35,26 @@ export async function preloadAll(urls) {
     urls.map(async (url) => {
       if (!cache.has(url)) {
         try {
-          const gltf = await loader.loadAsync(url);
-          cache.set(url, gltf);
+          if (isFBX(url)) {
+            const group = await fbxLoader.loadAsync(url);
+            // Apply sidecar texture if registered
+            const texUrl = FBX_TEXTURES[url];
+            if (texUrl) {
+              const tex = await textureLoader.loadAsync(texUrl);
+              tex.colorSpace = THREE.SRGBColorSpace;
+              group.traverse(child => {
+                if (child.isMesh) {
+                  const mats = Array.isArray(child.material) ? child.material : [child.material];
+                  mats.forEach(m => { if (!m.map) m.map = tex; });
+                }
+              });
+            }
+            // Normalize to same shape as GLTF ({ scene: ... }) so getModel() works unchanged
+            cache.set(url, { scene: group });
+          } else {
+            const gltf = await gltfLoader.loadAsync(url);
+            cache.set(url, gltf);
+          }
         } catch (e) {
           console.warn(`Failed to load model: ${url}`, e);
         }
@@ -147,12 +172,17 @@ export const MODEL_URLS = {
   peruPlanter: asset('models/scenery/peru/planter.glb'),
   peruTreeLarge: asset('models/scenery/peru/tree-large.glb'),
   peruTreeSmall: asset('models/scenery/peru/tree-small.glb'),
-  // Player vehicles (Kenney Car Kit — CC0)
-  vehicleEthan: asset('models/vehicles/ethan.glb'),
-  vehicleKate: asset('models/vehicles/kate.glb'),
-  vehicleDestiny: asset('models/vehicles/destiny.glb'),
-  vehicleLuke: asset('models/vehicles/luke.glb'),
+  // Player vehicles (FBX)
+  vehicleEthan: asset('models/vehicles/fbx/ethan.FBX'),
+  vehicleKate: asset('models/vehicles/fbx/kate.fbx'),
+  vehicleDestiny: asset('models/vehicles/fbx/destiny.fbx'),
+  vehicleLuke: asset('models/vehicles/fbx/luke.fbx'),
 };
+
+// Sidecar textures for FBX models that don't embed their textures
+const FBX_TEXTURES = {};
+FBX_TEXTURES[MODEL_URLS.vehicleDestiny] = asset('models/vehicles/fbx/destiny.png');
+FBX_TEXTURES[MODEL_URLS.vehicleLuke] = asset('models/vehicles/fbx/luke.png');
 
 // Target heights in world units (auto-applied by getModel)
 export const MODEL_HEIGHTS = {};
@@ -229,8 +259,8 @@ MODEL_HEIGHTS[MODEL_URLS.peruPlanter] = 0.6;
 MODEL_HEIGHTS[MODEL_URLS.peruTreeLarge] = 5;
 MODEL_HEIGHTS[MODEL_URLS.peruTreeSmall] = 3;
 
-// Player vehicles — heights tuned relative to kart (road-level camera, ~1.2h reference)
-MODEL_HEIGHTS[MODEL_URLS.vehicleEthan] = 1.8;     // Sports GT coupe
-MODEL_HEIGHTS[MODEL_URLS.vehicleKate] = 1.6;       // Compact hatchback
-MODEL_HEIGHTS[MODEL_URLS.vehicleDestiny] = 1.2;    // Formula — low-slung
-MODEL_HEIGHTS[MODEL_URLS.vehicleLuke] = 2.0;       // Rally SUV — tallest
+// Player vehicles (FBX) — heights tuned relative to road-level camera
+MODEL_HEIGHTS[MODEL_URLS.vehicleEthan] = 1.8;     // Sonata Pantera
+MODEL_HEIGHTS[MODEL_URLS.vehicleKate] = 1.44;      // Compact (90% of 1.6)
+MODEL_HEIGHTS[MODEL_URLS.vehicleDestiny] = 1.87;   // AMG GT (+10%)
+MODEL_HEIGHTS[MODEL_URLS.vehicleLuke] = 1.62;      // SUV (90% of 1.8)

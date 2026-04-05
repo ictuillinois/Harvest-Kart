@@ -19,13 +19,14 @@ import { DriverSelect } from './ui/DriverSelect.js';
 import { MapSelect } from './ui/MapSelect.js';
 import { HUD } from './ui/HUD.js';
 import { WinScreen } from './ui/WinScreen.js';
+import { RewardScreen } from './ui/RewardScreen.js';
 
 import { RaceStartSequence } from './game/RaceStartSequence.js';
 import { CompletionSequence } from './game/CompletionSequence.js';
 import { AMBIENT_MULTIPLIERS } from './game/LampPost.js';
 
 import { setupControls } from './utils/controls.js';
-import { playPlateHit, playLampLit, playComboBreak, playWinFanfare, playLaneSwitch, haptic, playMusic, stopMusic, startEngineIdle, stopEngine, updateEngine, playGearShift, playCountdownTone, playCountdownRev, playFinalPowerOn, playStartPress, playDriverSelect, playMapSelect } from './utils/audio.js';
+import { playPlateHit, playLampLit, playComboBreak, playWinFanfare, playLaneSwitch, haptic, playMusic, stopMusic, startEngineIdle, stopEngine, updateEngine, playGearShift, playCountdownTone, playCountdownRev, playFinalPowerOn, playStartPress, playDriverSelect, playMapSelect, playTurboBoost } from './utils/audio.js';
 import { gameRoot } from './utils/base.js';
 import {
   MIN_SPEED_MPH, MAX_SPEED_MPH, STARTING_SPEED_MPH, SCROLL_FACTOR,
@@ -146,6 +147,14 @@ let currentGear = 0;
 let shiftCooldown = 0;
 let currentRPM = RPM_IDLE;
 
+let _lastRpmQ = 0; // debounce engine audio updates
+
+// ── Turbo boost state ──
+let turboActive = false;
+let turboTimer = 0;
+const TURBO_BOOST_MPH = 10;
+const TURBO_DURATION = 3.0;
+
 // Active per-driver physics (set when driver is selected)
 let activePhysics = {
   topSpeed: MAX_SPEED_MPH,
@@ -250,8 +259,8 @@ const driverSelect = new DriverSelect(
     playDriverSelect();
     gameState.selectedDriver = driverIndex;
     activePhysics = getDriverPhysics(driverIndex);
-    kart.setDriver(driverIndex);
     kart.laneSwitchMs = activePhysics.laneSwitchMs;
+    // Defer kart.setDriver() to map select → playing transition (behind loading screen)
     gameState.transition('mapSelect');
   },
   () => gameState.transition('menu')
@@ -260,10 +269,32 @@ const driverSelect = new DriverSelect(
 // Loading overlay — masks synchronous environment.build() with a smooth fade-to-black
 const loadingOverlay = document.createElement('div');
 Object.assign(loadingOverlay.style, {
-  position: 'fixed', inset: '0', zIndex: '150',
+  position: 'fixed', inset: '0', zIndex: '200',
   background: '#000', opacity: '0', pointerEvents: 'none',
-  transition: 'opacity 0.45s ease', display: 'none',
+  transition: 'opacity 0.5s ease', display: 'none',
 });
+// Loading hint text (pulsing, visible during scene build)
+const loadingHint = document.createElement('div');
+Object.assign(loadingHint.style, {
+  position: 'absolute', bottom: '15%', left: '50%',
+  transform: 'translateX(-50%)',
+  fontFamily: "'Orbitron', sans-serif",
+  fontSize: 'clamp(10px, 1.2vw, 16px)',
+  fontWeight: '500',
+  color: 'rgba(255,255,255,0.35)',
+  letterSpacing: '4px',
+  animation: 'loadPulse 1.5s ease-in-out infinite',
+});
+loadingHint.textContent = 'LOADING';
+loadingHint.style.display = 'none';
+loadingOverlay.appendChild(loadingHint);
+
+// Inject the pulse animation
+const loadStyle = document.createElement('style');
+loadStyle.textContent = `@keyframes loadPulse {
+  0%,100% { opacity: 0.3; } 50% { opacity: 0.7; }
+}`;
+document.head.appendChild(loadStyle);
 document.body.appendChild(loadingOverlay);
 
 function fadeToBlack() {
@@ -271,20 +302,19 @@ function fadeToBlack() {
     loadingOverlay.style.display = 'block';
     loadingOverlay.style.opacity = '0';
     loadingOverlay.style.pointerEvents = 'all';
+    loadingHint.style.display = 'none';
     void loadingOverlay.offsetWidth;
     loadingOverlay.style.opacity = '1';
-    setTimeout(resolve, 480); // wait for fade to fully complete
+    setTimeout(() => {
+      loadingHint.style.display = 'block';
+      resolve();
+    }, 520);
   });
 }
 
 function clearLoadingOverlay() {
-  // RaceStartSequence has its own black overlay — just hide ours instantly
-  loadingOverlay.style.transition = 'none';
-  loadingOverlay.style.opacity = '0';
-  loadingOverlay.style.display = 'none';
-  loadingOverlay.style.pointerEvents = 'none';
-  void loadingOverlay.offsetWidth;
-  loadingOverlay.style.transition = 'opacity 0.45s ease';
+  loadingHint.style.display = 'none';
+  // Don't hide overlay — RaceStartSequence reuses it for seamless fade-out
 }
 
 const mapSelect = new MapSelect(
@@ -295,8 +325,15 @@ const mapSelect = new MapSelect(
     // Fade to black FIRST so the build happens behind a black screen
     await fadeToBlack();
 
+    // Start track music immediately — user hears it while scene loads
+    const musicKey = MAP_MUSIC_KEYS[mapIndex] || 'brazil';
+    playMusic(musicKey);
+
     // Yield to browser so the black frame paints before heavy build work
     await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+
+    // Build kart model now (deferred from driver select for instant UI response)
+    kart.setDriver(gameState.selectedDriver);
 
     await environment.build(mapIndex);
 
@@ -313,27 +350,31 @@ const mapSelect = new MapSelect(
     colorGradePass.uniforms.contrast.value = cg.contrast;
     colorGradePass.uniforms.brightness.value = cg.brightness;
 
-    // Transition to playing — RaceStartSequence creates its own black overlay
-    gameState.transition('playing');
-
-    // Remove our loading overlay once RaceStartSequence is in control
+    // Hide loading hint before transition
     clearLoadingOverlay();
+
+    // Transition to playing — RaceStartSequence reuses loadingOverlay
+    gameState.transition('playing');
   },
   () => gameState.transition('driverSelect')
 );
 
 const hud = new HUD(() => goHome(), () => togglePause());
 
-const winScreen = new WinScreen(() => goHome());
+const rewardScreen = new RewardScreen(() => {
+  rewardScreen.hide();
+  goHome();
+});
+const winScreen = new WinScreen(() => {
+  winScreen.hide();
+  rewardScreen.show();
+});
 
 // --- Controls ---
-const controls = setupControls((direction) => {
-  if (gameState.state !== 'playing') return;
-  kart.switchLane(direction);
-  gameState.currentLane = kart.currentLane;
-  playLaneSwitch();
-  haptic(15);
-});
+const controls = setupControls(
+  () => {},  // No instant lane switch — continuous movement only
+  () => {},  // No snap on release — player has full control
+);
 
 // Map index → music key
 const MAP_MUSIC_KEYS = ['brazil', 'usa', 'peru'];
@@ -451,6 +492,7 @@ gameState.on('stateChange', ({ from, to }) => {
   mapSelect.hide();
   hud.hide();
   winScreen.hide();
+  rewardScreen.hide();
   controls.hideButtons();
 
   switch (to) {
@@ -493,14 +535,13 @@ gameState.on('stateChange', ({ from, to }) => {
         // Start line decoration
         buildStartLine();
 
-        const musicKey = MAP_MUSIC_KEYS[gameState.selectedMap] || 'brazil';
-
         raceStart = new RaceStartSequence({
           camera,
           controls,
           hud,
           normalCam: { y: CAMERA_OFFSET.y, z: CAMERA_OFFSET.z },
-          playMusic: () => playMusic(musicKey),
+          existingOverlay: loadingOverlay,  // reuse — seamless transition
+          playMusic: () => {},             // music already started during loading
           playCountdownTone,
           playCountdownRev,
           startEngine: startEngineIdle,
@@ -510,6 +551,8 @@ gameState.on('stateChange', ({ from, to }) => {
             hud.updateSpeed(STARTING_SPEED_MPH);
             currentGear = 1; // gear 2 (0-indexed)
             shiftCooldown = 0;
+            turboActive = false;
+            turboTimer = 0;
             const { rpm } = computeGearAndRPM(STARTING_SPEED_MPH);
             currentRPM = rpm;
             hud.updateTacho(rpm, 2);
@@ -526,6 +569,7 @@ gameState.on('stateChange', ({ from, to }) => {
       break;
     case 'completing':
       // Cinematic ending — HUD stays visible, controls locked
+      hud.hideHurry();
       hud.show();
       controls.hideButtons();
       completionSeq = new CompletionSequence({
@@ -629,18 +673,28 @@ gameState.on('lampLit', ({ lampPostsLit }) => {
       }
 
       // Toast + urgency at tier 3
-      const labels = ['', 'SECTOR 1 POWERED', 'SECTOR 2 POWERED', 'Almost there. HURRY UP!'];
-      hud.showToast(labels[tier]);
+      const labels = ['', 'SECTOR 1 POWERED', 'SECTOR 2 POWERED'];
+      if (tier <= 2) {
+        hud.showToast(labels[tier]);
+      }
 
-      // Tier 3: make timer red for urgency
+      // Tier 3: persistent HURRY UP! + timer goes red + vibration
       if (tier === 3) {
-        const timerEl = document.getElementById('hud-time');
-        if (timerEl) timerEl.style.color = '#ff4444';
+        hud.showHurry();
       }
 
       // Increase difficulty
       const newRate = PLATE_SPAWN_INTERVAL - lampPostsLit * 0.08;
       plates.setSpawnRate(Math.max(newRate, 0.5));
+
+      // ── TURBO BOOST — instant +10 MPH for 3 seconds ──
+      turboActive = true;
+      turboTimer = TURBO_DURATION;
+      // Speed ramps up gradually in the game loop (5 MPH/sec)
+      kart.startTurboFlame();
+      playTurboBoost();
+      haptic(50);
+      hud.showTurboToast('⚡ TURBO BOOST ⚡');
     }
   }, 500);
 });
@@ -687,15 +741,40 @@ function animate() {
     if (!raceStart) {
       gameState.elapsed += delta;
 
-      // Per-driver gear-aware acceleration
-      if (controls.isPedalDown()) {
+      // Per-driver gear-aware acceleration (turbo-aware top speed)
+      const effectiveTopSpeed = turboActive
+        ? activePhysics.topSpeed + TURBO_BOOST_MPH
+        : activePhysics.topSpeed;
+
+      if (turboActive) {
+        // During turbo: ramp speed up at 5 MPH/sec toward boosted ceiling
+        gameState.speed = Math.min(gameState.speed + 5 * delta, effectiveTopSpeed);
+      } else if (gameState.speed > activePhysics.topSpeed) {
+        // Post-turbo bleed-down: don't accelerate, just let bleed handle it
+      } else if (controls.isPedalDown()) {
         if (shiftCooldown <= 0) {
-          gameState.speed = Math.min(gameState.speed + activePhysics.gearAccel[currentGear] * delta, activePhysics.topSpeed);
+          gameState.speed = Math.min(gameState.speed + activePhysics.gearAccel[currentGear] * delta, effectiveTopSpeed);
         }
       } else {
         gameState.speed = Math.max(gameState.speed - activePhysics.decelRate * delta, activePhysics.coastFloor);
       }
       shiftCooldown = Math.max(0, shiftCooldown - delta);
+
+      // Turbo timer countdown
+      if (turboActive) {
+        turboTimer -= delta;
+        if (turboTimer <= 0) {
+          turboActive = false;
+          kart.stopTurboFlame();
+        }
+      }
+      // After turbo ends, gradually bleed speed back to normal top speed at 2 MPH/sec
+      if (!turboActive && gameState.speed > activePhysics.topSpeed) {
+        gameState.speed = Math.max(
+          gameState.speed - 3 * delta,
+          activePhysics.topSpeed,
+        );
+      }
 
       // Gear shift detection
       const { gear: newGear, rpm } = computeGearAndRPM(gameState.speed);
@@ -712,10 +791,24 @@ function animate() {
 
     const speed = gameState.speed;
     const scrollSpeed = speed * SCROLL_FACTOR;
-    updateEngine(currentRPM);
+
+    // Debounced updates — skip when values haven't changed meaningfully
+    const rpmQ = Math.round(currentRPM / 25) * 25;
+    if (rpmQ !== _lastRpmQ) { updateEngine(currentRPM); _lastRpmQ = rpmQ; }
     hud.updateSpeed(speed);
     hud.updateTacho(currentRPM, currentGear + 1);
     hud.updateTime(gameState.elapsed);
+
+    // Continuous lateral movement when arrows held
+    if (controls.isLeftHeld()) {
+      kart.slideLateral(delta, 'left');
+      gameState.currentLane = kart.currentLane;
+    } else if (controls.isRightHeld()) {
+      kart.slideLateral(delta, 'right');
+      gameState.currentLane = kart.currentLane;
+    } else {
+      kart.recoverTilt(delta);
+    }
 
     road.update(delta, scrollSpeed);
     kart.update(delta, scrollSpeed, controls.isPedalDown());
@@ -723,7 +816,7 @@ function animate() {
     lampPosts.update(delta, scrollSpeed);
     updateStartLine(delta, scrollSpeed);
 
-    if (plates.checkCollision(gameState.currentLane)) {
+    if (plates.checkCollision(kart.group.position.x)) {
       gameState.hitPlate();
     }
     if (plates.checkMisses()) {
@@ -736,9 +829,13 @@ function animate() {
 
     // Dynamic FOV: widens with speed (relative to this driver's top speed)
     const speedFraction = (speed - activePhysics.coastFloor) / (activePhysics.topSpeed - activePhysics.coastFloor);
-    const targetFOV = CAMERA_FOV_MIN + speedFraction * (CAMERA_FOV_MAX - CAMERA_FOV_MIN);
-    camera.fov += (targetFOV - camera.fov) * 0.05;
-    camera.updateProjectionMatrix();
+    const turboFOVBoost = turboActive ? 5 : 0;
+    const targetFOV = CAMERA_FOV_MIN + speedFraction * (CAMERA_FOV_MAX - CAMERA_FOV_MIN) + turboFOVBoost;
+    const fovDelta = targetFOV - camera.fov;
+    if (Math.abs(fovDelta) > 0.01) {
+      camera.fov += fovDelta * 0.05;
+      camera.updateProjectionMatrix();
+    }
 
     // Camera shake at high speed
     if (speedFraction > CAMERA_SHAKE_THRESHOLD) {

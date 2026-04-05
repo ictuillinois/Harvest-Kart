@@ -3,6 +3,7 @@ import { DRIVER_TYPES } from '../utils/constants.js';
 import { gameRoot } from '../utils/base.js';
 import { fadeIn, fadeOut } from '../utils/transition.js';
 import { getModel, MODEL_URLS } from '../utils/assetLoader.js';
+import { Kart } from '../game/Kart.js';
 
 // Driver vehicleType → model URL
 const VEHICLE_MODELS = {
@@ -10,6 +11,72 @@ const VEHICLE_MODELS = {
   compact:  MODEL_URLS.vehicleKate,
   formula:  MODEL_URLS.vehicleDestiny,
   rally:    MODEL_URLS.vehicleLuke,
+};
+
+// Per-vehicle material finish profiles (mirrors Kart.js)
+const MATERIAL_PROFILES = {
+  candy:     { metalness: 0.25, roughness: 0.30, emissiveIntensity: 0.04, envMapIntensity: 1.0 },
+  raceMetal: { metalness: 0.55, roughness: 0.15, emissiveIntensity: 0.22, envMapIntensity: 1.8 },
+  matte:     { metalness: 0.15, roughness: 0.45, emissiveIntensity: 0.03, envMapIntensity: 0.6 },
+  rallySatin:{ metalness: 0.35, roughness: 0.22, emissiveIntensity: 0.20, envMapIntensity: 1.6 },
+};
+
+// Per-vehicle FBX mesh config (mirrors Kart.js)
+const VEHICLE_MESH_CONFIG = {
+  sportsGT: {
+    bodyNames: ['sonata_pantera_grey'],
+    wheelNames: [],
+    hiddenNames: [],
+    hasTexture: true,
+    glassTint: 0x0e1a2a,
+    sportsLights: true,
+    headlightYFrac: 0.30,
+    headlightXFrac: 0.52,
+    taillightYFrac: 0.30,
+    taillightXFrac: 0.42,
+  },
+  compact: {
+    bodyNames: ['body'],
+    wheelNames: ['front_wheels001', 'back_wheels001'],
+    hiddenNames: [],
+    hasTexture: false,
+    paintIndices: [0, 3],
+    glassIndices: [1, 4],
+    chromeIndices: [2],
+    glassTint: 0x1a1228,
+    materialProfile: 'candy',
+    compactLights: true,
+    headlightYFrac: 0.40,
+    headlightXFrac: 0.50,
+    taillightYFrac: 0.38,
+    taillightXFrac: 0.38,
+  },
+  formula: {
+    bodyNames: ['amg_gt_body'],
+    wheelNames: ['lfwheel001', 'rrwheel', 'rfwheel001', 'lrwheel002'],
+    hiddenNames: [],
+    hasTexture: true,
+    paintIndices: [0],
+    accentIndices: [1],
+    glassIndices: [2],
+    glassTint: 0x080810,
+    materialProfile: 'raceMetal',
+  },
+  rally: {
+    bodyNames: ['kuzov'],
+    wheelNames: ['kolesofr', 'kolesobr', 'kolesobl', 'kolesofl'],
+    hubNames: ['stupizafr', 'stupizafl', 'stupizabl', 'stupizabr'],
+    glassNames: ['steklo_digatelya', 'stekla_perednih_far'],
+    brakeLightNames: ['stop_signali'],
+    headlightMeshNames: ['front_fari'],
+    chromeNames: ['zerkalo'],
+    hiddenNames: ['hullcollider'],
+    hasTexture: true,
+    glassTint: 0x060a08,
+    materialProfile: 'rallySatin',
+    emissiveOnlyTint: true,
+    rallyLights: true,
+  },
 };
 
 function starRow(label, filled, total = 5) {
@@ -311,8 +378,8 @@ export class DriverSelect {
       scene.add(hemi);
 
       // Camera: 3/4 front showroom angle
-      const camera = new THREE.PerspectiveCamera(30, previewW / previewH, 0.1, 100);
-      camera.position.set(4.5, 2.5, 4.5);
+      const camera = new THREE.PerspectiveCamera(34, previewW / previewH, 0.1, 100);
+      camera.position.set(6.0, 3.0, 6.0);
       camera.lookAt(0, 0.3, 0);
 
       // Load vehicle model
@@ -322,25 +389,162 @@ export class DriverSelect {
         model = getModel(modelUrl);
         if (model && model.children.length > 0) {
           const dark = this._isDark(driver.carBody);
+          const meshConfig = VEHICLE_MESH_CONFIG[driver.vehicleType] || {};
+          const bodySet = new Set((meshConfig.bodyNames || []).map(n => n.toLowerCase()));
+          const wheelSet = new Set((meshConfig.wheelNames || []).map(n => n.toLowerCase()));
+          const hideSet = new Set((meshConfig.hiddenNames || []).map(n => n.toLowerCase()));
+          const glassNameSet = new Set((meshConfig.glassNames || []).map(n => n.toLowerCase()));
+          const brakeSet = new Set((meshConfig.brakeLightNames || []).map(n => n.toLowerCase()));
+          const hlMeshSet = new Set((meshConfig.headlightMeshNames || []).map(n => n.toLowerCase()));
+          const chromeNameSet = new Set((meshConfig.chromeNames || []).map(n => n.toLowerCase()));
+          const glassIdxSet = new Set(meshConfig.glassIndices || []);
+          const chromeIdxSet = new Set(meshConfig.chromeIndices || []);
+
+          const upgradeMat = (mat) => {
+            if (mat.type === 'MeshPhongMaterial') {
+              const std = new THREE.MeshStandardMaterial();
+              std.color.copy(mat.color);
+              if (mat.map) { std.map = mat.map; std.map.colorSpace = THREE.SRGBColorSpace; }
+              std.metalness = 0.3;
+              std.roughness = 0.4;
+              return std;
+            }
+            return mat.clone();
+          };
+          const makeGlass = (tint) => new THREE.MeshStandardMaterial({
+            color: tint || meshConfig.glassTint || 0x112233,
+            metalness: 0.85, roughness: 0.08,
+            transparent: true, opacity: 0.70, envMapIntensity: 2.0,
+          });
+          const makeChrome = () => new THREE.MeshStandardMaterial({
+            color: 0xdddddd, metalness: 0.95, roughness: 0.08, envMapIntensity: 2.0,
+          });
+          const applyPaint = (std) => {
+            if (dark) {
+              const phys = new THREE.MeshPhysicalMaterial();
+              if (std.map) { phys.map = std.map; phys.map.colorSpace = THREE.SRGBColorSpace; }
+              phys.color.set(meshConfig.hasTexture ? 0x787888 : 0x444454);
+              phys.metalness = 0.60;
+              phys.roughness = 0.10;
+              phys.clearcoat = 1.0;
+              phys.clearcoatRoughness = 0.02;
+              phys.emissive = new THREE.Color(0x1e1e30);
+              phys.emissiveIntensity = 0.55;
+              phys.envMapIntensity = 3.2;
+              phys.reflectivity = 0.95;
+              return phys;
+            } else if (meshConfig.emissiveOnlyTint) {
+              const phys = new THREE.MeshPhysicalMaterial();
+              if (std.map) { phys.map = std.map; phys.map.colorSpace = THREE.SRGBColorSpace; }
+              phys.emissive = new THREE.Color(driver.carBody);
+              if (meshConfig.materialProfile === 'rallySatin') {
+                phys.color.set(0xc8e0cc);
+                phys.metalness = 0.55;
+                phys.roughness = 0.12;
+                phys.clearcoat = 0.6;
+                phys.clearcoatRoughness = 0.10;
+                phys.emissiveIntensity = 0.32;
+                phys.envMapIntensity = 2.2;
+              } else {
+                phys.color.set(0xc8c8e0);
+                phys.metalness = 0.72;
+                phys.roughness = 0.08;
+                phys.clearcoat = 1.0;
+                phys.clearcoatRoughness = 0.03;
+                phys.emissiveIntensity = 0.28;
+                phys.envMapIntensity = 2.8;
+              }
+              return phys;
+            } else {
+              const profile = MATERIAL_PROFILES[meshConfig.materialProfile];
+              std.color.set(driver.carBody);
+              std.emissive = new THREE.Color(driver.carBody);
+              if (profile) {
+                std.metalness = profile.metalness;
+                std.roughness = profile.roughness;
+                std.emissiveIntensity = profile.emissiveIntensity;
+                std.envMapIntensity = profile.envMapIntensity;
+              } else {
+                std.metalness = meshConfig.hasTexture ? 0.4 : 0.35;
+                std.roughness = meshConfig.hasTexture ? 0.22 : 0.25;
+                std.emissiveIntensity = meshConfig.hasTexture ? 0.06 : 0.08;
+                std.envMapIntensity = meshConfig.hasTexture ? 1.4 : 1.0;
+              }
+              return std;
+            }
+          };
 
           model.traverse((child) => {
             if (!child.isMesh) return;
             const name = (child.name || '').toLowerCase();
-            if (name === 'body' || name === 'spoiler') {
-              child.material = child.material.clone();
-              child.material.color.set(dark ? 0x2a2a30 : driver.carBody);
-              child.material.metalness = dark ? 0.7 : 0.35;
-              child.material.roughness = dark ? 0.08 : 0.25;
-              child.material.emissive = new THREE.Color(dark ? 0x0a0a10 : driver.carBody);
-              child.material.emissiveIntensity = dark ? 0.15 : 0.08;
-              child.material.envMapIntensity = dark ? 1.8 : 1.0;
+
+            if (hideSet.has(name)) { child.visible = false; return; }
+            if (glassNameSet.has(name)) { child.material = makeGlass(); return; }
+            if (chromeNameSet.has(name)) { child.material = makeChrome(); return; }
+            if (brakeSet.has(name)) {
+              child.material = new THREE.MeshStandardMaterial({
+                color: 0xff1111, emissive: 0xff0000, emissiveIntensity: 1.2,
+                metalness: 0.3, roughness: 0.15,
+              }); return;
             }
-            if (name.includes('wheel')) {
-              child.material = child.material.clone();
-              child.material.color.set(0x2a2a2a);
-              child.material.roughness = 0.7;
-              child.material.metalness = 0.15;
-              child.material.envMapIntensity = 0.3;
+            if (hlMeshSet.has(name)) {
+              child.material = new THREE.MeshStandardMaterial({
+                color: 0xffffff, emissive: 0xffffdd, emissiveIntensity: 1.8,
+                metalness: 0.3, roughness: 0.05,
+              }); return;
+            }
+
+            const accentIdxSet = new Set(meshConfig.accentIndices || []);
+
+            if (bodySet.has(name)) {
+              if (Array.isArray(child.material)) {
+                child.material = child.material.map((m, idx) => {
+                  if (glassIdxSet.has(idx)) return makeGlass();
+                  if (chromeIdxSet.has(idx)) return makeChrome();
+                  if (accentIdxSet.has(idx)) {
+                    const std = upgradeMat(m);
+                    std.color.set(dark ? 0x444450 : driver.carAccent);
+                    std.metalness = dark ? 0.6 : 0.3;
+                    std.roughness = dark ? 0.12 : 0.3;
+                    std.emissive = new THREE.Color(dark ? 0x060608 : driver.carAccent);
+                    std.emissiveIntensity = dark ? 0.1 : 0.05;
+                    std.envMapIntensity = dark ? 1.5 : 1.0;
+                    return std;
+                  }
+                  if (meshConfig.paintIndices && !meshConfig.paintIndices.includes(idx)) {
+                    const std = upgradeMat(m); std.metalness = 0.4; std.roughness = 0.3; return std;
+                  }
+                  const std = upgradeMat(m); return applyPaint(std);
+                });
+              } else {
+                child.material = applyPaint(upgradeMat(child.material));
+              }
+              return;
+            }
+
+            if (wheelSet.has(name)) {
+              if (Array.isArray(child.material)) {
+                child.material = child.material.map(m => {
+                  const std = upgradeMat(m);
+                  std.color.set(0x2a2a2a); std.roughness = 0.7;
+                  std.metalness = 0.15; std.envMapIntensity = 0.3;
+                  return std;
+                });
+              } else {
+                child.material = upgradeMat(child.material);
+                child.material.color.set(0x2a2a2a);
+                child.material.roughness = 0.7;
+                child.material.metalness = 0.15;
+                child.material.envMapIntensity = 0.3;
+              }
+              return;
+            }
+
+            // Unmatched meshes — upgrade but don't tint
+            if (Array.isArray(child.material)) {
+              child.material = child.material.map(m => upgradeMat(m));
+            } else {
+              child.material = upgradeMat(child.material);
             }
           });
 
@@ -354,16 +558,49 @@ export class DriverSelect {
             rimLight.intensity = 2.0;
           }
 
-          // Wrap in pivot group for clean rotation + centering
+          // ── Add light geometry for preview ──
+          if (meshConfig.compactLights || meshConfig.sportsLights || meshConfig.rallyLights) {
+            const lightBbox = new THREE.Box3().setFromObject(model);
+            const lightSize = lightBbox.getSize(new THREE.Vector3());
+            const lHalfW = lightSize.x / 2;
+            const lHalfL = lightSize.z / 2;
+            const lHeight = lightSize.y;
+            const lTlY = lHeight * (meshConfig.taillightYFrac || 0.35);
+            const lTlZ = lHalfL - 0.02;
+
+            const lHlY = lHeight * (meshConfig.headlightYFrac || 0.35);
+            const lHlZ = -(lHalfL - 0.02);
+            const lHlXFrac = meshConfig.headlightXFrac || 0.55;
+            const lTlXFrac = meshConfig.taillightXFrac || 0.4;
+
+            if (meshConfig.compactLights) {
+              Kart._addCompactHeadlights(model, lHalfW, lHlY, lHlZ, lHlXFrac, lHeight);
+              Kart._addCompactTaillights(model, lHalfW, lTlY, lTlZ, lTlXFrac, lHeight);
+            }
+            if (meshConfig.sportsLights) {
+              Kart._addSportsHeadlights(model, lHalfW, lHlY, lHlZ, lHlXFrac, lHeight);
+              Kart._addSportsTaillights(model, lHalfW, lTlY, lTlZ, lHeight);
+            }
+            if (meshConfig.rallyLights) {
+              Kart._addSUVTaillights(model, lHalfW, lTlY, lTlZ, lTlXFrac, lHeight);
+            }
+          }
+
+          // Wrap in pivot group — center model at pivot origin BEFORE rotation
+          // so it rotates around its own geometric center (no wobble/offset)
           const pivot = new THREE.Group();
           pivot.add(model);
-          pivot.rotation.y = Math.PI * 0.8;
 
-          // Measure bounds in world space after rotation, then offset to center
-          pivot.updateMatrixWorld(true);
-          const bbox = new THREE.Box3().setFromObject(pivot);
-          const center = bbox.getCenter(new THREE.Vector3());
-          pivot.position.set(-center.x, -bbox.min.y, -center.z);
+          // Center model inside pivot (pre-rotation)
+          const preBbox = new THREE.Box3().setFromObject(model);
+          const preCenter = preBbox.getCenter(new THREE.Vector3());
+          model.position.set(
+            model.position.x - preCenter.x,
+            model.position.y - preBbox.min.y,
+            model.position.z - preCenter.z,
+          );
+
+          pivot.rotation.y = Math.PI * 0.8;
 
           scene.add(pivot);
           model = pivot; // store pivot as the rotating object

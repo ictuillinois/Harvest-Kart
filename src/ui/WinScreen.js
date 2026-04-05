@@ -30,7 +30,7 @@ export class WinScreen {
           </div>
         </div>
         <button class="win-btn" id="win-btn">
-          <span class="win-btn-text">PLAY AGAIN</span>
+          <span class="win-btn-text">CONTINUE</span>
           <span class="win-btn-arrow">&#8594;</span>
         </button>
       </div>

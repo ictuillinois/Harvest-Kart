@@ -214,11 +214,12 @@ export class Plate {
     ud.plateMesh.position.y = PLATE_H / 2;
   }
 
-  checkCollision(playerLane) {
+  checkCollision(kartX) {
     for (const plate of this.plates) {
       const ud = plate.userData;
       if (!ud.active || ud.hit) continue;
-      if (ud.lane === playerLane && Math.abs(plate.position.z) < PLATE_COLLISION_Z_THRESHOLD) {
+      // X-proximity collision: kart within 1.8 units of plate center
+      if (Math.abs(plate.position.x - kartX) < 1.8 && Math.abs(plate.position.z) < PLATE_COLLISION_Z_THRESHOLD) {
         ud.hit = true;
         this._animateCollection(plate);
         return true;
@@ -278,7 +279,9 @@ export class Plate {
       this.spawnPlate(spawnZ);
     }
 
-    const time = performance.now() * 0.001;
+    this._pulseFrame = (this._pulseFrame || 0) + 1;
+    const doPulse = (this._pulseFrame & 1) === 0; // every other frame
+    const time = doPulse ? performance.now() * 0.001 : 0;
 
     for (const plate of this.plates) {
       const ud = plate.userData;
@@ -286,8 +289,8 @@ export class Plate {
 
       plate.position.z += move;
 
-      // Idle pulse — only update the 2 cheapest properties
-      if (!ud.hit) {
+      // Idle pulse — every other frame for performance
+      if (!ud.hit && doPulse) {
         const pulse = Math.sin(time * 3 + plate.position.x * 2);
         ud.plateMat.emissiveIntensity = 0.35 + pulse * 0.15;
         ud.glowDisc.material.opacity = 0.3 + pulse * 0.1;

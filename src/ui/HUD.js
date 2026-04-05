@@ -678,7 +678,7 @@ export class HUD {
          ══════════════════════════════════════════ */
       .hud-toast {
         position: fixed; z-index: 120;
-        left: 50%; top: 38%;
+        left: 50%; top: 35%;
         transform: translate(-50%, -50%);
         font-family: var(--hud-font);
         font-size: clamp(14px, 1.6vw, 28px);
@@ -698,6 +698,78 @@ export class HUD {
         transition: opacity 0.2s ease;
       }
       .hud-toast.visible { opacity: 1; }
+
+      @keyframes hud-vibrate {
+        0%, 100% { transform: translate(-50%, -50%) translateX(0); }
+        10% { transform: translate(-50%, -50%) translateX(-3px); }
+        20% { transform: translate(-50%, -50%) translateX(3px); }
+        30% { transform: translate(-50%, -50%) translateX(-2px); }
+        40% { transform: translate(-50%, -50%) translateX(2px); }
+        50% { transform: translate(-50%, -50%) translateX(-1px); }
+        60% { transform: translate(-50%, -50%) translateX(1px); }
+        70% { transform: translate(-50%, -50%) translateX(-1px); }
+        80% { transform: translate(-50%, -50%) translateX(0); }
+      }
+      @keyframes hud-timer-vibrate {
+        0%, 100% { transform: translateX(0); }
+        15% { transform: translateX(-2px); }
+        30% { transform: translateX(2px); }
+        45% { transform: translateX(-1px); }
+        60% { transform: translateX(1px); }
+        75% { transform: translateX(-1px); }
+      }
+
+      .hud-hurry {
+        position: fixed; z-index: 119;
+        left: 50%; top: 28%;
+        transform: translate(-50%, -50%);
+        font-family: var(--hud-font);
+        font-size: clamp(16px, 2vw, 36px);
+        font-weight: 900;
+        color: #ff4444;
+        text-shadow: 0 0 16px #ff2200, 0 0 30px #ff0000, 0 2px 4px rgba(0,0,0,0.9);
+        letter-spacing: 4px;
+        text-align: center;
+        pointer-events: none;
+        padding: clamp(8px, 1vh, 16px) clamp(16px, 2vw, 32px);
+        background: linear-gradient(135deg, rgba(255,40,0,0.12), rgba(255,0,0,0.06));
+        border: 2px solid rgba(255,60,0,0.4);
+        border-radius: 100px;
+        animation: hud-vibrate 0.4s ease-in-out infinite;
+      }
+
+      .hud-timer-panel.urgency {
+        border-color: rgba(255,50,0,0.5) !important;
+      }
+      .hud-timer-panel.urgency .hud-timer {
+        color: #ff4444 !important;
+        text-shadow: 0 0 10px rgba(255,50,0,0.6), 0 0 24px rgba(255,0,0,0.3) !important;
+        animation: hud-timer-vibrate 0.5s ease-in-out infinite;
+      }
+
+      .hud-turbo-toast {
+        position: fixed; z-index: 121;
+        left: 50%; top: 50%;
+        transform: translate(-50%, -50%) scale(0.8);
+        font-family: var(--hud-font);
+        font-size: clamp(18px, 2.2vw, 40px);
+        font-weight: 900;
+        color: #ffaa00;
+        text-shadow: 0 0 20px #ff6600, 0 0 40px #ff4400, 0 2px 4px rgba(0,0,0,0.8);
+        letter-spacing: 5px;
+        text-align: center;
+        pointer-events: none;
+        padding: clamp(10px, 1.2vh, 20px) clamp(20px, 2.5vw, 40px);
+        background: linear-gradient(135deg, rgba(255,100,0,0.15), rgba(255,50,0,0.08));
+        border: 2px solid rgba(255,150,0,0.4);
+        border-radius: 100px;
+        opacity: 0;
+        transition: opacity 0.15s ease, transform 0.3s ease;
+      }
+      .hud-turbo-toast.visible {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1.0);
+      }
 
       /* ══════════════════════════════════════════
          COMPACT VIEWPORT
@@ -765,6 +837,10 @@ export class HUD {
   // ── Public API ──
 
   updateSpeed(mph) {
+    const rounded = Math.round(mph);
+    if (rounded === this._lastSpeedVal) return;  // Skip if unchanged
+    this._lastSpeedVal = rounded;
+
     const frac = Math.max(0, Math.min(1, mph / 100));
 
     // Arc fill
@@ -777,7 +853,7 @@ export class HUD {
     this._needle.setAttribute('y2', nEnd.y);
 
     // Speed number
-    this._speedText.textContent = Math.round(mph);
+    this._speedText.textContent = rounded;
 
     // Color the number based on speed
     let col = 'var(--hud-accent)';
@@ -787,9 +863,13 @@ export class HUD {
   }
 
   updateTime(elapsed) {
+    const cs = Math.floor((elapsed * 100) % 100);
+    if (cs === this._lastTimeCs && Math.floor(elapsed) === this._lastTimeSec) return;
+    this._lastTimeSec = Math.floor(elapsed);
+    this._lastTimeCs = cs;
+
     const m = Math.floor(elapsed / 60);
     const s = Math.floor(elapsed % 60);
-    const cs = Math.floor((elapsed * 100) % 100);
     this.spTime.textContent =
       String(m).padStart(2, '0') + "'" +
       String(s).padStart(2, '0') + '"' +
@@ -844,6 +924,10 @@ export class HUD {
   updateStage() {}
 
   updateTacho(rpm, gear) {
+    const rpmRound = Math.round(rpm / 50) * 50;  // Quantize to 50 RPM steps
+    if (rpmRound === this._lastRpmVal && gear === this._lastGear) return;
+    this._lastRpmVal = rpmRound;
+
     const frac = Math.max(0, Math.min(1, rpm / 8000));
 
     // Arc fill
@@ -903,6 +987,39 @@ export class HUD {
     setTimeout(() => el.remove(), 1500);
   }
 
+  showHurry() {
+    if (this._hurryEl) return; // already showing
+    const el = document.createElement('div');
+    el.className = 'hud-hurry';
+    el.textContent = 'HURRY UP!';
+    document.body.appendChild(el);
+    this._hurryEl = el;
+
+    // Timer urgency
+    const timerPanel = this.el.querySelector('.hud-timer-panel');
+    if (timerPanel) timerPanel.classList.add('urgency');
+  }
+
+  hideHurry() {
+    if (this._hurryEl) {
+      this._hurryEl.remove();
+      this._hurryEl = null;
+    }
+    const timerPanel = this.el.querySelector('.hud-timer-panel');
+    if (timerPanel) timerPanel.classList.remove('urgency');
+  }
+
+  showTurboToast(text) {
+    const el = document.createElement('div');
+    el.className = 'hud-turbo-toast';
+    el.textContent = text;
+    document.body.appendChild(el);
+    void el.offsetWidth;
+    el.classList.add('visible');
+    setTimeout(() => el.classList.remove('visible'), 2000);
+    setTimeout(() => el.remove(), 2300);
+  }
+
   showPause() { this.pauseOverlay.style.display = 'flex'; }
   hidePause() { this.pauseOverlay.style.display = 'none'; }
 
@@ -910,6 +1027,7 @@ export class HUD {
     this._charge = 0;
     this._lamps  = 0;
     this._prevLit = 0;
+    this.hideHurry();
     this.updateCharge(0);
     this.updateLamps(0);
     this.updateSpeed(0);
