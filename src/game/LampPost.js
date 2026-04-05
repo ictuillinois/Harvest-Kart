@@ -8,7 +8,7 @@ const LAMP_PAIRS   = 10;
 const LAMP_SPACING = 35;
 const TOTAL_SPAN   = LAMP_SPACING * LAMP_PAIRS;
 const RECYCLE_Z    = 20;
-const MAX_ACTIVE_LIGHTS = 8;
+const MAX_ACTIVE_LIGHTS = (navigator.maxTouchPoints > 0) ? 4 : 6;
 const LAMP_HEAD_Y  = 4.15;
 const CONE_HEIGHT  = 4.0;   // from lamp head to road
 
@@ -29,6 +29,7 @@ const TIER_COLORS = TIER.map(t => new THREE.Color(t.color));
 const BASE_CONE_R = TIER[0].coneR;
 
 // Ambient intensity multipliers per tier (applied to base theme value)
+// 5 entries: tier 0 (start), tier 1, tier 2, tier 3, tier 4 (fully powered)
 export const AMBIENT_MULTIPLIERS = [0.4, 0.55, 0.7, 0.85, 1.0];
 
 /** Create a circular radial gradient texture for ground light pools. */

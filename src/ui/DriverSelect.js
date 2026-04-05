@@ -354,15 +354,19 @@ export class DriverSelect {
             rimLight.intensity = 2.0;
           }
 
-          // Rotate first, then center — so the rotated model is centered
-          model.rotation.y = Math.PI * 0.8;
+          // Wrap in pivot group for clean rotation + centering
+          const pivot = new THREE.Group();
+          pivot.add(model);
+          pivot.rotation.y = Math.PI * 0.8;
 
-          // Recalculate bounds after rotation to center properly
-          const bbox = new THREE.Box3().setFromObject(model);
+          // Measure bounds in world space after rotation, then offset to center
+          pivot.updateMatrixWorld(true);
+          const bbox = new THREE.Box3().setFromObject(pivot);
           const center = bbox.getCenter(new THREE.Vector3());
-          model.position.set(-center.x, -bbox.min.y, -center.z);
+          pivot.position.set(-center.x, -bbox.min.y, -center.z);
 
-          scene.add(model);
+          scene.add(pivot);
+          model = pivot; // store pivot as the rotating object
         } else {
           model = null;
         }

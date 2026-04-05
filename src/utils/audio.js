@@ -106,32 +106,76 @@ export function setVolume(v) {
   getMaster().gain.value = Math.max(0, Math.min(1, v));
 }
 
-/** Plate hit — bright ping + reused noise crackle */
+/** Plate hit — piezoelectric spring compression + metallic sproing + electric zaps */
 export function playPlateHit() {
   const c = getCtx();
   const t = c.currentTime;
   const out = getMaster();
 
-  const osc = c.createOscillator();
-  const gain = c.createGain();
-  osc.type = 'sine';
-  osc.frequency.setValueAtTime(880, t);
-  osc.frequency.exponentialRampToValueAtTime(1760, t + 0.05);
-  osc.frequency.exponentialRampToValueAtTime(440, t + 0.15);
-  gain.gain.setValueAtTime(0.15, t);
-  gain.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
-  osc.connect(gain).connect(out);
-  osc.start(t);
-  osc.stop(t + 0.2);
+  // Impact thud — tire hitting the plate
+  const thud = c.createOscillator();
+  const thudG = c.createGain();
+  thud.type = 'sine';
+  thud.frequency.setValueAtTime(90, t);
+  thud.frequency.exponentialRampToValueAtTime(40, t + 0.08);
+  thudG.gain.setValueAtTime(0.18, t);
+  thudG.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
+  thud.connect(thudG).connect(out);
+  thud.start(t);
+  thud.stop(t + 0.1);
 
-  // Reused noise buffer (no allocation per hit)
+  // Spring compression — descending metallic tone
+  const springDown = c.createOscillator();
+  const sdG = c.createGain();
+  springDown.type = 'triangle';
+  springDown.frequency.setValueAtTime(800, t + 0.02);
+  springDown.frequency.exponentialRampToValueAtTime(200, t + 0.08);
+  sdG.gain.setValueAtTime(0.10, t + 0.02);
+  sdG.gain.exponentialRampToValueAtTime(0.01, t + 0.08);
+  springDown.connect(sdG).connect(out);
+  springDown.start(t + 0.02);
+  springDown.stop(t + 0.1);
+
+  // Spring release — ascending "sproing"
+  const springUp = c.createOscillator();
+  const suG = c.createGain();
+  const suF = c.createBiquadFilter();
+  springUp.type = 'square';
+  springUp.frequency.setValueAtTime(250, t + 0.08);
+  springUp.frequency.exponentialRampToValueAtTime(1200, t + 0.18);
+  springUp.frequency.exponentialRampToValueAtTime(600, t + 0.35);
+  suG.gain.setValueAtTime(0.06, t + 0.08);
+  suG.gain.exponentialRampToValueAtTime(0.001, t + 0.4);
+  suF.type = 'bandpass';
+  suF.frequency.value = 800;
+  suF.Q.value = 3;
+  springUp.connect(suF).connect(suG).connect(out);
+  springUp.start(t + 0.08);
+  springUp.stop(t + 0.4);
+
+  // Metallic ring — high harmonic resonance
+  const ring = c.createOscillator();
+  const rG = c.createGain();
+  ring.type = 'sine';
+  ring.frequency.setValueAtTime(2400, t + 0.06);
+  ring.frequency.exponentialRampToValueAtTime(1800, t + 0.5);
+  rG.gain.setValueAtTime(0.03, t + 0.06);
+  rG.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
+  ring.connect(rG).connect(out);
+  ring.start(t + 0.06);
+  ring.stop(t + 0.5);
+
+  // Electric zap — piezo charge crackle
   const noise = c.createBufferSource();
-  const nGain = c.createGain();
+  const nG = c.createGain();
+  const nF = c.createBiquadFilter();
   noise.buffer = getNoiseBuffer();
-  nGain.gain.setValueAtTime(0.08, t);
-  nGain.gain.exponentialRampToValueAtTime(0.001, t + 0.08);
-  noise.connect(nGain).connect(out);
-  noise.start(t);
+  nF.type = 'highpass';
+  nF.frequency.value = 3000;
+  nG.gain.setValueAtTime(0.06, t + 0.1);
+  nG.gain.exponentialRampToValueAtTime(0.001, t + 0.15);
+  noise.connect(nF).connect(nG).connect(out);
+  noise.start(t + 0.1);
 }
 
 /** Lamp light-up — ascending chord sting */
@@ -331,8 +375,8 @@ export function playMapSelect() {
 // =================================================================
 
 const ENG_BASE     = 45;     // fundamental idle Hz (deep V8)
-const ENG_IDLE_VOL = 0.08;   // master gain at idle (70% of previous)
-const ENG_MAX_VOL  = 0.30;   // master gain at max rev (louder at high RPM)
+const ENG_IDLE_VOL = 0.04;   // master gain at idle — reduced so music is prominent
+const ENG_MAX_VOL  = 0.15;   // master gain at max rev — half of previous
 const ENG_FILT_LO  = 250;    // lowpass cutoff at idle (dark rumble)
 const ENG_FILT_HI  = 2800;   // cutoff at max (brighter, more aggressive)
 const ENG_SMOOTH   = 0.04;   // param smoothing time-constant (s) — fast response for gear shifts

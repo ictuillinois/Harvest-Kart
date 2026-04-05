@@ -26,6 +26,7 @@ export class Kart {
     this.currentLane = 1;
     this.isSwitching = false;
     this._exhaustZ = 1.6;
+    this.laneSwitchMs = LANE_SWITCH_DURATION; // overridden per driver
 
     this._buildCar(DRIVER_TYPES[0]);
     this.group.position.set(LANE_POSITIONS[1], 0, 0);
@@ -138,56 +139,36 @@ export class Kart {
 
     const fillMul = dark ? 1.5 : 1.0;
 
-    // Overhead fill — tight radius, only illuminates kart
-    const fillTop = new THREE.PointLight(0xffffff, 2.0 * fillMul, 10, 2);
-    fillTop.position.set(0, height + 2.5, 0);
-    this.group.add(fillTop);
+    // ── Single combined fill light (replaces 3 separate fills) ──
+    const fill = new THREE.PointLight(0xffffff, 3.0 * fillMul, 12, 2);
+    fill.position.set(0, height + 2, halfL + 1);
+    this.group.add(fill);
 
-    // Rear chase-cam fill — tight radius
-    const fillRear = new THREE.PointLight(0xffffff, 1.8 * fillMul, 10, 2);
-    fillRear.position.set(0, height + 1, halfL + 3);
-    this.group.add(fillRear);
-
-    // Low front fill — tight radius
-    const fillLow = new THREE.PointLight(0xddeeff, 1.0 * fillMul, 8, 2);
-    fillLow.position.set(0, height * 0.5, -halfL);
-    this.group.add(fillLow);
-
-    // ── Underglow — only lights the road directly under the kart ──
+    // ── Underglow ──
     const underglowColor = dark ? 0x4488ff : driver.carBody;
-    const underglowIntensity = dark ? 4.0 : 2.5;
-    this._underglow = new THREE.PointLight(underglowColor, underglowIntensity, 6, 2);
+    this._underglow = new THREE.PointLight(underglowColor, dark ? 4.0 : 2.5, 6, 2);
     this._underglow.position.set(0, 0.15, 0);
     this.group.add(this._underglow);
 
-    // ── Headlights (front of car = -Z) ──
+    // ── Headlights: emissive bulbs + glow discs (NO PointLights — use emissive mesh only) ──
     const headlightY = height * 0.4;
     const headlightZ = -(halfL + 0.1);
     const hlBulbMat = new THREE.MeshStandardMaterial({
       color: 0xffffcc, emissive: 0xffffcc, emissiveIntensity: 1.5,
     });
-    // Glow halo around each headlight
     const hlGlowMat = new THREE.MeshBasicMaterial({
-      color: 0xffffdd, transparent: true, opacity: 0.25, depthWrite: false,
+      color: 0xffffdd, transparent: true, opacity: 0.3, depthWrite: false,
     });
     for (const x of [-halfW * 0.6, halfW * 0.6]) {
-      // Bright bulb
-      const hl = new THREE.Mesh(new THREE.SphereGeometry(0.1, 6, 4), hlBulbMat);
+      const hl = new THREE.Mesh(new THREE.SphereGeometry(0.1, 5, 3), hlBulbMat);
       hl.position.set(x, headlightY, headlightZ);
       this.group.add(hl);
-
-      // Soft glow disc
-      const glow = new THREE.Mesh(new THREE.CircleGeometry(0.25, 8), hlGlowMat);
+      const glow = new THREE.Mesh(new THREE.CircleGeometry(0.3, 6), hlGlowMat);
       glow.position.set(x, headlightY, headlightZ - 0.02);
       this.group.add(glow);
-
-      // PointLight casting warm light forward onto road
-      const hlLight = new THREE.PointLight(0xfff5dd, 1.5, 8, 2);
-      hlLight.position.set(x, headlightY, headlightZ - 0.1);
-      this.group.add(hlLight);
     }
 
-    // ── Taillight emissive strips (rear of car = +Z) ──
+    // ── Taillights: emissive strips + single PointLight (merged L+R) ──
     const tlMat = new THREE.MeshStandardMaterial({
       color: 0xff0000, emissive: 0xff0000, emissiveIntensity: 1.2,
     });
@@ -198,22 +179,16 @@ export class Kart {
       tl.position.set(x, taillightY, taillightZ);
       this.group.add(tl);
     }
-    // Rain light (center)
     const rain = new THREE.Mesh(
-      new THREE.BoxGeometry(halfW * 0.8, 0.04, 0.03),
-      new THREE.MeshStandardMaterial({ color: 0xff0000, emissive: 0xff0000, emissiveIntensity: 1.2 }));
+      new THREE.BoxGeometry(halfW * 0.8, 0.04, 0.03), tlMat);
     rain.position.set(0, taillightY - 0.06, taillightZ);
     this.group.add(rain);
 
-    // ── Taillight point lights — tight radius to avoid tinting scenery ──
-    const tailIntensity = dark ? 2.5 : 1.5;
-    const tailL = new THREE.PointLight(0xff2200, tailIntensity, 6, 2);
-    tailL.position.set(-halfW * 0.4, taillightY, taillightZ);
-    this.group.add(tailL);
-    const tailR = new THREE.PointLight(0xff2200, tailIntensity, 6, 2);
-    tailR.position.set(halfW * 0.4, taillightY, taillightZ);
-    this.group.add(tailR);
-    this._tailLights = [tailL, tailR];
+    // Single centered tail light (was 2 — halved)
+    const tailLight = new THREE.PointLight(0xff2200, dark ? 2.5 : 1.5, 6, 2);
+    tailLight.position.set(0, taillightY, taillightZ);
+    this.group.add(tailLight);
+    this._tailLights = [tailLight];
 
     // ── Exhaust pipes ──
     const exhaustY = height * 0.25;
@@ -270,18 +245,19 @@ export class Kart {
 
     const targetX = LANE_POSITIONS[this.currentLane];
     const tilt = direction === 'left' ? 0.18 : -0.18;
+    const dur = this.laneSwitchMs;
 
     new Tween(this.group.rotation, tweenGroup)
-      .to({ z: tilt }, LANE_SWITCH_DURATION * 0.4)
+      .to({ z: tilt }, dur * 0.4)
       .easing(Easing.Quadratic.Out).start();
 
     new Tween(this.group.position, tweenGroup)
-      .to({ x: targetX }, LANE_SWITCH_DURATION)
+      .to({ x: targetX }, dur)
       .easing(Easing.Quadratic.Out)
       .onComplete(() => {
         this.isSwitching = false;
         new Tween(this.group.rotation, tweenGroup)
-          .to({ z: 0 }, LANE_SWITCH_DURATION * 0.5)
+          .to({ z: 0 }, dur * 0.5)
           .easing(Easing.Quadratic.Out).start();
       }).start();
   }
@@ -306,9 +282,9 @@ export class Kart {
   _emitExhaust(delta) {
     if (!this._exhaustParticles) {
       this._exhaustParticles = [];
-      const geo = new THREE.SphereGeometry(0.05, 4, 4);
+      const geo = new THREE.BoxGeometry(0.1, 0.1, 0.1); // cheaper than sphere
       const mat = new THREE.MeshBasicMaterial({ color: 0x888888, transparent: true, opacity: 0.4 });
-      for (let i = 0; i < 10; i++) {
+      for (let i = 0; i < 6; i++) {
         const p = new THREE.Mesh(geo, mat.clone());
         p.visible = false; p.userData = { life: 0, vy: 0 };
         this.group.parent.add(p);

@@ -9,24 +9,90 @@ export const ROAD_WIDTH = 12;
 export const ROAD_SEGMENT_LENGTH = 100;
 export const ROAD_SEGMENT_COUNT = 3;
 
-// Speed system — gameState.speed is MPH directly (0-100)
-export const MIN_SPEED_MPH = 25;         // coast floor
-export const MAX_SPEED_MPH = 100;        // top speed
+// Speed system — gameState.speed is MPH directly
 export const STARTING_SPEED_MPH = 40;    // speed after green light (gear 2)
 export const SCROLL_FACTOR = 0.5;        // MPH → world scroll units/sec
-
-// 5-gear transmission
-export const GEAR_THRESHOLDS = [0, 12, 28, 50, 75, 100]; // MPH boundaries (6 for 5 gears)
-export const GEAR_ACCEL = [20, 16, 12, 8, 5];             // MPH/sec per gear
-export const DECEL_RATE = 8;              // MPH/sec when coasting
 export const SHIFT_PAUSE_MS = 200;        // brief accel pause on shift
 
 // RPM simulation
 export const RPM_IDLE = 1000;
 export const RPM_REDLINE = 8000;
 
-// Lane switching
-export const LANE_SWITCH_DURATION = 200; // ms
+// ═══════════════════════════════════════════
+//  PER-DRIVER VEHICLE PHYSICS
+//  Each driver's stats (SPD/ACC/EFF) map to gameplay feel.
+//  topSpeed from SPD, gearAccel from ACC, decelRate/coastFloor from EFF.
+// ═══════════════════════════════════════════
+
+// Base gear accel rates — scaled by ACC multiplier
+const BASE_GEAR_ACCEL = [20, 16, 12, 8, 5];
+
+function calcGearThresholds(topSpeed) {
+  const ratios = [0, 0.12, 0.28, 0.50, 0.75, 1.0];
+  return ratios.map(r => Math.round(r * topSpeed));
+}
+
+function calcGearAccel(accStars) {
+  const multiplier = 0.6 + (accStars - 1) * 0.2;
+  return BASE_GEAR_ACCEL.map(rate => Math.round(rate * multiplier * 10) / 10);
+}
+
+export const DRIVER_PHYSICS = {
+  // Ethan — The Balanced Pro (SPD 4, ACC 3, EFF 5)
+  ethan: {
+    topSpeed: 92,
+    gearAccel: calcGearAccel(3),          // [12, 9.6, 7.2, 4.8, 3]
+    gearThresholds: calcGearThresholds(92),
+    decelRate: 4,                          // excellent coast
+    coastFloor: 32,
+    laneSwitchMs: 200,
+    chargeMultiplier: 1.2,                // 5★ EFF → 20% bonus
+  },
+  // Kate — The Quick Starter (SPD 3, ACC 5, EFF 3)
+  kate: {
+    topSpeed: 84,
+    gearAccel: calcGearAccel(5),          // [16, 12.8, 9.6, 6.4, 4]
+    gearThresholds: calcGearThresholds(84),
+    decelRate: 10,                         // loses speed fast
+    coastFloor: 24,
+    laneSwitchMs: 150,                     // snappy handling
+    chargeMultiplier: 1.0,
+  },
+  // Destiny — The Speed Demon (SPD 5, ACC 3, EFF 4)
+  destiny: {
+    topSpeed: 100,
+    gearAccel: calcGearAccel(3),          // [12, 9.6, 7.2, 4.8, 3]
+    gearThresholds: calcGearThresholds(100),
+    decelRate: 7,
+    coastFloor: 28,
+    laneSwitchMs: 250,                     // heavier at high speed
+    chargeMultiplier: 1.1,
+  },
+  // Luke — The Eco Racer (SPD 3, ACC 4, EFF 5)
+  luke: {
+    topSpeed: 84,
+    gearAccel: calcGearAccel(4),          // [14, 11.2, 8.4, 5.6, 3.5]
+    gearThresholds: calcGearThresholds(84),
+    decelRate: 4,                          // barely slows down
+    coastFloor: 32,
+    laneSwitchMs: 180,
+    chargeMultiplier: 1.2,
+  },
+};
+
+// Driver ID lookup by index (matches DRIVER_TYPES order)
+const DRIVER_IDS = ['ethan', 'kate', 'destiny', 'luke'];
+export function getDriverPhysics(driverIndex) {
+  return DRIVER_PHYSICS[DRIVER_IDS[driverIndex]] || DRIVER_PHYSICS.ethan;
+}
+
+// Legacy exports (defaults — used before driver is selected)
+export const MAX_SPEED_MPH = 100;
+export const MIN_SPEED_MPH = 25;
+export const GEAR_THRESHOLDS = [0, 12, 28, 50, 75, 100];
+export const GEAR_ACCEL = [20, 16, 12, 8, 5];
+export const DECEL_RATE = 8;
+export const LANE_SWITCH_DURATION = 200;
 
 // Game config
 export const PLATES_TO_FILL_BAR = 10;
@@ -39,7 +105,7 @@ export const PLATE_COLLISION_Z_THRESHOLD = 2.5;
 // Color multiplies with procedural asphalt texture in Road.js.
 export const ROAD_SURFACE_COLORS = {
   brazil: 0x777780,   // warm medium gray (bright texture × this = visible gray)
-  usa:    0x606068,   // slightly cooler for night, still visibly gray
+  usa:    0x666660,   // warm neutral gray for sunset
   peru:   0x707078,   // neutral medium gray
 };
 
@@ -142,36 +208,36 @@ export const MAP_THEMES = [
   {
     id: 'usa',
     name: 'USA',
-    description: 'Big city lights & skyscrapers',
-    subtitle: 'Downtown Night Drive',
+    description: 'Golden hour skyline & skyscrapers',
+    subtitle: 'Downtown Sunset Drive',
     flag: asset('flags/usa.png'),
-    features: ['Neon-lit skyline', 'Moonlit twilight sky', 'Urban traffic'],
+    features: ['Sunset skyline', 'Golden hour glow', 'Urban highway'],
     sky: {
-      turbidity: 12,
-      rayleigh: 0.5,
-      mieCoefficient: 0.008,
-      mieDirectionalG: 0.95,
-      sunElevation: 1.5,    // just at horizon — deep twilight
-      sunAzimuth: 250,
-      exposure: 0.25,
+      turbidity: 8,
+      rayleigh: 2.5,
+      mieCoefficient: 0.02,
+      mieDirectionalG: 0.85,
+      sunElevation: 8,      // low sun — golden hour
+      sunAzimuth: 230,
+      exposure: 0.8,
     },
     clouds: {
-      coverage: 0.15,
-      density: 0.2,
-      scale: 0.0003,
-      speed: 0.00008,
-      elevation: 0.6,
+      coverage: 0.25,
+      density: 0.3,
+      scale: 0.00025,
+      speed: 0.0001,
+      elevation: 0.5,
     },
-    fog: 0x0a0a1e,
-    fogDensity: 0.003,
-    ground: 0x222228,
-    ambientColor: 0x1a1a3a,
-    ambientIntensity: 1.0,
-    dirColor: 0x4466aa,
-    dirIntensity: 0.7,
-    stars: true,
-    shadow: { far: 40, size: 15 },
-    colorGrade: { saturation: 1.0, contrast: 1.05, brightness: 1.05 },
+    fog: 0xcc8855,
+    fogDensity: 0.004,
+    ground: 0x3d5a2a,
+    ambientColor: 0xaa7744,
+    ambientIntensity: 0.6,
+    dirColor: 0xffaa55,
+    dirIntensity: 2.0,
+    stars: false,
+    shadow: { far: 50, size: 18 },
+    colorGrade: { saturation: 1.05, contrast: 1.0, brightness: 1.05 },
   },
   {
     id: 'peru',

@@ -4,29 +4,16 @@ import { tweenGroup } from '../utils/tweenGroup.js';
 /**
  * Cinematic game completion sequence.
  *
- * Timeline (from the moment the 40th plate fills the bar):
- *   T+0.0  Lock controls, auto-drive max speed, flash lamps to tier 4.
+ * Timeline:
+ *   T+0.0  Lock controls, auto-drive at max speed, flash lamps to tier 4.
  *   T+0.5  Stop plate spawning.
  *   T+1.0  Camera pulls back + up over 3s.
  *   T+2.0  "ENERGY HARVESTED" rolls up from bottom.
- *   T+5.0  Text fades out. Speed decelerates. Engine fades.
- *   T+6.0  Fade to black overlay.
- *   T+7.0  Black opaque → show win screen.
+ *   T+5.0  Text fades out. Car keeps driving (no deceleration).
+ *   T+6.0  Fade to black overlay (car still moving behind it).
+ *   T+7.5  Black opaque → transition to win screen.
  */
 export class CompletionSequence {
-  /**
-   * @param {object} opts
-   * @param {THREE.Camera}     opts.camera
-   * @param {object}           opts.controls
-   * @param {import('../ui/HUD.js').HUD} opts.hud
-   * @param {{ y: number, z: number }} opts.normalCam
-   * @param {import('./LampPost.js').LampPost} opts.lampPosts
-   * @param {import('./Plate.js').Plate}       opts.plates
-   * @param {import('./GameState.js').GameState} opts.gameState
-   * @param {() => void}       opts.playFinalPowerOn
-   * @param {() => void}       opts.stopEngine
-   * @param {() => void}       opts.onComplete  — show win screen
-   */
   constructor(opts) {
     this._opts = opts;
     this._timers = [];
@@ -47,12 +34,12 @@ export class CompletionSequence {
     lampPosts.flash();
     playFinalPowerOn();
 
-    // Auto-drive at max speed — main.js game loop reads gameState.speed
-    gameState.speed = 100; // MAX_SPEED_MPH — auto-drive at top speed
+    // Auto-drive at max speed — car keeps going throughout the sequence
+    gameState.speed = 100;
 
     // ── T+0.5: stop spawning plates ──
     this._at(500, () => {
-      plates.setSpawnRate(999); // effectively stops spawning
+      plates.setSpawnRate(999);
     });
 
     // ── T+1.0: camera pullback ──
@@ -68,18 +55,9 @@ export class CompletionSequence {
       this._showMissionText();
     });
 
-    // ── T+5.0: fade text, begin deceleration ──
+    // ── T+5.0: fade text — car keeps driving (NO deceleration) ──
     this._at(5000, () => {
       if (this._textEl) this._textEl.classList.add('fade');
-
-      // Decelerate to 0 over 1.5s
-      new Tween(gameState, tweenGroup)
-        .to({ speed: 0 }, 1500)
-        .easing(Easing.Quadratic.Out)
-        .start();
-
-      // Fade engine
-      stopEngine();
     });
 
     // ── T+5.5: remove text ──
@@ -87,25 +65,28 @@ export class CompletionSequence {
       if (this._textEl) { this._textEl.remove(); this._textEl = null; }
     });
 
-    // ── T+6.0: fade to black ──
+    // ── T+6.0: fade to black (car still moving behind overlay) ──
     this._at(6000, () => {
       this._overlay = document.createElement('div');
       Object.assign(this._overlay.style, {
         position: 'fixed', inset: '0',
         background: '#000', zIndex: '200',
         opacity: '0',
-        transition: 'opacity 1s ease',
+        transition: 'opacity 1.2s ease',
       });
       document.body.appendChild(this._overlay);
       void this._overlay.offsetWidth;
       this._overlay.style.opacity = '1';
+
+      // Stop engine audio during fade
+      stopEngine();
     });
 
-    // ── T+7.0: transition to win screen ──
-    this._at(7000, () => {
+    // ── T+7.5: transition to win screen ──
+    this._at(7500, () => {
+      gameState.speed = 0;
       onComplete();
-      // Clean up overlay after win screen shows
-      this._at(200, () => {
+      this._at(300, () => {
         if (this._overlay) { this._overlay.remove(); this._overlay = null; }
       });
     });
@@ -116,7 +97,6 @@ export class CompletionSequence {
   }
 
   _showMissionText() {
-    // Inject styles once
     if (!document.getElementById('completion-styles')) {
       const style = document.createElement('style');
       style.id = 'completion-styles';
@@ -129,10 +109,10 @@ export class CompletionSequence {
           pointer-events: none;
         }
         .mission-line {
-          font-family: 'Press Start 2P', monospace;
+          font-family: 'Orbitron', 'Impact', sans-serif;
           color: #FFD700;
           letter-spacing: 0.12em;
-          -webkit-text-stroke: 3px rgba(0,0,0,0.6);
+          -webkit-text-stroke: 2px rgba(0,0,0,0.5);
           text-shadow:
             0 0 30px #FFD700,
             0 0 60px #FFA500,

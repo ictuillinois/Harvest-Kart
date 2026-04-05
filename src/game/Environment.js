@@ -63,13 +63,13 @@ export class Environment {
       this.sunDirection.set(0.3, 0.8, -0.5).normalize();
       this.renderer.toneMappingExposure = 1.0;
     } else if (theme.id === 'usa') {
-      this._buildNightSky();
-      this.sunDirection.set(0.2, 0.6, -0.4).normalize();
-      this.renderer.toneMappingExposure = 1.0;
+      this._buildSunsetSky();
+      this.sunDirection.set(-0.5, 0.25, -0.8).normalize(); // low sun, left side
+      this.renderer.toneMappingExposure = 1.3;
     } else if (theme.id === 'peru') {
       this._buildMountainSky();
       this.sunDirection.set(0.3, 0.85, -0.3).normalize();
-      this.renderer.toneMappingExposure = 1.0;
+      this.renderer.toneMappingExposure = 1.3;
     } else {
       this.sky = new Sky();
       this.sky.scale.setScalar(10000);
@@ -107,8 +107,9 @@ export class Environment {
     this.dirLight = new THREE.DirectionalLight(theme.dirColor, theme.dirIntensity);
     this.dirLight.position.copy(this.sunDirection).multiplyScalar(100);
     this.dirLight.castShadow = true;
-    this.dirLight.shadow.mapSize.width = 1024;
-    this.dirLight.shadow.mapSize.height = 1024;
+    const shadowRes = (navigator.maxTouchPoints > 0) ? 512 : 1024;
+    this.dirLight.shadow.mapSize.width = shadowRes;
+    this.dirLight.shadow.mapSize.height = shadowRes;
     const sh = theme.shadow || { far: 50, size: 15 };
     this.dirLight.shadow.camera.near = 0.5;
     this.dirLight.shadow.camera.far = sh.far;
@@ -122,8 +123,8 @@ export class Environment {
       this.hemiLight = new THREE.HemisphereLight(0x87ceeb, 0xffe4b5, 0.7);
       this.dirLight.position.set(10, 30, -20);
     } else if (theme.id === 'usa') {
-      this.hemiLight = new THREE.HemisphereLight(0x334466, 0x332222, 0.5);
-      this.dirLight.position.set(10, 25, -15);
+      this.hemiLight = new THREE.HemisphereLight(0x7788bb, 0xaa8855, 0.5);
+      this.dirLight.position.set(-30, 15, -100); // low sunset angle
     } else if (theme.id === 'peru') {
       this.hemiLight = new THREE.HemisphereLight(0x6699cc, 0x8b7355, 0.6);
       this.dirLight.position.set(15, 35, -10);
@@ -179,7 +180,8 @@ export class Environment {
   // layer: 'fg' (foreground, 100% speed), 'mg' (midground, 60%), 'bg' (background, 20%)
   _placeModel(url, x, y, z, rotY = 0, sizeVariation = 1, layer = 'fg') {
     const model = getModel(url);
-    model.position.set(x, y, z);
+    // Preserve the Y offset from normalizeToHeight (base-on-ground correction)
+    model.position.set(x, model.position.y + y, z);
     if (sizeVariation !== 1) model.scale.multiplyScalar(sizeVariation);
     model.rotation.y = rotY;
     this.scene.add(model);
@@ -193,7 +195,7 @@ export class Environment {
   // --- Helper: place static model (doesn't scroll at all) ---
   _placeStatic(url, x, y, z, rotY = 0, sizeVariation = 1) {
     const model = getModel(url);
-    model.position.set(x, y, z);
+    model.position.set(x, model.position.y + y, z);
     if (sizeVariation !== 1) model.scale.multiplyScalar(sizeVariation);
     model.rotation.y = rotY;
     this.scene.add(model);
@@ -276,9 +278,9 @@ export class Environment {
   }
 
   // =====================================================================
-  //  NIGHT SKY (USA — dark gradient with light pollution + stars)
+  //  SUNSET SKY (USA — golden hour gradient with sun disc)
   // =====================================================================
-  _buildNightSky() {
+  _buildSunsetSky() {
     const skyGeo = new THREE.SphereGeometry(500, 32, 16);
     const skyMat = new THREE.ShaderMaterial({
       side: THREE.BackSide,
@@ -293,42 +295,22 @@ export class Environment {
       `,
       fragmentShader: `
         varying vec3 vWorldPos;
-
-        // Simple pseudo-random for star placement
-        float hash(vec2 p) {
-          return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
-        }
-
         void main() {
-          vec3 dir = normalize(vWorldPos);
-          float h = dir.y;
+          float h = normalize(vWorldPos).y;
 
-          // 6-stop gradient: zenith → city glow at horizon
-          vec3 zenith  = vec3(0.020, 0.020, 0.063);  // #050510
-          vec3 upper   = vec3(0.039, 0.039, 0.145);  // #0a0a25
-          vec3 mid     = vec3(0.059, 0.063, 0.208);  // #0f1035
-          vec3 lower   = vec3(0.102, 0.082, 0.271);  // #1a1545
-          vec3 horizon = vec3(0.165, 0.125, 0.314);  // #2a2050
-          vec3 glow    = vec3(0.227, 0.145, 0.251);  // #3a2540
+          // 5-stop sunset gradient: zenith deep blue → horizon golden
+          vec3 zenith  = vec3(0.10, 0.10, 0.30);   // #1a1a4e deep blue-purple
+          vec3 upper   = vec3(0.25, 0.18, 0.45);   // dusky purple
+          vec3 mid     = vec3(0.80, 0.33, 0.20);   // #cc5533 warm orange-red
+          vec3 lower   = vec3(0.95, 0.60, 0.25);   // bright orange
+          vec3 horizon = vec3(1.00, 0.80, 0.40);   // #ffcc66 golden yellow
 
           vec3 col;
           if (h > 0.5) col = mix(upper, zenith, (h - 0.5) / 0.5);
           else if (h > 0.25) col = mix(mid, upper, (h - 0.25) / 0.25);
-          else if (h > 0.1) col = mix(lower, mid, (h - 0.1) / 0.15);
-          else if (h > 0.02) col = mix(horizon, lower, (h - 0.02) / 0.08);
-          else if (h > -0.05) col = mix(glow, horizon, (h + 0.05) / 0.07);
-          else col = glow;
-
-          // Stars in upper sky (above light pollution)
-          if (h > 0.15) {
-            vec2 grid = floor(dir.xz * 200.0);
-            float star = hash(grid);
-            if (star > 0.992) {
-              float brightness = 0.4 + 0.6 * hash(grid + 1.0);
-              float size = smoothstep(0.994, 0.992, star);
-              col += vec3(brightness * size * 0.7);
-            }
-          }
+          else if (h > 0.08) col = mix(lower, mid, (h - 0.08) / 0.17);
+          else if (h > 0.0) col = mix(horizon, lower, h / 0.08);
+          else col = horizon;
 
           gl_FragColor = vec4(col, 1.0);
         }
@@ -337,17 +319,53 @@ export class Environment {
     this.sky = new THREE.Mesh(skyGeo, skyMat);
     this.scene.add(this.sky);
 
-    // Moon
-    const moonGroup = new THREE.Group();
-    const moonMat = new THREE.MeshBasicMaterial({ color: 0xeeeeff });
-    moonGroup.add(new THREE.Mesh(new THREE.SphereGeometry(6, 32, 32), moonMat));
-    const moonGlowMat = new THREE.MeshBasicMaterial({
-      color: 0x8888cc, transparent: true, opacity: 0.1, depthWrite: false,
-    });
-    moonGroup.add(new THREE.Mesh(new THREE.SphereGeometry(12, 32, 32), moonGlowMat));
-    moonGroup.position.set(-50, 120, -250);
-    this.scene.add(moonGroup);
-    this.themeObjects.push(moonGroup);
+    // Sun glow sprite at horizon
+    const sunCanvas = document.createElement('canvas');
+    sunCanvas.width = 128;
+    sunCanvas.height = 128;
+    const sctx = sunCanvas.getContext('2d');
+    const grad = sctx.createRadialGradient(64, 64, 0, 64, 64, 64);
+    grad.addColorStop(0, 'rgba(255,240,200,1.0)');
+    grad.addColorStop(0.15, 'rgba(255,200,100,0.8)');
+    grad.addColorStop(0.4, 'rgba(255,150,50,0.3)');
+    grad.addColorStop(1, 'rgba(255,100,30,0.0)');
+    sctx.fillStyle = grad;
+    sctx.fillRect(0, 0, 128, 128);
+    const sunTex = new THREE.CanvasTexture(sunCanvas);
+    const sunSprite = new THREE.Sprite(
+      new THREE.SpriteMaterial({
+        map: sunTex, color: 0xffeeaa, transparent: true,
+        blending: THREE.AdditiveBlending, depthWrite: false,
+      }),
+    );
+    sunSprite.scale.set(40, 40, 1);
+    sunSprite.position.set(-60, 8, -300);
+    this.scene.add(sunSprite);
+    this.themeObjects.push(sunSprite);
+
+    // Sunset cloud sprites
+    const cloudTex = this._makeCloudTexture();
+    const cloudColors = [0xff9955, 0xffaa66, 0xff8844, 0xffbb77, 0xcc6644];
+    for (let i = 0; i < 6; i++) {
+      const w = 40 + Math.random() * 40;
+      const h = 8 + Math.random() * 8;
+      const cloudMat = new THREE.MeshBasicMaterial({
+        map: cloudTex, transparent: true,
+        opacity: 0.3 + Math.random() * 0.2,
+        depthWrite: false, side: THREE.DoubleSide,
+        color: cloudColors[Math.floor(Math.random() * cloudColors.length)],
+      });
+      const cloud = new THREE.Mesh(new THREE.PlaneGeometry(w, h), cloudMat);
+      cloud.position.set(
+        -80 + Math.random() * 160,
+        22 + Math.random() * 20,
+        -200 - Math.random() * 120,
+      );
+      cloud.lookAt(0, cloud.position.y, 0);
+      this.scene.add(cloud);
+      this.themeObjects.push(cloud);
+      this.background.push(cloud);
+    }
   }
 
   // =====================================================================
@@ -537,12 +555,12 @@ export class Environment {
     this.scene.add(hillGround);
     this.themeObjects.push(hillGround);
 
-    // ── SUGARLOAF MOUNTAIN — procedural landmark (right, behind ocean) ──
+    // ── SUGARLOAF MOUNTAIN — on the LEFT (land side), behind the city ──
     const sugarloaf = new THREE.Mesh(
       new THREE.ConeGeometry(18, 35, 8),
       new THREE.MeshStandardMaterial({ color: 0x4a6a3a, roughness: 0.85, flatShading: true }),
     );
-    sugarloaf.position.set(RH + 80, 12, -280);
+    sugarloaf.position.set(-(RH + 80), 12, -280);
     this.scene.add(sugarloaf);
     this.themeObjects.push(sugarloaf);
     this.background.push(sugarloaf);
@@ -552,48 +570,58 @@ export class Environment {
       new THREE.ConeGeometry(12, 25, 6),
       new THREE.MeshStandardMaterial({ color: 0x5a7a4a, roughness: 0.85, flatShading: true }),
     );
-    sugarloaf2.position.set(RH + 60, 8, -250);
+    sugarloaf2.position.set(-(RH + 60), 8, -250);
     this.scene.add(sugarloaf2);
     this.themeObjects.push(sugarloaf2);
     this.background.push(sugarloaf2);
 
-    // ── CHRIST THE REDEEMER — silhouette on far left hill ──
-    const christGroup = new THREE.Group();
+    // ── CHRIST THE REDEEMER — on top of Corcovado mountain, far left background ──
+    const corcovadoGroup = new THREE.Group();
+
+    // Mountain base (Corcovado)
+    const mtHeight = 50;
+    const mtRadius = 22;
+    const mountain = new THREE.Mesh(
+      new THREE.ConeGeometry(mtRadius, mtHeight, 7),
+      new THREE.MeshStandardMaterial({ color: 0x3a6a2a, roughness: 0.85, flatShading: true }),
+    );
+    mountain.position.y = mtHeight / 2;
+    corcovadoGroup.add(mountain);
+
+    // Statue on top
     const statueMat = new THREE.MeshStandardMaterial({
-      color: 0xeeeeee, emissive: 0xcccccc, emissiveIntensity: 0.2, roughness: 0.5,
+      color: 0xeeeeee, emissive: 0xcccccc, emissiveIntensity: 0.25, roughness: 0.5,
     });
+    const statueGroup = new THREE.Group();
     // Body
-    christGroup.add((() => {
-      const body = new THREE.Mesh(new THREE.BoxGeometry(1.2, 6, 1), statueMat);
-      body.position.y = 3;
-      return body;
-    })());
-    // Arms (outstretched)
-    christGroup.add((() => {
-      const arms = new THREE.Mesh(new THREE.BoxGeometry(8, 0.8, 0.8), statueMat);
-      arms.position.y = 5.2;
-      return arms;
-    })());
+    const body = new THREE.Mesh(new THREE.BoxGeometry(1.2, 6, 1), statueMat);
+    body.position.y = 3;
+    statueGroup.add(body);
+    // Arms
+    const arms = new THREE.Mesh(new THREE.BoxGeometry(8, 0.8, 0.8), statueMat);
+    arms.position.y = 5.2;
+    statueGroup.add(arms);
     // Head
-    christGroup.add((() => {
-      const head = new THREE.Mesh(new THREE.SphereGeometry(0.7, 8, 6), statueMat);
-      head.position.y = 6.8;
-      return head;
-    })());
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.7, 8, 6), statueMat);
+    head.position.y = 6.8;
+    statueGroup.add(head);
     // Pedestal
-    christGroup.add((() => {
-      const ped = new THREE.Mesh(
-        new THREE.BoxGeometry(3, 2, 3),
-        new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.8 }),
-      );
-      ped.position.y = -1;
-      return ped;
-    })());
-    christGroup.position.set(-(RH + 70), 30, -300);
-    christGroup.scale.setScalar(2.5);
-    this.scene.add(christGroup);
-    this.themeObjects.push(christGroup);
-    this.background.push(christGroup);
+    const ped = new THREE.Mesh(
+      new THREE.BoxGeometry(3, 2, 3),
+      new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.8 }),
+    );
+    ped.position.y = -1;
+    statueGroup.add(ped);
+
+    statueGroup.scale.setScalar(1.8);
+    statueGroup.position.y = mtHeight;
+    corcovadoGroup.add(statueGroup);
+
+    // Place far left and deep in background so it's always visible
+    corcovadoGroup.position.set(-(RH + 120), 0, -400);
+    this.scene.add(corcovadoGroup);
+    this.themeObjects.push(corcovadoGroup);
+    this.background.push(corcovadoGroup);
 
     // ── DISTANT CITY SKYLINE — faded boxes along horizon ──
     const skylineMat = new THREE.MeshStandardMaterial({
@@ -734,47 +762,121 @@ export class Environment {
   }
 
   // =====================================================================
-  //  USA — Chicago night city
+  //  USA — Chicago sunset with varied architecture
   // =====================================================================
+
+  /** Generate a canvas window texture for a building face. */
+  _buildingWindowTex(wSegs, hSegs, wallColor, facingSun) {
+    const cW = 16, cH = 20;
+    const canvas = document.createElement('canvas');
+    canvas.width = wSegs * cW;
+    canvas.height = hSegs * cH;
+    const ctx = canvas.getContext('2d');
+    const wc = new THREE.Color(wallColor);
+    ctx.fillStyle = `rgb(${wc.r * 255 | 0},${wc.g * 255 | 0},${wc.b * 255 | 0})`;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    for (let y = 0; y < hSegs; y++) {
+      for (let x = 0; x < wSegs; x++) {
+        const wx = x * cW + 3, wy = y * cH + 4, ww = cW - 6, wh = cH - 8;
+        ctx.fillStyle = 'rgba(0,0,0,0.2)';
+        ctx.fillRect(wx - 1, wy - 1, ww + 2, wh + 2);
+
+        if (facingSun && Math.random() > 0.15) {
+          const r = 200 + (Math.random() * 55 | 0);
+          const g = 130 + (Math.random() * 60 | 0);
+          const b = 40 + (Math.random() * 40 | 0);
+          ctx.fillStyle = `rgb(${r},${g},${b})`;
+        } else if (!facingSun && Math.random() > 0.55) {
+          const v = 160 + (Math.random() * 80 | 0);
+          ctx.fillStyle = `rgb(${v},${v - 25},${v - 70})`;
+        } else {
+          const d = 20 + (Math.random() * 20 | 0);
+          ctx.fillStyle = `rgb(${d},${d + 5},${d + 15})`;
+        }
+        ctx.fillRect(wx, wy, ww, wh);
+      }
+    }
+    // Ground-floor awning
+    if (hSegs > 3) {
+      const gy = (hSegs - 1) * cH;
+      const awnings = ['#cc3333', '#336699', '#339966', '#cc6633', '#996633'];
+      ctx.fillStyle = awnings[(Math.random() * awnings.length) | 0];
+      ctx.fillRect(2, gy, canvas.width - 4, 3);
+    }
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.magFilter = THREE.NearestFilter;
+    return tex;
+  }
+
+  /** Create a procedural Chicago building with varied facade. */
+  _createChicagoBuilding(w, h, d) {
+    // Random architectural style
+    const styles = [
+      { color: 0x8B4513, r: 0.9, m: 0.02 },  // red brick
+      { color: 0x6B2A1A, r: 0.92, m: 0.02 }, // dark brick
+      { color: 0x7B7B85, r: 0.85, m: 0.05 }, // gray concrete
+      { color: 0xA09888, r: 0.8, m: 0.03 },  // limestone
+      { color: 0x445566, r: 0.15, m: 0.6 },  // glass tower
+      { color: 0xD4C8A8, r: 0.75, m: 0.02 }, // cream painted
+      { color: 0x7A6B5A, r: 0.88, m: 0.03 }, // brownstone
+    ];
+    const style = styles[(Math.random() * styles.length) | 0];
+
+    const wSegs = Math.max(2, (w / 1.5) | 0);
+    const dSegs = Math.max(2, (d / 1.5) | 0);
+    const hSegs = Math.max(3, (h / 2.5) | 0);
+
+    const sunFront = this._buildingWindowTex(wSegs, hSegs, style.color, true);
+    const shadeFront = this._buildingWindowTex(wSegs, hSegs, style.color, false);
+    const sunSide = this._buildingWindowTex(dSegs, hSegs, style.color, true);
+    const shadeSide = this._buildingWindowTex(dSegs, hSegs, style.color, false);
+
+    const roofMat = new THREE.MeshStandardMaterial({ color: 0x3a3a3a, roughness: 0.9 });
+    const baseMat = new THREE.MeshStandardMaterial({ color: style.color, roughness: style.r, metalness: style.m });
+
+    // BoxGeometry face order: [+X, -X, +Y, -Y, +Z, -Z]
+    // Sun comes from -Z, -X direction
+    const mats = [
+      new THREE.MeshBasicMaterial({ map: shadeSide }),  // +X shadow
+      new THREE.MeshBasicMaterial({ map: sunSide }),    // -X sun
+      roofMat,
+      baseMat,
+      new THREE.MeshBasicMaterial({ map: sunFront }),   // +Z sun
+      new THREE.MeshBasicMaterial({ map: shadeFront }), // -Z shadow
+    ];
+
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mats);
+    mesh.position.y = h / 2;
+    return mesh;
+  }
+
   _buildUSA() {
     const RH = ROAD_WIDTH / 2;
 
-    // Moonlight — wide fill for silhouette visibility
-    const moonLight = new THREE.PointLight(0x6677aa, 0.5, 500);
-    moonLight.position.set(-50, 120, -250);
-    this.scene.add(moonLight);
-    this.themeObjects.push(moonLight);
+    // ── Warm fill light ──
+    const warmFill = new THREE.DirectionalLight(0xff8844, 0.6);
+    warmFill.position.set(20, 10, 50);
+    this.scene.add(warmFill);
+    this.themeObjects.push(warmFill);
 
-    // ── City glow plane at horizon (light pollution) ──
-    const cityGlow = new THREE.Mesh(
-      new THREE.PlaneGeometry(400, 20),
-      new THREE.MeshBasicMaterial({
-        color: 0x2a1530, transparent: true, opacity: 0.18, depthWrite: false, side: THREE.DoubleSide,
+    // ── Lake Michigan ──
+    const lake = new THREE.Mesh(
+      new THREE.PlaneGeometry(200, 600),
+      new THREE.MeshStandardMaterial({
+        color: 0x2a5577, roughness: 0.3, metalness: 0.2,
+        emissive: 0x332211, emissiveIntensity: 0.15,
       }),
     );
-    cityGlow.position.set(0, 8, -350);
-    this.scene.add(cityGlow);
-    this.themeObjects.push(cityGlow);
-    this.background.push(cityGlow);
-
-    // ── Lake Michigan — dark reflective plane on right side ──
-    const lakeMat = new THREE.MeshStandardMaterial({
-      color: 0x0a1020, roughness: 0.4, metalness: 0.3,
-      emissive: 0x050810, emissiveIntensity: 0.3,
-    });
-    const lake = new THREE.Mesh(new THREE.PlaneGeometry(200, 600), lakeMat);
     lake.rotation.x = -Math.PI / 2;
-    lake.position.set(RH + 80, -0.3, -150);
+    lake.position.set(RH + 80, -0.2, -150);
     this.scene.add(lake);
     this.themeObjects.push(lake);
 
     // ══════════════════════════════════════════
-    //  BACKGROUND SKYLINE — tall skyscrapers (20% scroll)
+    //  BACKGROUND SKYLINE — GLTF skyscrapers (far, 20% scroll)
     // ══════════════════════════════════════════
-    const windowColors = [0xffcc66, 0xffffff, 0xaaccff, 0xffaa44];
-
     if (this.modelsReady) {
-      // Far skyline with Chicago skyscrapers → background (dense)
       const skyscrapers = [
         MODEL_URLS.chicagoSkyscraperA, MODEL_URLS.chicagoSkyscraperB,
         MODEL_URLS.chicagoSkyscraperC, MODEL_URLS.chicagoSkyscraperD,
@@ -782,73 +884,14 @@ export class Environment {
       ];
       for (const side of [-1, 1]) {
         for (let i = 0; i < 12; i++) {
-          const url = skyscrapers[Math.floor(Math.random() * skyscrapers.length)];
-          const x = side * (RH + 30 + Math.random() * 25);
-          const z = -i * 30 - Math.random() * 15;
-          const scale = 0.7 + Math.random() * 0.6;
-          const model = this._placeModel(url, x, 0, z, side > 0 ? Math.PI : 0, scale, 'bg');
-          this._darkenForNight(model);
+          const url = skyscrapers[(Math.random() * skyscrapers.length) | 0];
+          this._placeModel(url, side * (RH + 30 + Math.random() * 25), 0,
+            -i * 30 - Math.random() * 15, side > 0 ? Math.PI : 0,
+            0.7 + Math.random() * 0.6, 'bg');
         }
       }
 
-      // ── Midground buildings — lower buildings closer to road ──
-      const lowBuildings = [
-        MODEL_URLS.chicagoLowA, MODEL_URLS.chicagoLowB, MODEL_URLS.chicagoLowE,
-        MODEL_URLS.chicagoLowL, MODEL_URLS.chicagoLowM,
-      ];
-
-      // Collect window positions for InstancedMesh batching
-      const windowBuckets = {}; // color → [{x, y, z}]
-      for (const wc of windowColors) windowBuckets[wc] = [];
-
-      for (const side of [-1, 1]) {
-        for (let i = 0; i < 12; i++) {
-          const url = lowBuildings[Math.floor(Math.random() * lowBuildings.length)];
-          const x = side * (RH + 8 + Math.random() * 10);
-          const z = -i * 25 - Math.random() * 10;
-          const heightScale = 0.8 + Math.random() * 0.5;
-          const model = this._placeModel(url, x, 0, z, side > 0 ? Math.PI : 0, heightScale, 'mg');
-          this._darkenForNight(model);
-
-          // Collect window positions (batched below as InstancedMesh)
-          const buildingHeight = heightScale * 8;
-          const rows = Math.floor(buildingHeight / 1.2);
-          const cols = 3 + Math.floor(Math.random() * 3);
-          const faceOffset = side > 0 ? -1.2 : 1.2;
-
-          for (let r = 0; r < rows; r++) {
-            for (let c = 0; c < cols; c++) {
-              if (Math.random() < 0.35) continue; // some windows dark
-              const wc = windowColors[Math.floor(Math.random() * windowColors.length)];
-              windowBuckets[wc].push({
-                x: x + faceOffset, y: 1.2 + r * 1.2, z: z + (c - cols / 2) * 0.7,
-              });
-            }
-          }
-        }
-      }
-
-      // Batch all windows into InstancedMesh (1 draw call per color instead of hundreds)
-      const winGeo = new THREE.PlaneGeometry(0.45, 0.55);
-      for (const wc of windowColors) {
-        const positions = windowBuckets[wc];
-        if (positions.length === 0) continue;
-        const winMat = new THREE.MeshBasicMaterial({ color: wc, side: THREE.DoubleSide });
-        const instanced = new THREE.InstancedMesh(winGeo, winMat, positions.length);
-        const dummy = new THREE.Object3D();
-        for (let idx = 0; idx < positions.length; idx++) {
-          const p = positions[idx];
-          dummy.position.set(p.x, p.y, p.z);
-          dummy.updateMatrix();
-          instanced.setMatrixAt(idx, dummy.matrix);
-        }
-        instanced.instanceMatrix.needsUpdate = true;
-        this.scene.add(instanced);
-        this.themeObjects.push(instanced);
-        this.midground.push(instanced);
-      }
-
-      // Roadside props → foreground
+      // Roadside props
       this._scatterProps(
         [MODEL_URLS.dumpster, MODEL_URLS.trafficLight, MODEL_URLS.bench,
          MODEL_URLS.firehydrant, MODEL_URLS.trashcan, MODEL_URLS.mailbox],
@@ -859,116 +902,224 @@ export class Environment {
       this._scatterProps([MODEL_URLS.carSedan, MODEL_URLS.carTaxi, MODEL_URLS.carHatchback], 6, [2, 4], 50, 'fg');
     }
 
-    // ── The Bean (Cloud Gate) — reflective metallic ellipsoid ──
-    const beanGroup = new THREE.Group();
-    const beanMat = new THREE.MeshStandardMaterial({
-      color: 0x888899, metalness: 1.0, roughness: 0.05, envMapIntensity: 2.0,
-    });
-    const bean = new THREE.Mesh(new THREE.SphereGeometry(4, 12, 8), beanMat);
-    bean.scale.set(1.4, 0.7, 1.0);
-    beanGroup.add(bean);
-    beanGroup.position.set(-(RH + 22), 2.5, -120);
-    this.scene.add(beanGroup);
-    this.themeObjects.push(beanGroup);
-    this.midground.push(beanGroup);
+    // ══════════════════════════════════════════
+    //  MIDGROUND — Procedural buildings with varied facades (60% scroll)
+    // ══════════════════════════════════════════
+    for (const side of [-1, 1]) {
+      let z = 10;
+      while (z > -320) {
+        const w = 4 + Math.random() * 6;
+        const h = 6 + Math.random() * 14;
+        const d = 4 + Math.random() * 5;
+        const gap = 0.5 + Math.random() * 1.5;
 
-    // ── Procedural deciduous trees (not palms — it's Chicago) ──
-    const treeTrunkMat = new THREE.MeshStandardMaterial({ color: 0x2a1f16 });
-    const treeLeafMat = new THREE.MeshStandardMaterial({ color: 0x1a3a12, roughness: 0.85 });
-    for (let i = 0; i < 10; i++) {
-      const side = i % 2 === 0 ? -1 : 1;
-      const treeG = new THREE.Group();
-      const trH = 2.0 + Math.random() * 1.5;
-      const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.12, trH, 6), treeTrunkMat);
-      trunk.position.y = trH / 2;
-      treeG.add(trunk);
-      const canopy = new THREE.Mesh(new THREE.SphereGeometry(1.0 + Math.random() * 0.5, 6, 5), treeLeafMat);
-      canopy.position.y = trH + 0.4;
-      canopy.scale.y = 0.7;
-      treeG.add(canopy);
+        const bldg = this._createChicagoBuilding(w, h, d);
+        bldg.position.x = side * (RH + 8 + d / 2 + Math.random() * 4);
+        bldg.position.z = z - w / 2;
+        this.scene.add(bldg);
+        this.themeObjects.push(bldg);
+        this.midground.push(bldg);
 
-      treeG.position.set(side * (RH + 4 + Math.random() * 4), 0, -i * 30 - Math.random() * 15);
-      this.scene.add(treeG);
-      this.themeObjects.push(treeG);
-      this.foreground.push(treeG);
-    }
-
-    // ── Neon signs (emissive mesh, PointLight only on every other for perf) ──
-    const neonColors = [0xff00ff, 0x00ffff, 0xff4444, 0x44ff44, 0xff6600];
-    const boardMat = new THREE.MeshStandardMaterial({ color: 0x222222 });
-    for (let i = 0; i < 8; i++) {
-      const side = i % 2 === 0 ? -1 : 1;
-      const nColor = neonColors[Math.floor(Math.random() * neonColors.length)];
-      const neonGroup = new THREE.Group();
-
-      const board = new THREE.Mesh(new THREE.BoxGeometry(2.5, 0.8, 0.1), boardMat);
-      neonGroup.add(board);
-
-      const glow = new THREE.Mesh(
-        new THREE.PlaneGeometry(2.2, 0.6),
-        new THREE.MeshBasicMaterial({ color: nColor }),
-      );
-      glow.position.z = 0.06;
-      neonGroup.add(glow);
-
-      neonGroup.position.set(side * (RH + 6), 4 + Math.random() * 2, -i * 35 - 15);
-      neonGroup.rotation.y = side > 0 ? -0.3 : 0.3;
-      this.scene.add(neonGroup);
-      this.themeObjects.push(neonGroup);
-      this.midground.push(neonGroup);
-
-      // PointLight on every other sign only (halves light count)
-      if (i % 2 === 0) {
-        const nLight = new THREE.PointLight(nColor, 0.4, 10, 2);
-        nLight.position.copy(neonGroup.position);
-        this.scene.add(nLight);
-        this.themeObjects.push(nLight);
-        this.midground.push(nLight);
+        z -= w + gap;
       }
     }
 
-    // ── Street lamps (emissive fixture only — no PointLights for perf) ──
-    const poleMat = new THREE.MeshStandardMaterial({ color: 0x333333, metalness: 0.7 });
+    // ══════════════════════════════════════════
+    //  FOREGROUND — Trees, lamps, signs
+    // ══════════════════════════════════════════
+
+    // ── The Bean ──
+    const bean = new THREE.Mesh(
+      new THREE.SphereGeometry(4, 12, 8),
+      new THREE.MeshStandardMaterial({ color: 0xaa9988, metalness: 1.0, roughness: 0.05, envMapIntensity: 2.0 }),
+    );
+    bean.scale.set(1.4, 0.7, 1.0);
+    bean.position.set(-(RH + 22), 2.5, -120);
+    this.scene.add(bean);
+    this.themeObjects.push(bean);
+    this.midground.push(bean);
+
+    // ── Grass strips along roadside (blends ground into vegetation) ──
+    const grassMat = new THREE.MeshStandardMaterial({ color: 0x4a7a35, roughness: 0.95 });
+    for (const side of [-1, 1]) {
+      const strip = new THREE.Mesh(new THREE.PlaneGeometry(5, 600), grassMat);
+      strip.rotation.x = -Math.PI / 2;
+      strip.position.set(side * (RH + 3.5), 0.01, -150);
+      this.scene.add(strip);
+      this.themeObjects.push(strip);
+    }
+
+    // ── Deciduous trees — dense along sidewalks + second row behind ──
+    const treeTrunkMat = new THREE.MeshStandardMaterial({ color: 0x3a2a18 });
+    const canopyColors = [0x3d6b2e, 0x4a7a3a, 0x356328, 0x4d7040, 0x3a5c2a];
+    const trunkGeo = new THREE.CylinderGeometry(0.1, 0.15, 2.5, 5);
+    const canopyGeo = new THREE.SphereGeometry(1, 6, 5);
+
+    // Front row — close to road (sidewalk trees)
+    for (const side of [-1, 1]) {
+      for (let z = 10; z > -320; z -= 6 + Math.random() * 8) {
+        if (Math.random() > 0.7) continue;
+        const treeG = new THREE.Group();
+        const trunk = new THREE.Mesh(trunkGeo, treeTrunkMat);
+        trunk.position.y = 1.25;
+        treeG.add(trunk);
+        const cc = canopyColors[(Math.random() * canopyColors.length) | 0];
+        const canopy = new THREE.Mesh(canopyGeo,
+          new THREE.MeshStandardMaterial({ color: cc, roughness: 0.9, flatShading: true }));
+        canopy.position.y = 3.2 + Math.random() * 0.5;
+        canopy.scale.set(0.8 + Math.random() * 0.5, 0.6 + Math.random() * 0.3, 0.8 + Math.random() * 0.5);
+        treeG.add(canopy);
+        treeG.position.set(side * (RH + 2.5 + Math.random() * 2), 0, z);
+        treeG.scale.setScalar(0.8 + Math.random() * 0.4);
+        this.scene.add(treeG);
+        this.themeObjects.push(treeG);
+        this.foreground.push(treeG);
+      }
+    }
+
+    // Back row — behind buildings (park trees, larger)
+    for (const side of [-1, 1]) {
+      for (let z = 0; z > -320; z -= 12 + Math.random() * 18) {
+        if (Math.random() > 0.6) continue;
+        const treeG = new THREE.Group();
+        const trunk = new THREE.Mesh(trunkGeo, treeTrunkMat);
+        trunk.position.y = 1.25;
+        treeG.add(trunk);
+        const cc = canopyColors[(Math.random() * canopyColors.length) | 0];
+        const canopy = new THREE.Mesh(canopyGeo,
+          new THREE.MeshStandardMaterial({ color: cc, roughness: 0.9, flatShading: true }));
+        canopy.position.y = 3.5 + Math.random() * 0.5;
+        canopy.scale.set(1.0 + Math.random() * 0.6, 0.7 + Math.random() * 0.3, 1.0 + Math.random() * 0.6);
+        treeG.add(canopy);
+        treeG.position.set(side * (RH + 18 + Math.random() * 8), 0, z);
+        treeG.scale.setScalar(1.0 + Math.random() * 0.5);
+        this.scene.add(treeG);
+        this.themeObjects.push(treeG);
+        this.midground.push(treeG);
+      }
+    }
+
+    // ── Street lamps ──
+    const poleMat = new THREE.MeshStandardMaterial({ color: 0x333333, metalness: 0.5 });
     const fixtureMat = new THREE.MeshBasicMaterial({ color: 0xffdd88 });
     for (let i = 0; i < 8; i++) {
       const side = i % 2 === 0 ? -1 : 1;
       const lampGroup = new THREE.Group();
-      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.06, 4, 5), poleMat);
-      pole.position.y = 2;
-      lampGroup.add(pole);
-      const fixture = new THREE.Mesh(new THREE.SphereGeometry(0.15, 4, 3), fixtureMat);
-      fixture.position.y = 4.1;
-      lampGroup.add(fixture);
-
+      lampGroup.add((() => {
+        const p = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.06, 4, 5), poleMat);
+        p.position.y = 2; return p;
+      })());
+      lampGroup.add((() => {
+        const f = new THREE.Mesh(new THREE.SphereGeometry(0.15, 4, 3), fixtureMat);
+        f.position.y = 4.1; return f;
+      })());
       lampGroup.position.set(side * (RH + 1.5), 0, -i * 35 - Math.random() * 10);
       this.scene.add(lampGroup);
       this.themeObjects.push(lampGroup);
       this.foreground.push(lampGroup);
     }
+
+    // ── Signs ──
+    const signColors = [0xcc4444, 0x3366aa, 0xddaa33, 0x448844, 0xcc6633];
+    const signMat = new THREE.MeshStandardMaterial({ color: 0x555555 });
+    for (let i = 0; i < 6; i++) {
+      const side = i % 2 === 0 ? -1 : 1;
+      const sg = new THREE.Group();
+      sg.add(new THREE.Mesh(new THREE.BoxGeometry(2.5, 1.0, 0.1), signMat));
+      const face = new THREE.Mesh(new THREE.PlaneGeometry(2.2, 0.7),
+        new THREE.MeshStandardMaterial({ color: signColors[(Math.random() * signColors.length) | 0], roughness: 0.5 }));
+      face.position.z = 0.06;
+      sg.add(face);
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 3, 4), signMat);
+      pole.position.y = -2;
+      sg.add(pole);
+      sg.position.set(side * (RH + 5), 4.5 + Math.random() * 1.5, -i * 45 - 20);
+      this.scene.add(sg);
+      this.themeObjects.push(sg);
+      this.midground.push(sg);
+    }
   }
 
-  /** Darken a model for night scene (preserves texture). */
-  _darkenForNight(model) {
-    model.traverse((child) => {
-      if (child.isMesh && child.material) {
-        child.material = child.material.clone();
-        // Darken via color multiply — texture stays, just rendered darker
-        child.material.color.multiplyScalar(0.35);
-        child.material.roughness = 0.8;
-        child.material.metalness = 0;
-        child.material.envMapIntensity = 0;
+  // =====================================================================
+  //  PERU — Andean mountain pass (improved)
+  // =====================================================================
+
+  /** Create a mountain with vertex displacement + altitude gradient colors. */
+  _createAndeanMountain(radius, height, segments) {
+    const seg = Math.max(segments || 12, 10); // smoother silhouette
+    const geo = new THREE.ConeGeometry(radius, height, seg);
+    const pos = geo.attributes.position;
+
+    // Vertex displacement for organic rocky shape
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
+      const hNorm = (y + height / 2) / height;
+      if (hNorm > 0.95) continue; // preserve clean peak
+      const strength = hNorm < 0.1 ? 0.3 : 1.0;
+      const noise = Math.sin(x * 3.7 + z * 2.3) * Math.cos(y * 1.8 + x * 4.1);
+      const disp = noise * radius * 0.1 * strength;
+      const dist = Math.sqrt(x * x + z * z);
+      if (dist > 0.01) {
+        pos.setX(i, x + (x / dist) * disp);
+        pos.setZ(i, z + (z / dist) * disp);
       }
-    });
+      pos.setY(i, y + noise * height * 0.015);
+    }
+    geo.computeVertexNormals();
+
+    // Altitude gradient colors
+    const colors = new Float32Array(pos.count * 3);
+    const zones = [
+      { max: 0.30, from: new THREE.Color(0x4a7a33), to: new THREE.Color(0x5a7a3a) },
+      { max: 0.50, from: new THREE.Color(0x5a7a3a), to: new THREE.Color(0x7a6b50) },
+      { max: 0.70, from: new THREE.Color(0x7a6b50), to: new THREE.Color(0x8a7a65) },
+      { max: 0.85, from: new THREE.Color(0x8a7a65), to: new THREE.Color(0xa09888) },
+      { max: 1.00, from: new THREE.Color(0xa09888), to: new THREE.Color(0xe8e4e0) },
+    ];
+    const tmp = new THREE.Color();
+    for (let i = 0; i < pos.count; i++) {
+      const t = Math.max(0, Math.min(1, (pos.getY(i) + height / 2) / height));
+      tmp.set(0x4a7a33);
+      for (let zi = 0; zi < zones.length; zi++) {
+        if (t <= zones[zi].max) {
+          const prev = zi > 0 ? zones[zi - 1].max : 0;
+          const local = (t - prev) / (zones[zi].max - prev);
+          tmp.copy(zones[zi].from).lerp(zones[zi].to, local);
+          break;
+        }
+      }
+      tmp.r += (Math.random() - 0.5) * 0.03;
+      tmp.g += (Math.random() - 0.5) * 0.03;
+      tmp.b += (Math.random() - 0.5) * 0.03;
+      colors[i * 3] = tmp.r;
+      colors[i * 3 + 1] = tmp.g;
+      colors[i * 3 + 2] = tmp.b;
+    }
+    geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    return new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
+      vertexColors: true, roughness: 0.88, flatShading: true,
+    }));
   }
 
-  // =====================================================================
-  //  PERU — Andean mountain pass
-  // =====================================================================
+  /** Apply atmospheric perspective (blue-tint) to distant mountain vertex colors. */
+  _applyAtmosphere(mesh, amount) {
+    const fogCol = new THREE.Color(0xaabbcc);
+    const colors = mesh.geometry.attributes.color;
+    for (let i = 0; i < colors.count; i++) {
+      colors.setXYZ(i,
+        colors.getX(i) + (fogCol.r - colors.getX(i)) * amount,
+        colors.getY(i) + (fogCol.g - colors.getY(i)) * amount,
+        colors.getZ(i) + (fogCol.b - colors.getZ(i)) * amount,
+      );
+    }
+    colors.needsUpdate = true;
+  }
+
   _buildPeru() {
     const RH = ROAD_WIDTH / 2;
 
-    // ── Green valley ground planes (both sides) ──
-    const valleyMat = new THREE.MeshStandardMaterial({ color: 0x4a7a2a, roughness: 0.9 });
+    // ── Valley ground (warm green) ──
+    const valleyMat = new THREE.MeshStandardMaterial({ color: 0x5a7a40, roughness: 0.9 });
     for (const side of [-1, 1]) {
       const valley = new THREE.Mesh(new THREE.PlaneGeometry(80, 600), valleyMat);
       valley.rotation.x = -Math.PI / 2;
@@ -977,69 +1128,78 @@ export class Environment {
       this.themeObjects.push(valley);
     }
 
-    // ══════════════════════════════════════════
-    //  MOUNTAINS (background, 20% scroll)
-    // ══════════════════════════════════════════
-    const mtColors = [0x7a8a6a, 0x6a7a5a, 0x8a8a7a, 0x5a7a4a, 0x6a8a5a];
-    for (const side of [-1, 1]) {
-      for (let i = 0; i < 6; i++) {
-        const radius = 12 + Math.random() * 15;
-        const height = 30 + Math.random() * 45;
-        const color = mtColors[Math.floor(Math.random() * mtColors.length)];
-        const mt = new THREE.Mesh(
-          new THREE.ConeGeometry(radius, height, 5 + Math.floor(Math.random() * 3)),
-          new THREE.MeshStandardMaterial({ color, roughness: 0.9, flatShading: true }),
-        );
-        // Place center far enough that base edge (center - radius) clears road
-        const minX = radius + 20; // radius + 20-unit buffer from road center
-        mt.position.set(
-          side * (minX + 20 + Math.random() * 25), height / 2 - 4,
-          -i * 55 - Math.random() * 20,
-        );
-        this.scene.add(mt);
-        this.themeObjects.push(mt);
-        this.background.push(mt);
-
-        // Snow cap
-        if (height > 30 || Math.random() > 0.3) {
-          const snow = new THREE.Mesh(
-            new THREE.ConeGeometry(radius * 0.28, height * 0.15, 5),
-            new THREE.MeshStandardMaterial({
-              color: 0xffffff, emissive: 0xffffff, emissiveIntensity: 0.15, roughness: 0.5,
-            }),
-          );
-          snow.position.y = height * 0.43;
-          mt.add(snow);
-        }
+    // ── Ground variation patches (dirt, light grass, dark grass, rock) ──
+    const patchGeo = new THREE.CircleGeometry(1, 6);
+    const patchMats = [
+      new THREE.MeshStandardMaterial({ color: 0x8a7a5a, roughness: 0.95 }), // dirt
+      new THREE.MeshStandardMaterial({ color: 0x6a9a4a, roughness: 0.95 }), // light grass
+      new THREE.MeshStandardMaterial({ color: 0x3a5a25, roughness: 0.95 }), // dark grass
+      new THREE.MeshStandardMaterial({ color: 0x7a7a6a, roughness: 0.92 }), // rock
+    ];
+    for (let z = 15; z > -300; z -= 4 + Math.random() * 6) {
+      for (const side of [-1, 1]) {
+        if (Math.random() > 0.4) continue;
+        const patch = new THREE.Mesh(patchGeo, patchMats[(Math.random() * patchMats.length) | 0]);
+        patch.rotation.x = -Math.PI / 2;
+        patch.position.set(side * (RH + 5 + Math.random() * 18), 0.01 + Math.random() * 0.01, z);
+        patch.scale.setScalar(1.5 + Math.random() * 3.5);
+        this.scene.add(patch);
+        this.themeObjects.push(patch);
+        this.foreground.push(patch);
       }
     }
 
-    // ── Distant mountain range silhouette (far back, very tall) ──
-    // Placed on both sides, never crossing the road zone (|x| > radius + 20)
-    const rangeMat = new THREE.MeshStandardMaterial({ color: 0x6a7a8a, roughness: 0.9 });
-    for (const side of [-1, 1]) {
-      for (let i = 0; i < 5; i++) {
-        const h = 40 + Math.random() * 30;
-        const r = 15 + Math.random() * 10;
-        const peak = new THREE.Mesh(new THREE.ConeGeometry(r, h, 4), rangeMat);
-        // Ensure center is far enough that base edge doesn't reach road
-        const x = side * (r + 30 + i * 20 + Math.random() * 10);
-        peak.position.set(x, h / 2 - 6, -350 - Math.random() * 50);
-        this.scene.add(peak);
-        this.themeObjects.push(peak);
-        this.background.push(peak);
+    // ══════════════════════════════════════════
+    //  MOUNTAINS — vertex-colored + displaced (background)
+    // ══════════════════════════════════════════
+    const mtConfigs = [
+      { r: 25, h: 55, x: -50, z: -250 },
+      { r: 20, h: 48, x: 55, z: -280 },
+      { r: 18, h: 38, x: -75, z: -200 },
+      { r: 15, h: 32, x: 70, z: -230 },
+      { r: 22, h: 42, x: -90, z: -310 },
+      { r: 16, h: 35, x: 85, z: -260 },
+      { r: 12, h: 20, x: -40, z: -150 },
+      { r: 14, h: 22, x: 45, z: -160 },
+      { r: 10, h: 16, x: -65, z: -130 },
+      { r: 11, h: 18, x: 70, z: -140 },
+    ];
+    for (const cfg of mtConfigs) {
+      // Main peak
+      const mt = this._createAndeanMountain(cfg.r, cfg.h);
+      mt.position.set(cfg.x, cfg.h / 2 - 4, cfg.z);
+      const dist = Math.abs(cfg.z) / 350;
+      if (dist > 0.3) this._applyAtmosphere(mt, dist * 0.35);
+      this.scene.add(mt);
+      this.themeObjects.push(mt);
+      this.background.push(mt);
+
+      // 1-2 secondary ridges behind each peak (creates ridgeline)
+      const ridgeCount = cfg.h > 30 ? 2 : 1;
+      for (let ri = 0; ri < ridgeCount; ri++) {
+        const rr = cfg.r * (0.5 + Math.random() * 0.35);
+        const rh = cfg.h * (0.4 + Math.random() * 0.3);
+        const ridge = this._createAndeanMountain(rr, rh);
+        const angle = (ri / ridgeCount) * Math.PI + Math.random() * 0.5;
+        ridge.position.set(
+          cfg.x + Math.cos(angle) * cfg.r * 0.4,
+          rh / 2 - 4,
+          cfg.z + Math.sin(angle) * cfg.r * 0.4 - 5,
+        );
+        if (dist > 0.3) this._applyAtmosphere(ridge, dist * 0.35);
+        this.scene.add(ridge);
+        this.themeObjects.push(ridge);
+        this.background.push(ridge);
       }
     }
 
-    // ── Mist/cloud layers between mountains ──
+    // ── Mist layers ──
     const mistMat = new THREE.MeshBasicMaterial({
-      color: 0xddeeff, transparent: true, opacity: 0.25, depthWrite: false, side: THREE.DoubleSide,
+      color: 0xccddee, transparent: true, opacity: 0.2, depthWrite: false, side: THREE.DoubleSide,
     });
-    for (let i = 0; i < 5; i++) {
-      const mist = new THREE.Mesh(new THREE.PlaneGeometry(60 + Math.random() * 40, 6 + Math.random() * 4), mistMat);
-      mist.position.set(
-        (Math.random() - 0.5) * 100, 10 + Math.random() * 15, -80 - i * 50 - Math.random() * 30,
-      );
+    for (let i = 0; i < 6; i++) {
+      const mist = new THREE.Mesh(new THREE.PlaneGeometry(60 + Math.random() * 40, 5 + Math.random() * 4), mistMat);
+      mist.position.set((Math.random() - 0.5) * 100, 8 + Math.random() * 12, -80 - i * 45 - Math.random() * 25);
       mist.lookAt(0, mist.position.y, 0);
       this.scene.add(mist);
       this.themeObjects.push(mist);
@@ -1047,20 +1207,18 @@ export class Environment {
     }
 
     // ══════════════════════════════════════════
-    //  ROLLING HILLS (midground, 60% scroll)
+    //  ROLLING HILLS (midground)
     // ══════════════════════════════════════════
     const hillColors = [0x5a8a3a, 0x4a7a2a, 0x6a9a4a];
     for (const side of [-1, 1]) {
-      for (let i = 0; i < 6; i++) {
+      for (let i = 0; i < 7; i++) {
         const r = 4 + Math.random() * 5;
         const hill = new THREE.Mesh(
-          new THREE.SphereGeometry(r, 10, 6),
-          new THREE.MeshStandardMaterial({
-            color: hillColors[Math.floor(Math.random() * hillColors.length)], roughness: 0.9,
-          }),
+          new THREE.SphereGeometry(r, 8, 5),
+          new THREE.MeshStandardMaterial({ color: hillColors[i % hillColors.length], roughness: 0.9 }),
         );
         hill.scale.y = 0.3;
-        hill.position.set(side * (RH + 14 + Math.random() * 14), -1.5, -i * 45 - Math.random() * 20);
+        hill.position.set(side * (RH + 14 + Math.random() * 14), -1.5, -i * 40 - Math.random() * 20);
         this.scene.add(hill);
         this.themeObjects.push(hill);
         this.midground.push(hill);
@@ -1068,69 +1226,200 @@ export class Environment {
     }
 
     // ══════════════════════════════════════════
-    //  INCA TERRACES (midground) — enhanced with grass tops
+    //  INCA TERRACES (midground)
     // ══════════════════════════════════════════
-    const terrMats = [0x7a6b4f, 0x8a7a5a, 0x6a5b3f, 0x7a6a44].map(
-      c => new THREE.MeshStandardMaterial({ color: c, roughness: 0.9 })
-    );
-    const grassMat = new THREE.MeshStandardMaterial({ color: 0x66aa44, roughness: 0.85 });
+    const terrMat = new THREE.MeshStandardMaterial({ color: 0x7a6b4f, roughness: 0.9 });
+    const tGrassMat = new THREE.MeshStandardMaterial({ color: 0x5a9a3a, roughness: 0.85 });
     for (let i = 0; i < 5; i++) {
       const terrGroup = new THREE.Group();
-      for (let level = 0; level < 6; level++) {
-        const w = 6 - level * 0.9;
-        const step = new THREE.Mesh(
-          new THREE.BoxGeometry(w, 0.7, w + 2),
-          terrMats[Math.min(level, terrMats.length - 1)],
-        );
-        step.position.y = level * 0.7;
+      const levels = 5 + Math.floor(Math.random() * 2);
+      const baseW = 8 + Math.random() * 4;
+      for (let level = 0; level < levels; level++) {
+        const w = baseW - level * (baseW * 0.12);
+        const step = new THREE.Mesh(new THREE.BoxGeometry(w, 1.0, 3), terrMat);
+        step.position.set(0, level * 1.0 + 0.5, level * 0.6);
         terrGroup.add(step);
-
-        const grass = new THREE.Mesh(
-          new THREE.BoxGeometry(w - 0.2, 0.12, w + 1.6), grassMat,
-        );
-        grass.position.y = level * 0.7 + 0.4;
+        const grass = new THREE.Mesh(new THREE.BoxGeometry(w - 0.2, 0.1, 2.6), tGrassMat);
+        grass.position.set(0, level * 1.0 + 1.05, level * 0.6);
         terrGroup.add(grass);
       }
       const side = i % 2 === 0 ? -1 : 1;
-      terrGroup.position.set(
-        side * (RH + 16 + Math.random() * 10), 0, -i * 70 - 30,
-      );
+      terrGroup.position.set(side * (RH + 16 + Math.random() * 10), 0, -i * 65 - 25);
+      terrGroup.rotation.y = (Math.random() - 0.5) * 0.3;
       this.scene.add(terrGroup);
       this.themeObjects.push(terrGroup);
       this.midground.push(terrGroup);
     }
 
     // ══════════════════════════════════════════
-    //  ICHU GRASS CLUMPS (foreground) — shared materials
+    //  PROCEDURAL ANDEAN HOUSES (midground, clustered)
+    // ══════════════════════════════════════════
+    const wallColors = [0xD4B896, 0xC8A87A, 0xBB9966, 0xE8D5B8, 0xAA8866, 0xCC9955];
+    const roofColors = [0x8B4513, 0x7A3B10, 0x6B3A1A, 0x994422];
+    const doorMat = new THREE.MeshBasicMaterial({ color: 0x2a1a0a });
+
+    const clusters = [
+      { z: -20, side: -1, count: 6 },
+      { z: -55, side: 1, count: 5 },
+      { z: -95, side: -1, count: 7 },
+      { z: -130, side: 1, count: 4 },
+      { z: -170, side: -1, count: 6 },
+      { z: -210, side: 1, count: 5 },
+      { z: -255, side: -1, count: 4 },
+    ];
+    for (const cl of clusters) {
+      for (let j = 0; j < cl.count; j++) {
+        const hg = new THREE.Group();
+        const w = 2 + Math.random() * 2, h = 1.5 + Math.random() * 1.5, d = 2 + Math.random() * 2;
+        hg.add((() => {
+          const body = new THREE.Mesh(new THREE.BoxGeometry(w, h, d),
+            new THREE.MeshStandardMaterial({ color: wallColors[(Math.random() * wallColors.length) | 0], roughness: 0.9 }));
+          body.position.y = h / 2; return body;
+        })());
+        hg.add((() => {
+          const roof = new THREE.Mesh(new THREE.ConeGeometry(Math.max(w, d) * 0.75, h * 0.5, 4),
+            new THREE.MeshStandardMaterial({ color: roofColors[(Math.random() * roofColors.length) | 0], roughness: 0.85 }));
+          roof.position.y = h + h * 0.25; roof.rotation.y = Math.PI / 4; return roof;
+        })());
+        hg.add((() => {
+          const dr = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.9), doorMat);
+          dr.position.set(0, 0.45, d / 2 + 0.01); return dr;
+        })());
+        hg.position.set(
+          cl.side * (RH + 14 + Math.random() * 14),
+          0, cl.z + (Math.random() - 0.5) * 18,
+        );
+        hg.rotation.y = Math.random() * Math.PI * 2;
+        hg.scale.setScalar(0.8 + Math.random() * 0.4);
+        this.scene.add(hg);
+        this.themeObjects.push(hg);
+        this.midground.push(hg);
+      }
+    }
+
+    // ══════════════════════════════════════════
+    //  LLAMAS (midground)
+    // ══════════════════════════════════════════
+    const llamaMat = new THREE.MeshStandardMaterial({ color: 0xeeddcc, roughness: 0.9 });
+    const llamaSpots = [{ x: -22, z: -45, n: 3 }, { x: 35, z: -135, n: 2 }, { x: -30, z: -210, n: 3 }];
+    for (const spot of llamaSpots) {
+      for (let j = 0; j < spot.n; j++) {
+        const lg = new THREE.Group();
+        const bodyMat = Math.random() > 0.5 ? llamaMat : new THREE.MeshStandardMaterial({ color: 0xccbb99, roughness: 0.9 });
+        lg.add((() => { const b = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.5, 1.2), bodyMat); b.position.y = 0.9; return b; })());
+        lg.add((() => { const n = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.9, 0.25), bodyMat); n.position.set(0, 1.5, -0.4); n.rotation.x = -0.2; return n; })());
+        lg.add((() => { const h = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.25, 0.35), bodyMat); h.position.set(0, 2.0, -0.6); return h; })());
+        for (const [lx, lz] of [[-0.2, -0.4], [0.2, -0.4], [-0.2, 0.4], [0.2, 0.4]]) {
+          const leg = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.65, 0.12), bodyMat);
+          leg.position.set(lx, 0.32, lz);
+          lg.add(leg);
+        }
+        lg.position.set(spot.x + (Math.random() - 0.5) * 6, 0, spot.z + (Math.random() - 0.5) * 8);
+        lg.rotation.y = Math.random() * Math.PI * 2;
+        lg.scale.setScalar(0.6 + Math.random() * 0.3);
+        this.scene.add(lg);
+        this.themeObjects.push(lg);
+        this.midground.push(lg);
+      }
+    }
+
+    // ══════════════════════════════════════════
+    //  TREES — dense, 3 types (foreground + midground)
+    // ══════════════════════════════════════════
+    const trunkMat = new THREE.MeshStandardMaterial({ color: 0x5c3d1e, roughness: 0.9 });
+    const trunkGeo = new THREE.CylinderGeometry(0.1, 0.15, 2, 5);
+    const pineGeo = new THREE.ConeGeometry(1.2, 3.5, 6);
+    const bushGeo = new THREE.SphereGeometry(0.8, 5, 4);
+    const roundGeo = new THREE.SphereGeometry(1.0, 5, 4);
+    const canopyColors = [0x2d5a1e, 0x3a6a2a, 0x4a7a35, 0x356328, 0x4d7040];
+
+    // Pre-create shared canopy materials (5 shades)
+    const canopyMats = canopyColors.map(
+      c => new THREE.MeshStandardMaterial({ color: c, roughness: 0.9, flatShading: true })
+    );
+    const pickCanopy = () => canopyMats[(Math.random() * canopyMats.length) | 0];
+
+    // Foreground trees — denser (spacing 3-7 units, 60% fill)
+    for (const side of [-1, 1]) {
+      for (let z = 15; z > -320; z -= 3 + Math.random() * 4) {
+        if (Math.random() > 0.6) continue;
+        const tg = new THREE.Group();
+        const type = Math.random();
+        if (type < 0.4) {
+          tg.add((() => { const t = new THREE.Mesh(trunkGeo, trunkMat); t.position.y = 1; return t; })());
+          tg.add((() => { const c = new THREE.Mesh(pineGeo, pickCanopy()); c.position.y = 3.5; return c; })());
+        } else if (type < 0.65) {
+          tg.add((() => { const b = new THREE.Mesh(bushGeo, pickCanopy()); b.position.y = 0.5; b.scale.y = 0.6; return b; })());
+        } else {
+          tg.add((() => { const t = new THREE.Mesh(trunkGeo, trunkMat); t.position.y = 1; return t; })());
+          tg.add((() => { const c = new THREE.Mesh(roundGeo, pickCanopy()); c.position.y = 3; c.scale.set(0.8, 1.1, 0.8); return c; })());
+        }
+        tg.position.set(side * (RH + 3 + Math.random() * 5), 0, z);
+        tg.scale.setScalar(0.6 + Math.random() * 0.6);
+        this.scene.add(tg);
+        this.themeObjects.push(tg);
+        this.foreground.push(tg);
+      }
+    }
+
+    // Midground trees — dense fill between terraces and houses
+    for (const side of [-1, 1]) {
+      for (let z = 15; z > -320; z -= 2.5 + Math.random() * 4) {
+        if (Math.random() > 0.45) continue;
+        const tg = new THREE.Group();
+        tg.add((() => { const t = new THREE.Mesh(trunkGeo, trunkMat); t.position.y = 1; return t; })());
+        const geoType = Math.random() > 0.5 ? pineGeo : roundGeo;
+        tg.add((() => { const c = new THREE.Mesh(geoType, pickCanopy()); c.position.y = geoType === pineGeo ? 3.5 : 3; return c; })());
+        tg.position.set(side * (RH + 16 + Math.random() * 22), 0, z);
+        tg.scale.setScalar(0.5 + Math.random() * 0.8);
+        this.scene.add(tg);
+        this.themeObjects.push(tg);
+        this.midground.push(tg);
+      }
+    }
+
+    // Hillside trees (background — canopy blobs on mountain bases, no trunk)
+    for (let i = 0; i < 35; i++) {
+      const canopy = new THREE.Mesh(pineGeo, pickCanopy());
+      canopy.position.set(
+        (Math.random() > 0.5 ? 1 : -1) * (30 + Math.random() * 45),
+        Math.random() * 6,
+        -80 - Math.random() * 200,
+      );
+      canopy.scale.setScalar(0.3 + Math.random() * 0.5);
+      this.scene.add(canopy);
+      this.themeObjects.push(canopy);
+      this.midground.push(canopy);
+    }
+
+    // ══════════════════════════════════════════
+    //  GRASS CLUMPS + ROCKS (foreground)
     // ══════════════════════════════════════════
     const ichuMats = [0x9aaa3a, 0x8a9a2a, 0x7a8a1a, 0xaaaa4a].map(
       c => new THREE.MeshStandardMaterial({ color: c, roughness: 0.9 })
     );
     const clumpGeo = new THREE.SphereGeometry(0.3, 4, 3);
-    for (let i = 0; i < 30; i++) {
+    for (let i = 0; i < 25; i++) {
       const side = i % 2 === 0 ? -1 : 1;
       const clump = new THREE.Mesh(clumpGeo, ichuMats[i % ichuMats.length]);
       const s = 0.6 + Math.random() * 0.8;
       clump.scale.set(s, s * 0.5, s);
-      clump.position.set(side * (RH + 4 + Math.random() * 14), 0, -i * 13 - Math.random() * 5);
+      clump.position.set(side * (RH + 4 + Math.random() * 14), 0, -i * 15 - Math.random() * 5);
       this.scene.add(clump);
       this.themeObjects.push(clump);
       this.foreground.push(clump);
     }
 
-    // ══════════════════════════════════════════
-    //  ROCKS / BOULDERS (foreground) — shared geometry + materials
-    // ══════════════════════════════════════════
     const rockMats = [0x6b5b45, 0x7a6b55, 0x5a4a35].map(
       c => new THREE.MeshStandardMaterial({ color: c, roughness: 1.0 })
     );
     const rockGeo = new THREE.DodecahedronGeometry(0.5, 0);
-    for (let i = 0; i < 12; i++) {
+    for (let i = 0; i < 10; i++) {
       const side = i % 2 === 0 ? -1 : 1;
       const s = 0.6 + Math.random() * 1.0;
       const rock = new THREE.Mesh(rockGeo, rockMats[i % rockMats.length]);
       rock.scale.setScalar(s);
-      rock.position.set(side * (RH + 4 + Math.random() * 7), s * 0.2, -i * 25 - Math.random() * 10);
+      rock.position.set(side * (RH + 4 + Math.random() * 7), s * 0.2, -i * 28 - Math.random() * 10);
       rock.rotation.set(Math.random(), Math.random(), Math.random());
       this.scene.add(rock);
       this.themeObjects.push(rock);
@@ -1138,75 +1427,40 @@ export class Environment {
     }
 
     // ══════════════════════════════════════════
-    //  LOADED MODELS
+    //  LOADED MODELS (if available)
     // ══════════════════════════════════════════
     if (this.modelsReady) {
-      // Peru buildings (Andean village clusters) → midground
       const peruBldgs = [
         MODEL_URLS.peruBuildingA, MODEL_URLS.peruBuildingB, MODEL_URLS.peruBuildingC,
         MODEL_URLS.peruBuildingD, MODEL_URLS.peruBuildingE, MODEL_URLS.peruBuildingF,
         MODEL_URLS.peruBuildingR, MODEL_URLS.peruBuildingS, MODEL_URLS.peruBuildingT,
       ];
-      // Village clusters along hillsides
-      for (let i = 0; i < 8; i++) {
+      for (let i = 0; i < 10; i++) {
         const side = i % 2 === 0 ? -1 : 1;
-        const url = peruBldgs[Math.floor(Math.random() * peruBldgs.length)];
-        const x = side * (RH + 10 + Math.random() * 10);
-        const y = Math.random() * 1.5;
-        this._placeModel(url, x, y, -i * 35 - Math.random() * 15,
-          Math.random() * Math.PI * 2, 0.7 + Math.random() * 0.4, 'mg');
+        const url = peruBldgs[(Math.random() * peruBldgs.length) | 0];
+        this._placeModel(url, side * (RH + 10 + Math.random() * 10), 0,
+          -i * 30 - Math.random() * 15, Math.random() * Math.PI * 2, 0.7 + Math.random() * 0.4, 'mg');
       }
 
-      // Peru trees → foreground/midground
-      for (let i = 0; i < 8; i++) {
+      for (let i = 0; i < 10; i++) {
         const side = i % 2 === 0 ? -1 : 1;
         const url = Math.random() > 0.5 ? MODEL_URLS.peruTreeLarge : MODEL_URLS.peruTreeSmall;
-        this._placeModel(url, side * (RH + 4 + Math.random() * 8), 0,
-          -i * 30 - Math.random() * 15, Math.random() * Math.PI * 2, 0.8 + Math.random() * 0.4, 'fg');
+        this._placeModel(url, side * (RH + 5 + Math.random() * 8), 0,
+          -i * 28 - Math.random() * 12, Math.random() * Math.PI * 2, 0.8 + Math.random() * 0.4, 'fg');
       }
 
-      // Planters near road → foreground
       this._scatterProps([MODEL_URLS.peruPlanter], 6, [2, 5], 45, 'fg');
-
-      // Existing props
       this._scatterProps([MODEL_URLS.bush], 8, [4, 9], 30, 'fg');
       this._scatterProps([MODEL_URLS.flowers], 8, [3, 12], 30, 'fg');
       this._scatterProps([MODEL_URLS.stoneWall], 6, [4, 10], 45, 'fg');
 
-      // Andean huts → midground
-      for (let i = 0; i < 4; i++) {
+      for (let i = 0; i < 5; i++) {
         const side = i % 2 === 0 ? -1 : 1;
         this._placeModel(MODEL_URLS.hut, side * (RH + 12 + Math.random() * 6), 0,
-          -i * 80 - 30, Math.random() * Math.PI * 2, 0.9 + Math.random() * 0.2, 'mg');
+          -i * 65 - 25, Math.random() * Math.PI * 2, 0.9 + Math.random() * 0.2, 'mg');
       }
 
       this._scatterProps([MODEL_URLS.tires, MODEL_URLS.raceBarrier], 4, [2, 4], 70, 'fg');
-    } else {
-      // ── Procedural fallback trees ──
-      const foliageColors = [0x2d5a1e, 0x3a6a2a, 0x4a8a3a];
-      const trunkMat = new THREE.MeshStandardMaterial({ color: 0x4a3728 });
-      for (const side of [-1, 1]) {
-        for (let i = 0; i < 6; i++) {
-          const treeGroup = new THREE.Group();
-          const trunkH = 1.5 + Math.random() * 1.2;
-          const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.12, trunkH, 6), trunkMat);
-          trunk.position.y = trunkH / 2;
-          treeGroup.add(trunk);
-
-          const fMat = new THREE.MeshStandardMaterial({
-            color: foliageColors[Math.floor(Math.random() * foliageColors.length)], roughness: 0.8,
-          });
-          for (let f = 0; f < 2; f++) {
-            const foliage = new THREE.Mesh(new THREE.SphereGeometry(0.5 + Math.random() * 0.3, 6, 5), fMat);
-            foliage.position.set((Math.random() - 0.5) * 0.3, trunkH + 0.3 + f * 0.25, (Math.random() - 0.5) * 0.3);
-            treeGroup.add(foliage);
-          }
-          treeGroup.position.set(side * (RH + 5 + Math.random() * 7), 0, -i * 35 - Math.random() * 15);
-          this.scene.add(treeGroup);
-          this.themeObjects.push(treeGroup);
-          this.foreground.push(treeGroup);
-        }
-      }
     }
   }
 
@@ -1216,15 +1470,15 @@ export class Environment {
   update(delta, speed) {
     if (this.sky && this.sky.material.uniforms['time']) this.sky.material.uniforms['time'].value += delta;
     if (this.starField) this.starField.material.uniforms.time.value += delta;
-    // Animate ocean waves (vertex displacement)
-    if (this.water && this.water.userData.basePositions) {
+    // Animate ocean waves every other frame (400 verts is costly per frame)
+    this._waveFrame = (this._waveFrame || 0) + 1;
+    if (this.water && this.water.userData.basePositions && this._waveFrame % 2 === 0) {
       const pos = this.water.geometry.attributes.position;
       const base = this.water.userData.basePositions;
       const time = performance.now() * 0.001;
       for (let i = 0; i < pos.count; i++) {
         const bx = base[i * 3];
         const by = base[i * 3 + 1];
-        // Gentle sine wave on Z axis (which is Y in world after rotation)
         pos.array[i * 3 + 2] = base[i * 3 + 2] + Math.sin(time * 1.5 + bx * 0.3 + by * 0.2) * 0.15;
       }
       pos.needsUpdate = true;

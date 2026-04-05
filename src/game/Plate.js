@@ -1,78 +1,194 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { Tween, Easing } from '@tweenjs/tween.js';
+import { tweenGroup } from '../utils/tweenGroup.js';
 import {
-  LANE_POSITIONS, COLORS, PLATE_SPAWN_INTERVAL,
+  LANE_POSITIONS, PLATE_SPAWN_INTERVAL,
   PLATE_COLLISION_Z_THRESHOLD, ROAD_SEGMENT_LENGTH
 } from '../utils/constants.js';
 
-const PLATE_POOL_SIZE = 20;
+const POOL_SIZE = 15;
+const PLATE_W = 2.4;
+const PLATE_L = 1.5;
+const PLATE_H = 0.18;
+const BLUE = 0x22aaff;
+const BLUE_BRIGHT = 0x44ccff;
+const BLUE_WHITE = 0x88ddff;
 
-// Procedural radial glow texture for plate sprites
-function createGlowTexture() {
-  const size = 64;
-  const canvas = document.createElement('canvas');
-  canvas.width = size;
-  canvas.height = size;
-  const ctx = canvas.getContext('2d');
-  const gradient = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
-  gradient.addColorStop(0, 'rgba(57,255,20,0.6)');
-  gradient.addColorStop(0.4, 'rgba(57,255,20,0.2)');
-  gradient.addColorStop(1, 'rgba(57,255,20,0)');
-  ctx.fillStyle = gradient;
-  ctx.fillRect(0, 0, size, size);
-  return new THREE.CanvasTexture(canvas);
+// ═══════════════════════════════════════════════════════
+//  OPTIMIZED PLATE FACTORY
+//  Each plate = 3 meshes total (was 21 + 1 PointLight):
+//    1. plateMesh   — animated body (depression on collect)
+//    2. detailMesh  — merged static decorations (edges, grid, dots, bolt, arcs)
+//    3. glowDisc    — flat emissive plane replacing PointLight (zero light cost)
+// ═══════════════════════════════════════════════════════
+
+// Shared materials (used by ALL plates — never cloned)
+const borderMat = new THREE.MeshStandardMaterial({ color: 0x1a1a22, roughness: 0.5, metalness: 0.4 });
+const glowDiscMat = new THREE.MeshBasicMaterial({
+  color: BLUE, transparent: true, opacity: 0.35, depthWrite: false, side: THREE.DoubleSide,
+});
+
+function createPlate() {
+  const group = new THREE.Group();
+
+  // ── 1. Border housing (static, behind plate body) ──
+  const border = new THREE.Mesh(
+    new THREE.BoxGeometry(PLATE_W + 0.12, PLATE_H + 0.04, PLATE_L + 0.12),
+    borderMat,
+  );
+  border.position.y = PLATE_H / 2;
+  group.add(border);
+
+  // ── 2. Main plate body (animated — separate for depression tween) ──
+  const plateMat = new THREE.MeshStandardMaterial({
+    color: 0x111118, roughness: 0.25, metalness: 0.5,
+    emissive: new THREE.Color(BLUE), emissiveIntensity: 0.4,
+  });
+  const plateMesh = new THREE.Mesh(
+    new THREE.BoxGeometry(PLATE_W, PLATE_H, PLATE_L),
+    plateMat,
+  );
+  plateMesh.position.y = PLATE_H / 2;
+  group.add(plateMesh);
+
+  // ── 3. Merged detail overlay (all decorations baked into ONE mesh) ──
+  const detailMat = new THREE.MeshBasicMaterial({
+    color: BLUE_BRIGHT, transparent: true, opacity: 0.6,
+  });
+
+  const parts = [];
+  const topY = PLATE_H + 0.003;
+
+  // Edge strips (4)
+  for (const zOff of [-(PLATE_L / 2 + 0.04), PLATE_L / 2 + 0.04]) {
+    const g = new THREE.BoxGeometry(PLATE_W + 0.14, 0.04, 0.06);
+    g.translate(0, PLATE_H + 0.02, zOff);
+    parts.push(g);
+  }
+  for (const xOff of [-(PLATE_W / 2 + 0.04), PLATE_W / 2 + 0.04]) {
+    const g = new THREE.BoxGeometry(0.06, 0.04, PLATE_L + 0.14);
+    g.translate(xOff, PLATE_H + 0.02, 0);
+    parts.push(g);
+  }
+
+  // Grid lines (3H + 3V = 6)
+  for (const zOff of [-PLATE_L / 3, 0, PLATE_L / 3]) {
+    const g = new THREE.BoxGeometry(PLATE_W - 0.15, 0.006, 0.04);
+    g.translate(0, topY, zOff);
+    parts.push(g);
+  }
+  for (const xOff of [-PLATE_W / 3, 0, PLATE_W / 3]) {
+    const g = new THREE.BoxGeometry(0.04, 0.006, PLATE_L - 0.15);
+    g.translate(xOff, topY, 0);
+    parts.push(g);
+  }
+
+  // Corner nodes (4 small boxes instead of spheres — cheaper)
+  for (const [x, z] of [
+    [-PLATE_W / 2 + 0.18, -PLATE_L / 2 + 0.18],
+    [PLATE_W / 2 - 0.18, -PLATE_L / 2 + 0.18],
+    [-PLATE_W / 2 + 0.18, PLATE_L / 2 - 0.18],
+    [PLATE_W / 2 - 0.18, PLATE_L / 2 - 0.18],
+  ]) {
+    const g = new THREE.BoxGeometry(0.1, 0.08, 0.1);
+    g.translate(x, PLATE_H + 0.04, z);
+    parts.push(g);
+  }
+
+  // Lightning bolt (3 segments)
+  for (const [x, z, ry] of [[0.1, -0.2, 0.5], [-0.05, 0, -0.5], [0.1, 0.2, 0.5]]) {
+    const g = new THREE.BoxGeometry(0.08, 0.006, 0.3);
+    // Apply rotation via matrix (can't use translate for rotation)
+    const m = new THREE.Matrix4().makeRotationY(ry).setPosition(x, topY + 0.001, z);
+    g.applyMatrix4(m);
+    parts.push(g);
+  }
+
+  // Diagonal arcs (2)
+  const diagLen = Math.sqrt(PLATE_W * PLATE_W + PLATE_L * PLATE_L) * 0.38;
+  for (const rot of [0.56, -0.56]) {
+    const g = new THREE.BoxGeometry(diagLen, 0.005, 0.025);
+    const m = new THREE.Matrix4().makeRotationY(rot).setPosition(0, topY, 0);
+    g.applyMatrix4(m);
+    parts.push(g);
+  }
+
+  const mergedGeo = mergeGeometries(parts, false);
+  // Dispose individual geometries
+  parts.forEach(g => g.dispose());
+
+  const detailMesh = new THREE.Mesh(mergedGeo, detailMat);
+  group.add(detailMesh);
+
+  // ── 4. Ground glow disc (replaces PointLight — zero GPU light cost) ──
+  const glowDisc = new THREE.Mesh(
+    new THREE.CircleGeometry(2.0, 12),
+    glowDiscMat.clone(), // clone only this one for per-plate opacity animation
+  );
+  glowDisc.rotation.x = -Math.PI / 2;
+  glowDisc.position.y = 0.02;
+  group.add(glowDisc);
+
+  group.userData = {
+    plateMesh,
+    plateMat,
+    detailMat,
+    glowDisc,
+    active: false,
+    hit: false,
+    missed: false,
+    lane: 0,
+  };
+
+  return group;
+}
+
+// ── Lane sequence generator ──
+function generateLaneSequence(count) {
+  const seq = [];
+  let last = 1, lastLast = 1;
+
+  for (let i = 0; i < count; i++) {
+    const options = [0, 1, 2].filter(l => {
+      if (l === last && l === lastLast) return false;
+      if (Math.abs(l - last) === 2 && Math.abs(last - lastLast) === 2) return false;
+      return true;
+    });
+
+    const weights = options.map(l => {
+      const d = Math.abs(l - last);
+      return d === 0 ? 0.15 : d === 1 ? 0.6 : 0.25;
+    });
+    const total = weights.reduce((a, b) => a + b, 0);
+    let r = Math.random() * total;
+    let lane = options[0];
+    for (let j = 0; j < options.length; j++) {
+      r -= weights[j];
+      if (r <= 0) { lane = options[j]; break; }
+    }
+
+    seq.push(lane);
+    lastLast = last;
+    last = lane;
+  }
+  return seq;
 }
 
 export class Plate {
   constructor(scene) {
     this.scene = scene;
     this.plates = [];
-    this.particles = [];
     this.timeSinceSpawn = 0;
     this.spawnInterval = PLATE_SPAWN_INTERVAL;
+    this._sequence = generateLaneSequence(200);
+    this._seqIdx = 0;
 
-    const plateGeo = new THREE.CylinderGeometry(0.8, 0.8, 0.08, 16);
-    const glowTex = createGlowTexture();
-    const glowMat = new THREE.SpriteMaterial({
-      map: glowTex,
-      blending: THREE.AdditiveBlending,
-      transparent: true,
-      depthWrite: false,
-    });
-
-    for (let i = 0; i < PLATE_POOL_SIZE; i++) {
-      const mat = new THREE.MeshStandardMaterial({
-        color: COLORS.plate,
-        emissive: COLORS.plate,
-        emissiveIntensity: 0.5,
-        transparent: true,
-        opacity: 0.9,
-        metalness: 0.4,
-        roughness: 0.3,
-      });
-      const mesh = new THREE.Mesh(plateGeo, mat);
-      mesh.position.set(0, 0.05, -999);
-      mesh.visible = false;
-      mesh.userData = { active: false, hit: false, lane: 0 };
-
-      // Glow sprite (child of plate — moves with it)
-      const glow = new THREE.Sprite(glowMat.clone());
-      glow.scale.set(3, 3, 1);
-      glow.position.y = 0.1;
-      mesh.add(glow);
-
-      scene.add(mesh);
-      this.plates.push(mesh);
-    }
-
-    // Particle pool
-    const particleGeo = new THREE.SphereGeometry(0.08, 6, 6);
-    const particleMat = new THREE.MeshBasicMaterial({ color: COLORS.plateGlow });
-    for (let i = 0; i < 30; i++) {
-      const p = new THREE.Mesh(particleGeo, particleMat.clone());
-      p.visible = false;
-      p.userData = { velocity: new THREE.Vector3(), life: 0 };
-      scene.add(p);
-      this.particles.push(p);
+    for (let i = 0; i < POOL_SIZE; i++) {
+      const plate = createPlate();
+      plate.visible = false;
+      scene.add(plate);
+      this.plates.push(plate);
     }
   }
 
@@ -80,125 +196,108 @@ export class Plate {
     const plate = this.plates.find(p => !p.userData.active);
     if (!plate) return;
 
-    const laneIdx = Math.floor(Math.random() * 3);
-    plate.position.set(LANE_POSITIONS[laneIdx], 0.05, aheadZ);
+    const laneIdx = this._sequence[this._seqIdx % this._sequence.length];
+    this._seqIdx++;
+
+    plate.position.set(LANE_POSITIONS[laneIdx], 0, aheadZ);
     plate.visible = true;
-    plate.scale.set(1, 1, 1);
-    plate.material.emissiveIntensity = 0.5;
-    plate.material.opacity = 0.9;
-    plate.userData.active = true;
-    plate.userData.hit = false;
-    plate.userData.lane = laneIdx;
+    const ud = plate.userData;
+    ud.active = true;
+    ud.hit = false;
+    ud.missed = false;
+    ud.lane = laneIdx;
+    // Reset visual state
+    ud.plateMat.emissive.set(BLUE);
+    ud.plateMat.emissiveIntensity = 0.4;
+    ud.detailMat.opacity = 0.6;
+    ud.glowDisc.material.opacity = 0.35;
+    ud.plateMesh.position.y = PLATE_H / 2;
   }
 
   checkCollision(playerLane) {
     for (const plate of this.plates) {
-      if (!plate.userData.active || plate.userData.hit) continue;
-      if (plate.userData.lane === playerLane && Math.abs(plate.position.z) < PLATE_COLLISION_Z_THRESHOLD) {
-        plate.userData.hit = true;
-        this.animateHit(plate);
+      const ud = plate.userData;
+      if (!ud.active || ud.hit) continue;
+      if (ud.lane === playerLane && Math.abs(plate.position.z) < PLATE_COLLISION_Z_THRESHOLD) {
+        ud.hit = true;
+        this._animateCollection(plate);
         return true;
       }
     }
     return false;
   }
 
-  animateHit(plate) {
-    // Press down + flash
-    const startY = plate.position.y;
-    const duration = 300;
-    const start = performance.now();
+  _animateCollection(plate) {
+    const mesh = plate.userData.plateMesh;
+    const mat = plate.userData.plateMat;
+    const detailMat = plate.userData.detailMat;
+    const glowMat = plate.userData.glowDisc.material;
+    const baseY = PLATE_H / 2;
 
-    const animate = () => {
-      const elapsed = performance.now() - start;
-      const t = Math.min(elapsed / duration, 1);
-      plate.scale.y = 1 - t * 0.8;
-      plate.material.emissiveIntensity = 0.5 + Math.sin(t * Math.PI * 4) * 2;
-      plate.material.opacity = 1 - t * 0.7;
+    // ── BUMP: compress → spring back ──
+    new Tween(mesh.position, tweenGroup)
+      .to({ y: baseY - 0.12 }, 70)
+      .easing(Easing.Quadratic.In)
+      .onComplete(() => {
+        new Tween(mesh.position, tweenGroup)
+          .to({ y: baseY + 0.06 }, 140)
+          .easing(Easing.Back.Out)
+          .onComplete(() => {
+            new Tween(mesh.position, tweenGroup)
+              .to({ y: baseY }, 120)
+              .easing(Easing.Quadratic.Out)
+              .start();
+          })
+          .start();
+      })
+      .start();
 
-      if (t < 1) {
-        requestAnimationFrame(animate);
-      } else {
-        plate.visible = false;
-        plate.userData.active = false;
-      }
-    };
-    animate();
+    // ── FLASH: bright white burst then fade ──
+    mat.emissive.set(0xffffff);
+    mat.emissiveIntensity = 2.0;
+    glowMat.opacity = 0.8;
 
-    // Spawn particles
-    this.spawnParticles(plate.position.x, plate.position.z);
-  }
+    new Tween(mat, tweenGroup)
+      .to({ emissiveIntensity: 0.05 }, 500)
+      .delay(50)
+      .onStart(() => mat.emissive.set(BLUE))
+      .start();
 
-  spawnParticles(x, z) {
-    let count = 0;
-    for (const p of this.particles) {
-      if (p.visible || count >= 6) continue;
-      p.visible = true;
-      p.position.set(x + (Math.random() - 0.5) * 0.5, 0.2, z + (Math.random() - 0.5) * 0.5);
-      p.userData.velocity.set(
-        (Math.random() - 0.5) * 2,
-        2 + Math.random() * 3,
-        (Math.random() - 0.5) * 2
-      );
-      p.userData.life = 1.0;
-      p.material.opacity = 1;
-      p.material.transparent = true;
-      count++;
-    }
+    // Details + glow fade out
+    new Tween(detailMat, tweenGroup).to({ opacity: 0.08 }, 600).start();
+    new Tween(glowMat, tweenGroup).to({ opacity: 0.05 }, 600).start();
   }
 
   update(delta, speed) {
     const move = speed * delta;
     this.timeSinceSpawn += delta;
 
-    // Spawn new plates
     if (this.timeSinceSpawn >= this.spawnInterval) {
       this.timeSinceSpawn = 0;
-      // Spawn 1-2 plates ahead
       const spawnZ = -(ROAD_SEGMENT_LENGTH * 0.8 + Math.random() * 40);
       this.spawnPlate(spawnZ);
-      if (Math.random() > 0.5) {
-        this.spawnPlate(spawnZ - 8 - Math.random() * 10);
-      }
     }
 
-    // Move plates
+    const time = performance.now() * 0.001;
+
     for (const plate of this.plates) {
-      if (!plate.userData.active) continue;
+      const ud = plate.userData;
+      if (!ud.active) continue;
+
       plate.position.z += move;
 
-      // Animate: pulse glow + hover bob + slow spin
-      if (!plate.userData.hit) {
-        const t = performance.now() * 0.001;
-        plate.material.emissiveIntensity = 0.5 + Math.sin(t * 5) * 0.3;
-        plate.position.y = 0.05 + Math.sin(t * 3 + plate.position.x) * 0.08;
-        plate.rotation.y += delta * 1.5;
+      // Idle pulse — only update the 2 cheapest properties
+      if (!ud.hit) {
+        const pulse = Math.sin(time * 3 + plate.position.x * 2);
+        ud.plateMat.emissiveIntensity = 0.35 + pulse * 0.15;
+        ud.glowDisc.material.opacity = 0.3 + pulse * 0.1;
       }
 
-      // Deactivate plates that passed behind — track misses
       if (plate.position.z > 10) {
-        if (!plate.userData.hit) {
-          plate.userData.missed = true;
-        }
+        if (!ud.hit) ud.missed = true;
         plate.visible = false;
-        plate.userData.active = false;
+        ud.active = false;
       }
-    }
-
-    // Update particles
-    for (const p of this.particles) {
-      if (!p.visible) continue;
-      p.userData.life -= delta * 2;
-      if (p.userData.life <= 0) {
-        p.visible = false;
-        continue;
-      }
-      p.position.x += p.userData.velocity.x * delta;
-      p.position.y += p.userData.velocity.y * delta;
-      p.position.z += p.userData.velocity.z * delta + move;
-      p.userData.velocity.y -= 5 * delta; // gravity
-      p.material.opacity = p.userData.life;
-      p.scale.setScalar(p.userData.life);
     }
   }
 
@@ -219,5 +318,7 @@ export class Plate {
 
   resetSpawnRate() {
     this.spawnInterval = PLATE_SPAWN_INTERVAL;
+    this._seqIdx = 0;
+    this._sequence = generateLaneSequence(200);
   }
 }

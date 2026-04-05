@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
@@ -30,21 +31,22 @@ import {
   MIN_SPEED_MPH, MAX_SPEED_MPH, STARTING_SPEED_MPH, SCROLL_FACTOR,
   GEAR_THRESHOLDS, GEAR_ACCEL, DECEL_RATE, SHIFT_PAUSE_MS,
   RPM_IDLE, RPM_REDLINE,
-  MAP_THEMES, PLATE_SPAWN_INTERVAL,
+  MAP_THEMES, PLATE_SPAWN_INTERVAL, TOTAL_LAMP_POSTS,
   CAMERA_OFFSET, CAMERA_LOOK_AHEAD,
-  CAMERA_FOV_MIN, CAMERA_FOV_MAX, CAMERA_SHAKE_THRESHOLD
+  CAMERA_FOV_MIN, CAMERA_FOV_MAX, CAMERA_SHAKE_THRESHOLD,
+  getDriverPhysics,
 } from './utils/constants.js';
 
 // --- Renderer ---
 // Uses the full browser viewport — no fixed resolution, no CSS transform scaling.
 const isMobile = navigator.maxTouchPoints > 0 || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-const renderer = new THREE.WebGLRenderer({ antialias: true });
+const renderer = new THREE.WebGLRenderer({ antialias: !isMobile }); // disable AA on mobile
 renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, isMobile ? 1.5 : 2));
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, isMobile ? 1 : 2)); // 1x on mobile
 renderer.toneMapping = THREE.AgXToneMapping;
 renderer.toneMappingExposure = 1.3;
 renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = isMobile ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
+renderer.shadowMap.type = THREE.PCFShadowMap; // cheaper shadow type for all
 gameRoot().appendChild(renderer.domElement);
 
 // --- Scene & Camera ---
@@ -63,7 +65,7 @@ function updateEnvMap() {
   kart.group.visible = wasVisible;
 }
 
-const camera = new THREE.PerspectiveCamera(CAMERA_FOV_MIN, window.innerWidth / window.innerHeight, 0.1, 1000);
+const camera = new THREE.PerspectiveCamera(CAMERA_FOV_MIN, window.innerWidth / window.innerHeight, 0.1, 500);
 camera.position.set(CAMERA_OFFSET.x, CAMERA_OFFSET.y, CAMERA_OFFSET.z);
 camera.lookAt(0, 0.5, -CAMERA_LOOK_AHEAD);
 
@@ -144,13 +146,25 @@ let currentGear = 0;
 let shiftCooldown = 0;
 let currentRPM = RPM_IDLE;
 
+// Active per-driver physics (set when driver is selected)
+let activePhysics = {
+  topSpeed: MAX_SPEED_MPH,
+  gearAccel: GEAR_ACCEL,
+  gearThresholds: GEAR_THRESHOLDS,
+  decelRate: DECEL_RATE,
+  coastFloor: MIN_SPEED_MPH,
+  laneSwitchMs: 200,
+  chargeMultiplier: 1.0,
+};
+
 function computeGearAndRPM(speedMph) {
+  const thresholds = activePhysics.gearThresholds;
   let gear = 0;
-  for (let g = GEAR_THRESHOLDS.length - 2; g >= 0; g--) {
-    if (speedMph >= GEAR_THRESHOLDS[g]) { gear = g; break; }
+  for (let g = thresholds.length - 2; g >= 0; g--) {
+    if (speedMph >= thresholds[g]) { gear = g; break; }
   }
-  gear = Math.min(gear, GEAR_ACCEL.length - 1);
-  const lo = GEAR_THRESHOLDS[gear], hi = GEAR_THRESHOLDS[gear + 1];
+  gear = Math.min(gear, activePhysics.gearAccel.length - 1);
+  const lo = thresholds[gear], hi = thresholds[gear + 1];
   const t = Math.max(0, Math.min(1, (speedMph - lo) / (hi - lo)));
   const rpm = RPM_IDLE + t * (RPM_REDLINE - RPM_IDLE);
   return { gear, rpm: Math.max(RPM_IDLE, Math.min(RPM_REDLINE, rpm)) };
@@ -169,24 +183,15 @@ function addKartLights(themeId) {
   removeKartLights();
   const cfg = THEME_VEHICLE_LIGHT[themeId] || THEME_VEHICLE_LIGHT.brazil;
 
-  // === SPOTLIGHT HEADLIGHTS — visible cones on road ===
-  const headlightTarget = new THREE.Object3D();
-  headlightTarget.position.set(0, -1, -40);
-  kart.group.add(headlightTarget);
-  kartLights.push(headlightTarget);
+  // === HEADLIGHTS — single PointLight (replaces 2 SpotLights for perf) ===
+  const headlight = new THREE.PointLight(0xfff5e6, cfg.headlights, 15, 2);
+  headlight.position.set(0, 0.8, -2);
+  kart.group.add(headlight);
+  kartLights.push(headlight);
 
-  for (const xOff of [-0.5, 0.5]) {
-    const spot = new THREE.SpotLight(0xfff5e6, cfg.headlights, 30, Math.PI / 5, 0.6, 1.5);
-    spot.position.set(xOff, 0.8, -1.5);
-    spot.target = headlightTarget;
-    spot.castShadow = false;
-    kart.group.add(spot);
-    kartLights.push(spot);
-  }
-
-  // === CAMERA BACKFILL — tight radius, only lights kart rear ===
-  const backfill = new THREE.PointLight(0xaabbdd, cfg.backfill, 12, 2);
-  backfill.position.set(0, 6, 6);
+  // === CAMERA BACKFILL ===
+  const backfill = new THREE.PointLight(0xaabbdd, cfg.backfill, 10, 2);
+  backfill.position.set(0, 5, 5);
   kart.group.add(backfill);
   kartLights.push(backfill);
 
@@ -211,6 +216,10 @@ function goHome() {
   stopEngine();
   controls.unlock();
   removeKartLights();
+  removeStartLine();
+  // Reset timer color (may be red from tier 3 urgency)
+  const timerEl = document.getElementById('hud-time');
+  if (timerEl) timerEl.style.color = '';
   gameState.reset();
   hud.reset();
   lampPosts.resetAll();
@@ -240,7 +249,9 @@ const driverSelect = new DriverSelect(
   (driverIndex) => {
     playDriverSelect();
     gameState.selectedDriver = driverIndex;
+    activePhysics = getDriverPhysics(driverIndex);
     kart.setDriver(driverIndex);
+    kart.laneSwitchMs = activePhysics.laneSwitchMs;
     gameState.transition('mapSelect');
   },
   () => gameState.transition('menu')
@@ -327,6 +338,106 @@ const controls = setupControls((direction) => {
 // Map index → music key
 const MAP_MUSIC_KEYS = ['brazil', 'usa', 'peru'];
 
+// ── Start line decoration ──
+let startLineObjects = [];
+
+function buildStartLine() {
+  removeStartLine();
+  const ROAD_W = 12;
+  const lineZ = -3;
+  const squareSize = 0.8;
+  const cols = Math.floor(ROAD_W / squareSize);
+  const rows = 3;
+  const pillarH = 6;
+  const pillarW = 0.4;
+  const bannerCols = 14;
+  const bannerSquare = (ROAD_W + 1.4) / bannerCols;
+
+  // ── Merge all white squares (road + banner) into ONE mesh ──
+  const whiteGeos = [];
+  const blackGeos = [];
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const g = new THREE.PlaneGeometry(squareSize, squareSize);
+      const m = new THREE.Matrix4()
+        .makeRotationX(-Math.PI / 2)
+        .setPosition(-ROAD_W / 2 + squareSize / 2 + c * squareSize, 0.01, lineZ - r * squareSize);
+      g.applyMatrix4(m);
+      ((r + c) % 2 === 0 ? whiteGeos : blackGeos).push(g);
+    }
+  }
+  // Banner squares
+  for (let c = 0; c < bannerCols; c++) {
+    const g = new THREE.PlaneGeometry(bannerSquare, 0.8);
+    g.translate(
+      -ROAD_W / 2 - 0.7 + bannerSquare / 2 + c * bannerSquare,
+      pillarH - 0.7,
+      lineZ - squareSize - pillarW / 2 - 0.01,
+    );
+    (c % 2 === 0 ? whiteGeos : blackGeos).push(g);
+  }
+
+  const whiteMesh = new THREE.Mesh(mergeGeometries(whiteGeos), new THREE.MeshBasicMaterial({ color: 0xffffff }));
+  const blackMesh = new THREE.Mesh(mergeGeometries(blackGeos), new THREE.MeshBasicMaterial({ color: 0x111111 }));
+  whiteGeos.forEach(g => g.dispose());
+  blackGeos.forEach(g => g.dispose());
+  scene.add(whiteMesh, blackMesh);
+  startLineObjects.push(whiteMesh, blackMesh);
+
+  // ── Gantry arch (3 meshes: 2 pillars + crossbar merged) ──
+  const pillarMat = new THREE.MeshStandardMaterial({ color: 0xdddddd, metalness: 0.6, roughness: 0.3 });
+  const gantryGeos = [];
+  // Left pillar
+  const lp = new THREE.BoxGeometry(pillarW, pillarH, pillarW);
+  lp.translate(-ROAD_W / 2 - 0.5, pillarH / 2, lineZ - squareSize);
+  gantryGeos.push(lp);
+  // Right pillar
+  const rp = new THREE.BoxGeometry(pillarW, pillarH, pillarW);
+  rp.translate(ROAD_W / 2 + 0.5, pillarH / 2, lineZ - squareSize);
+  gantryGeos.push(rp);
+  // Crossbar
+  const cb = new THREE.BoxGeometry(ROAD_W + 1.4, 0.5, pillarW);
+  cb.translate(0, pillarH, lineZ - squareSize);
+  gantryGeos.push(cb);
+
+  const gantry = new THREE.Mesh(mergeGeometries(gantryGeos), pillarMat);
+  gantryGeos.forEach(g => g.dispose());
+  scene.add(gantry);
+  startLineObjects.push(gantry);
+
+  // ── Gantry lights (merged into 1 mesh) ──
+  const lightGeos = [];
+  for (let i = 0; i < 5; i++) {
+    const lg = new THREE.SphereGeometry(0.15, 5, 3);
+    lg.translate(-2 + i, pillarH + 0.4, lineZ - squareSize);
+    lightGeos.push(lg);
+  }
+  const lights = new THREE.Mesh(mergeGeometries(lightGeos), new THREE.MeshBasicMaterial({ color: 0xff0000 }));
+  lightGeos.forEach(g => g.dispose());
+  scene.add(lights);
+  startLineObjects.push(lights);
+}
+
+function removeStartLine() {
+  for (const obj of startLineObjects) {
+    scene.remove(obj);
+  }
+  startLineObjects = [];
+}
+
+// Scroll start line objects with the road (foreground speed)
+function updateStartLine(delta, speed) {
+  if (startLineObjects.length === 0) return;
+  const move = speed * delta;
+  for (const obj of startLineObjects) {
+    obj.position.z += move;
+  }
+  // Remove once fully behind camera
+  if (startLineObjects[0] && startLineObjects[0].position.z > 30) {
+    removeStartLine();
+  }
+}
+
 // Active sequences (null when not running)
 let raceStart = null;
 let completionSeq = null;
@@ -378,6 +489,9 @@ gameState.on('stateChange', ({ from, to }) => {
         // All maps get kart-attached lights (scaled per theme)
         const themeId = MAP_THEMES[gameState.selectedMap]?.id;
         addKartLights(themeId);
+
+        // Start line decoration
+        buildStartLine();
 
         const musicKey = MAP_MUSIC_KEYS[gameState.selectedMap] || 'brazil';
 
@@ -464,7 +578,12 @@ gameState.on('plateHit', ({ currentCharge, combo, score }) => {
   hud.updateCharge(currentCharge);
   hud.updateCombo(combo);
   hud.updateScore(score);
-  const points = 100 + Math.min(combo - 1, 9) * 25;
+
+  // Speed-scaled score display: faster vehicles earn more per plate
+  const basePoints = 100 + Math.min(combo - 1, 9) * 25;
+  const speedRatio = Math.max(0, (gameState.speed - STARTING_SPEED_MPH) / (activePhysics.topSpeed - STARTING_SPEED_MPH));
+  const speedMultiplier = 1.0 + speedRatio;
+  const points = Math.round(basePoints * speedMultiplier);
   hud.showFloatingScore(points);
   playPlateHit();
   haptic(25);
@@ -485,18 +604,18 @@ gameState.on('lampLit', ({ lampPostsLit }) => {
 
   const tier = lampPostsLit; // 1, 2, 3, or 4
 
-  // Tier 4 is handled by CompletionSequence (transition to 'completing')
-  if (tier < 4) {
+  // Final tier is handled by CompletionSequence (transition to 'completing')
+  if (tier < TOTAL_LAMP_POSTS) {
     playLampLit();
   }
 
   setTimeout(() => {
     hud.updateLamps(lampPostsLit);
-    hud.updateStage(lampPostsLit, 4);
+    hud.updateStage(lampPostsLit, TOTAL_LAMP_POSTS);
     hud.updateCharge(0);
 
     // Tier transition: flash + set tier on all lamp posts
-    if (tier < 4) {
+    if (tier < TOTAL_LAMP_POSTS) {
       lampPosts.setTier(tier, true);
       lampPosts.flash();
 
@@ -509,9 +628,15 @@ gameState.on('lampLit', ({ lampPostsLit }) => {
           .start();
       }
 
-      // Toast
-      const labels = ['', 'SECTOR 1 POWERED', 'SECTOR 2 POWERED', 'SECTOR 3 POWERED'];
+      // Toast + urgency at tier 3
+      const labels = ['', 'SECTOR 1 POWERED', 'SECTOR 2 POWERED', 'Almost there. HURRY UP!'];
       hud.showToast(labels[tier]);
+
+      // Tier 3: make timer red for urgency
+      if (tier === 3) {
+        const timerEl = document.getElementById('hud-time');
+        if (timerEl) timerEl.style.color = '#ff4444';
+      }
 
       // Increase difficulty
       const newRate = PLATE_SPAWN_INTERVAL - lampPostsLit * 0.08;
@@ -562,13 +687,13 @@ function animate() {
     if (!raceStart) {
       gameState.elapsed += delta;
 
-      // Gear-aware acceleration
+      // Per-driver gear-aware acceleration
       if (controls.isPedalDown()) {
         if (shiftCooldown <= 0) {
-          gameState.speed = Math.min(gameState.speed + GEAR_ACCEL[currentGear] * delta, MAX_SPEED_MPH);
+          gameState.speed = Math.min(gameState.speed + activePhysics.gearAccel[currentGear] * delta, activePhysics.topSpeed);
         }
       } else {
-        gameState.speed = Math.max(gameState.speed - DECEL_RATE * delta, MIN_SPEED_MPH);
+        gameState.speed = Math.max(gameState.speed - activePhysics.decelRate * delta, activePhysics.coastFloor);
       }
       shiftCooldown = Math.max(0, shiftCooldown - delta);
 
@@ -596,6 +721,7 @@ function animate() {
     kart.update(delta, scrollSpeed, controls.isPedalDown());
     plates.update(delta, scrollSpeed);
     lampPosts.update(delta, scrollSpeed);
+    updateStartLine(delta, scrollSpeed);
 
     if (plates.checkCollision(gameState.currentLane)) {
       gameState.hitPlate();
@@ -608,8 +734,8 @@ function animate() {
     const targetCamX = kart.group.position.x * 0.25;
     camera.position.x += (targetCamX - camera.position.x) * 0.08;
 
-    // Dynamic FOV: widens with speed
-    const speedFraction = (speed - MIN_SPEED_MPH) / (MAX_SPEED_MPH - MIN_SPEED_MPH);
+    // Dynamic FOV: widens with speed (relative to this driver's top speed)
+    const speedFraction = (speed - activePhysics.coastFloor) / (activePhysics.topSpeed - activePhysics.coastFloor);
     const targetFOV = CAMERA_FOV_MIN + speedFraction * (CAMERA_FOV_MAX - CAMERA_FOV_MIN);
     camera.fov += (targetFOV - camera.fov) * 0.05;
     camera.updateProjectionMatrix();
@@ -624,7 +750,12 @@ function animate() {
     }
   }
 
-  composer.render();
+  // Skip post-processing on mobile for performance
+  if (isMobile) {
+    renderer.render(scene, camera);
+  } else {
+    composer.render();
+  }
 }
 
 // --- Bootstrap ---

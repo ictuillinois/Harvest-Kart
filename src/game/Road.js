@@ -1,21 +1,18 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { ROAD_WIDTH, ROAD_SEGMENT_LENGTH, ROAD_SEGMENT_COUNT, COLORS, ROAD_SURFACE_COLORS } from '../utils/constants.js';
 
-// Generate a procedural asphalt texture via Canvas
 function createAsphaltTexture() {
-  const size = 512;
+  const size = 256; // reduced from 512 — road is distant, no visible quality loss
   const canvas = document.createElement('canvas');
   canvas.width = size;
   canvas.height = size;
   const ctx = canvas.getContext('2d');
 
-  // Base asphalt — light enough that material.color multiplication
-  // still produces visible gray (not near-black)
   ctx.fillStyle = '#808080';
   ctx.fillRect(0, 0, size, size);
 
-  // Noise grain for texture
-  for (let i = 0; i < 15000; i++) {
+  for (let i = 0; i < 6000; i++) {
     const x = Math.random() * size;
     const y = Math.random() * size;
     const brightness = 90 + Math.random() * 50;
@@ -23,10 +20,9 @@ function createAsphaltTexture() {
     ctx.fillRect(x, y, 1 + Math.random() * 2, 1 + Math.random() * 2);
   }
 
-  // Subtle cracks
   ctx.strokeStyle = 'rgba(0,0,0,0.3)';
   ctx.lineWidth = 0.5;
-  for (let i = 0; i < 8; i++) {
+  for (let i = 0; i < 5; i++) {
     ctx.beginPath();
     ctx.moveTo(Math.random() * size, Math.random() * size);
     ctx.lineTo(Math.random() * size, Math.random() * size);
@@ -35,7 +31,7 @@ function createAsphaltTexture() {
 
   const tex = new THREE.CanvasTexture(canvas);
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-  tex.repeat.set(2, 20); // stretch across road width, repeat along length
+  tex.repeat.set(2, 20);
   return tex;
 }
 
@@ -55,55 +51,64 @@ export class Road {
     this.roadTexture = asphaltTex;
     const roadMat = this.roadMaterial;
 
+    // Shared materials (one instance for all segments)
     const lineMat = new THREE.MeshBasicMaterial({ color: COLORS.roadLine });
     const dashedMat = new THREE.MeshBasicMaterial({ color: COLORS.roadLineDashed });
+    const curbMat = new THREE.MeshStandardMaterial({ color: 0x555555, roughness: 0.9 });
 
     for (let i = 0; i < ROAD_SEGMENT_COUNT; i++) {
-      // Road surface with texture
-      const roadGeo = new THREE.BoxGeometry(ROAD_WIDTH, 0.1, ROAD_SEGMENT_LENGTH);
-      const road = new THREE.Mesh(roadGeo, roadMat);
+      const road = new THREE.Mesh(
+        new THREE.BoxGeometry(ROAD_WIDTH, 0.1, ROAD_SEGMENT_LENGTH),
+        roadMat,
+      );
       road.position.set(0, -0.05, -i * ROAD_SEGMENT_LENGTH);
       road.receiveShadow = true;
       scene.add(road);
       this.segments.push(road);
 
-      // Lane lines group
-      const lineGroup = new THREE.Group();
-      lineGroup.position.z = road.position.z;
+      // ── Merge ALL lane markings + curbs into 2 meshes per segment ──
+      // (was ~55 individual meshes per segment → now 2)
 
-      // Side lines (solid)
+      // Solid lines: side lines + curbs → merge into 1 mesh
+      const solidGeos = [];
       for (const x of [-ROAD_WIDTH / 2 + 0.1, ROAD_WIDTH / 2 - 0.1]) {
-        const geo = new THREE.BoxGeometry(0.15, 0.02, ROAD_SEGMENT_LENGTH);
-        const line = new THREE.Mesh(geo, lineMat);
-        line.position.set(x, 0.01, 0);
-        lineGroup.add(line);
+        const g = new THREE.BoxGeometry(0.15, 0.02, ROAD_SEGMENT_LENGTH);
+        g.translate(x, 0.01, 0);
+        solidGeos.push(g);
       }
+      const solidMesh = new THREE.Mesh(mergeGeometries(solidGeos), lineMat);
+      solidGeos.forEach(g => g.dispose());
 
-      // Dashed center lines
+      // Dashed lines → merge into 1 mesh
+      const dashGeos = [];
       for (const x of [-1.5, 1.5]) {
         for (let d = 0; d < ROAD_SEGMENT_LENGTH; d += 4) {
-          const geo = new THREE.BoxGeometry(0.12, 0.02, 2);
-          const dash = new THREE.Mesh(geo, dashedMat);
-          dash.position.set(x, 0.01, -ROAD_SEGMENT_LENGTH / 2 + d + 1);
-          lineGroup.add(dash);
+          const g = new THREE.BoxGeometry(0.12, 0.02, 2);
+          g.translate(x, 0.01, -ROAD_SEGMENT_LENGTH / 2 + d + 1);
+          dashGeos.push(g);
         }
       }
+      const dashMesh = new THREE.Mesh(mergeGeometries(dashGeos), dashedMat);
+      dashGeos.forEach(g => g.dispose());
 
-      // Road edge curbs (thin raised strips)
+      // Curbs → merge into 1 mesh
+      const curbGeos = [];
       for (const x of [-ROAD_WIDTH / 2, ROAD_WIDTH / 2]) {
-        const curbGeo = new THREE.BoxGeometry(0.2, 0.15, ROAD_SEGMENT_LENGTH);
-        const curbMat = new THREE.MeshStandardMaterial({ color: 0x555555, roughness: 0.9 });
-        const curb = new THREE.Mesh(curbGeo, curbMat);
-        curb.position.set(x, 0.02, 0);
-        lineGroup.add(curb);
+        const g = new THREE.BoxGeometry(0.2, 0.15, ROAD_SEGMENT_LENGTH);
+        g.translate(x, 0.02, 0);
+        curbGeos.push(g);
       }
+      const curbMesh = new THREE.Mesh(mergeGeometries(curbGeos), curbMat);
+      curbGeos.forEach(g => g.dispose());
 
+      const lineGroup = new THREE.Group();
+      lineGroup.position.z = road.position.z;
+      lineGroup.add(solidMesh, dashMesh, curbMesh);
       scene.add(lineGroup);
       this.lineGroups.push(lineGroup);
     }
   }
 
-  /** Update road surface color for the active theme. */
   setThemeColor(themeId) {
     const color = ROAD_SURFACE_COLORS[themeId] || ROAD_SURFACE_COLORS.brazil;
     this.roadMaterial.color.set(color);
@@ -111,8 +116,6 @@ export class Road {
 
   update(delta, speed) {
     const move = speed * delta;
-
-    // Scroll road texture UV for surface motion
     this.roadTexture.offset.y += speed * delta * 0.03;
 
     for (let i = 0; i < this.segments.length; i++) {
