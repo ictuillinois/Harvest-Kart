@@ -70,43 +70,15 @@ const camera = new THREE.PerspectiveCamera(CAMERA_FOV_MIN, window.innerWidth / w
 camera.position.set(CAMERA_OFFSET.x, CAMERA_OFFSET.y, CAMERA_OFFSET.z);
 camera.lookAt(0, 0.5, -CAMERA_LOOK_AHEAD);
 
-// --- Post-processing ---
+// --- Post-processing (single combined pass: vignette + color grade) ---
 const composer = new EffectComposer(renderer);
 composer.addPass(new RenderPass(scene, camera));
 
-// NOTE: Bloom removed — Preetham sky HDR output produces extreme
-// brightness near the sun disc that any bloom threshold catches,
-// washing out the entire scene. Shadows + vignette are sufficient.
-
-// Vignette: subtle darkening at edges
-const vignetteShader = {
+const comboShader = {
   uniforms: {
     tDiffuse: { value: null },
     darkness: { value: 0.25 },
     offset: { value: 1.5 },
-  },
-  vertexShader: `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
-  fragmentShader: `
-    uniform sampler2D tDiffuse;
-    uniform float darkness;
-    uniform float offset;
-    varying vec2 vUv;
-    void main() {
-      vec4 color = texture2D(tDiffuse, vUv);
-      vec2 center = vUv - 0.5;
-      float dist = length(center) * 2.0;
-      float vig = 1.0 - darkness * smoothstep(offset - 0.5, offset, dist);
-      color.rgb *= vig;
-      gl_FragColor = color;
-    }
-  `,
-};
-composer.addPass(new ShaderPass(vignetteShader));
-
-// Color grading: per-theme saturation, contrast, brightness
-const colorGradeShader = {
-  uniforms: {
-    tDiffuse: { value: null },
     saturation: { value: 1.0 },
     contrast: { value: 1.0 },
     brightness: { value: 1.0 },
@@ -114,24 +86,24 @@ const colorGradeShader = {
   vertexShader: `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
   fragmentShader: `
     uniform sampler2D tDiffuse;
-    uniform float saturation;
-    uniform float contrast;
-    uniform float brightness;
+    uniform float darkness, offset;
+    uniform float saturation, contrast, brightness;
     varying vec2 vUv;
     void main() {
       vec4 color = texture2D(tDiffuse, vUv);
-      // Brightness
+      // Vignette
+      float dist = length(vUv - 0.5) * 2.0;
+      color.rgb *= 1.0 - darkness * smoothstep(offset - 0.5, offset, dist);
+      // Color grade
       color.rgb *= brightness;
-      // Contrast (around 0.5 midpoint)
       color.rgb = (color.rgb - 0.5) * contrast + 0.5;
-      // Saturation (luminance-preserving)
       float luma = dot(color.rgb, vec3(0.299, 0.587, 0.114));
       color.rgb = mix(vec3(luma), color.rgb, saturation);
       gl_FragColor = color;
     }
   `,
 };
-const colorGradePass = new ShaderPass(colorGradeShader);
+const colorGradePass = new ShaderPass(comboShader);
 composer.addPass(colorGradePass);
 
 // --- Game objects ---
@@ -761,6 +733,9 @@ gameState.on('plateHit', ({ currentCharge, combo, score }) => {
   playPlateHit();
   haptic(25);
 
+  // Reveal lamp posts on first plate hit (deferred for smoother start)
+  if (!lampPosts.posts[0].group.visible) lampPosts.setVisible(true);
+
   // Per-coin lamp post micro-progression + flash
   lampPosts.microProgress(currentCharge);
   lampPosts.microFlash();
@@ -775,7 +750,7 @@ gameState.on('lampLit', ({ lampPostsLit }) => {
   // Celebrate the full bar before resetting
   hud.celebrateCharge();
 
-  const tier = lampPostsLit; // 1, 2, 3, or 4
+  const tier = lampPostsLit; // 1 … TOTAL_LAMP_POSTS
 
   // Final tier is handled by CompletionSequence (transition to 'completing')
   if (tier < TOTAL_LAMP_POSTS) {
@@ -807,8 +782,8 @@ gameState.on('lampLit', ({ lampPostsLit }) => {
         hud.showToast(labels[tier]);
       }
 
-      // Tier 3: persistent HURRY UP! + timer goes red + vibration
-      if (tier === 3) {
+      // Last tier before completion: persistent HURRY UP! + timer goes red + vibration
+      if (tier === TOTAL_LAMP_POSTS - 1) {
         hud.showHurry();
       }
 
@@ -961,7 +936,7 @@ function animate() {
     const turboFOVBoost = turboActive ? 5 : 0;
     const targetFOV = CAMERA_FOV_MIN + speedFraction * (CAMERA_FOV_MAX - CAMERA_FOV_MIN) + turboFOVBoost;
     const fovDelta = targetFOV - camera.fov;
-    if (Math.abs(fovDelta) > 0.01) {
+    if (Math.abs(fovDelta) > 0.5) {
       camera.fov += fovDelta * 0.05;
       camera.updateProjectionMatrix();
     }
@@ -1002,12 +977,10 @@ playMusic('menu');
   renderer.compile(scene, camera);
   renderer.render(scene, camera);
 
-  // Show the start screen NOW, behind the intro overlay (z-index 100 vs 500).
-  // When the intro fades out it reveals the already-visible start screen,
-  // so the 3D scene is never exposed during the transition.
-  startScreen.show();
-
+  // Create intro overlay FIRST (z-index 500) so it covers everything,
+  // then show start screen behind it (z-index 100).
   const intro = new IntroScreen();
+  startScreen.show();
   await intro.run();
   // Start screen is already visible — nothing more to do.
 })();

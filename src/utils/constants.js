@@ -96,7 +96,7 @@ export const LANE_SWITCH_DURATION = 200;
 
 // Game config
 export const PLATES_TO_FILL_BAR = 10;
-export const TOTAL_LAMP_POSTS = 4;
+export const TOTAL_LAMP_POSTS = 3;
 export const PLATE_SPAWN_INTERVAL = 0.6; // fast spawns
 export const PLATE_COLLISION_Z_THRESHOLD = 2.5;
 

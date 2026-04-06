@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { Sky } from 'three/addons/objects/Sky.js';
-import { Water } from 'three/addons/objects/Water.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { ROAD_WIDTH, ROAD_SEGMENT_LENGTH, MAP_THEMES, ROAD_SURFACE_COLORS } from '../utils/constants.js';
 import { getModel, preloadAll, MODEL_URLS } from '../utils/assetLoader.js';
 import { asset } from '../utils/base.js';
@@ -35,9 +35,19 @@ export class Environment {
   }
 
   async build(themeIndex) {
-    // --- Cleanup ---
+    // --- Cleanup: remove from scene and dispose GPU resources ---
     for (const obj of this.themeObjects) {
       this.scene.remove(obj);
+      obj.traverse?.(node => {
+        if (node.geometry) node.geometry.dispose();
+        if (node.material) {
+          const mats = Array.isArray(node.material) ? node.material : [node.material];
+          for (const m of mats) {
+            if (m.map) m.map.dispose();
+            m.dispose();
+          }
+        }
+      });
     }
     this.themeObjects = [];
     this.foreground = [];
@@ -154,16 +164,18 @@ export class Environment {
     // =================================================================
     //  BARRIERS
     // =================================================================
-    const barrierMat = new THREE.MeshStandardMaterial({ color: 0x888888, metalness: 0.5, roughness: 0.6 });
+    const barrierMat = new THREE.MeshBasicMaterial({ color: 0x777777 });
     for (const side of [-1, 1]) {
+      const geos = [];
       for (let i = 0; i < 6; i++) {
-        const barrierGeo = new THREE.BoxGeometry(0.3, 0.8, ROAD_SEGMENT_LENGTH * 0.9);
-        const barrier = new THREE.Mesh(barrierGeo, barrierMat);
-        barrier.position.set(side * (ROAD_WIDTH / 2 + 0.5), 0.4, -i * ROAD_SEGMENT_LENGTH * 0.9);
-        this.scene.add(barrier);
-        this.themeObjects.push(barrier);
-        this.foreground.push(barrier);
+        const g = new THREE.BoxGeometry(0.3, 0.8, ROAD_SEGMENT_LENGTH * 0.9);
+        g.translate(side * (ROAD_WIDTH / 2 + 0.5), 0.4, -i * ROAD_SEGMENT_LENGTH * 0.9);
+        geos.push(g);
       }
+      const merged = new THREE.Mesh(mergeGeometries(geos, false), barrierMat);
+      this.scene.add(merged);
+      this.themeObjects.push(merged);
+      this.foreground.push(merged);
     }
 
     // =================================================================
@@ -189,17 +201,6 @@ export class Environment {
     if (layer === 'bg') this.background.push(model);
     else if (layer === 'mg') this.midground.push(model);
     else this.foreground.push(model);
-    return model;
-  }
-
-  // --- Helper: place static model (doesn't scroll at all) ---
-  _placeStatic(url, x, y, z, rotY = 0, sizeVariation = 1) {
-    const model = getModel(url);
-    model.position.set(x, model.position.y + y, z);
-    if (sizeVariation !== 1) model.scale.multiplyScalar(sizeVariation);
-    model.rotation.y = rotY;
-    this.scene.add(model);
-    this.themeObjects.push(model);
     return model;
   }
 
@@ -256,7 +257,7 @@ export class Environment {
 
     // ── Cloud planes ──
     const cloudTex = this._makeCloudTexture();
-    for (let i = 0; i < 7; i++) {
+    for (let i = 0; i < 3; i++) {
       const w = 30 + Math.random() * 40;
       const h = 8 + Math.random() * 12;
       const cloudMat = new THREE.MeshBasicMaterial({
@@ -346,7 +347,7 @@ export class Environment {
     // Sunset cloud sprites
     const cloudTex = this._makeCloudTexture();
     const cloudColors = [0xff9955, 0xffaa66, 0xff8844, 0xffbb77, 0xcc6644];
-    for (let i = 0; i < 6; i++) {
+    for (let i = 0; i < 3; i++) {
       const w = 40 + Math.random() * 40;
       const h = 8 + Math.random() * 8;
       const cloudMat = new THREE.MeshBasicMaterial({
@@ -412,7 +413,7 @@ export class Environment {
 
     // Wispy high-altitude clouds (few, thin, elongated)
     const cloudTex = this._makeCloudTexture();
-    for (let i = 0; i < 4; i++) {
+    for (let i = 0; i < 3; i++) {
       const w = 50 + Math.random() * 60;
       const h = 5 + Math.random() * 6;
       const cloudMat = new THREE.MeshBasicMaterial({
@@ -630,9 +631,9 @@ export class Environment {
     // All buildings removed for performance
 
     // ── Palms between buildings → midground ──
-    for (let i = 0; i < 6; i++) {
+    for (let i = 0; i < 4; i++) {
       const x = -(RH + 4 + Math.random() * 4);
-      this._placeModel(MODEL_URLS.palmTree, x, 0, -i * 28 - Math.random() * 12,
+      this._placeModel(MODEL_URLS.palmTree, x, 0, -i * 40 - Math.random() * 15,
         Math.random() * Math.PI * 2, 0.8 + Math.random() * 0.4, 'mg');
     }
 
@@ -641,37 +642,35 @@ export class Environment {
     // ══════════════════════════════════════════
 
     // Beach palms → foreground
-    for (let i = 0; i < 8; i++) {
+    for (let i = 0; i < 5; i++) {
       const x = RH + 3 + Math.random() * 5;
-      const lean = (Math.random() - 0.5) * 0.1; // slight lean
+      const lean = (Math.random() - 0.5) * 0.1;
       const model = this._placeModel(MODEL_URLS.palmTree, x, 0,
-        -i * 20 - Math.random() * 10, Math.random() * Math.PI * 2, 0.8 + Math.random() * 0.3, 'fg');
+        -i * 30 - Math.random() * 15, Math.random() * Math.PI * 2, 0.8 + Math.random() * 0.3, 'fg');
       model.rotation.z = lean;
     }
 
     // ── Boats on ocean → background ──
     const boatColors = [0xcc3333, 0x3366cc, 0xeeeedd, 0x33aa66, 0xdd8833];
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 2; i++) {
       const boatGroup = new THREE.Group();
       const boatColor = boatColors[Math.floor(Math.random() * boatColors.length)];
-      // Hull
       const hull = new THREE.Mesh(
         new THREE.BoxGeometry(0.8, 0.4, 2),
-        new THREE.MeshStandardMaterial({ color: boatColor, roughness: 0.6 }),
+        new THREE.MeshBasicMaterial({ color: boatColor }),
       );
       hull.position.y = 0.2;
       boatGroup.add(hull);
-      // Cabin
       const cabin = new THREE.Mesh(
         new THREE.BoxGeometry(0.5, 0.4, 0.6),
-        new THREE.MeshStandardMaterial({ color: 0xeeeeee, roughness: 0.5 }),
+        new THREE.MeshBasicMaterial({ color: 0xeeeeee }),
       );
       cabin.position.set(0, 0.6, 0.2);
       boatGroup.add(cabin);
 
       boatGroup.position.set(
         RH + 25 + Math.random() * 30, -0.3,
-        -i * 60 - Math.random() * 30,
+        -i * 80 - Math.random() * 40,
       );
       boatGroup.rotation.y = Math.random() * Math.PI * 2;
       boatGroup.scale.setScalar(1.5 + Math.random());
@@ -681,10 +680,10 @@ export class Environment {
     }
 
     // ── Left road additional palms (sparser, inland) ──
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 2; i++) {
       const x = -(RH + 4 + Math.random() * 6);
       this._placeModel(MODEL_URLS.palmTree, x, 0,
-        -i * 35 - Math.random() * 15, Math.random() * Math.PI * 2, 0.7 + Math.random() * 0.3, 'fg');
+        -i * 50 - Math.random() * 20, Math.random() * Math.PI * 2, 0.7 + Math.random() * 0.3, 'fg');
     }
   }
 
@@ -748,44 +747,39 @@ export class Environment {
     return tex;
   }
 
-  /** Create a procedural Chicago building with varied facade. */
-  _createChicagoBuilding(w, h, d) {
-    // Random architectural style
-    const styles = [
-      { color: 0x8B4513, r: 0.9, m: 0.02 },  // red brick
-      { color: 0x6B2A1A, r: 0.92, m: 0.02 }, // dark brick
-      { color: 0x7B7B85, r: 0.85, m: 0.05 }, // gray concrete
-      { color: 0xA09888, r: 0.8, m: 0.03 },  // limestone
-      { color: 0x445566, r: 0.15, m: 0.6 },  // glass tower
-      { color: 0xD4C8A8, r: 0.75, m: 0.02 }, // cream painted
-      { color: 0x7A6B5A, r: 0.88, m: 0.03 }, // brownstone
-    ];
-    const style = styles[(Math.random() * styles.length) | 0];
+  /**
+   * Pre-generate a shared pool of building window textures.
+   * 3 style groups × 1 reference size = 3 base textures.
+   */
+  _buildWindowTexPool() {
+    const REF = 6;
+    const groups = [0x7B3020, 0x8A8A90, 0x445566]; // brick, concrete, glass
+    const pool = {};
+    for (let gi = 0; gi < groups.length; gi++) {
+      const tex = this._buildingWindowTex(REF, REF, groups[gi], true);
+      tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+      pool[`${gi}_${true}`] = tex;
+    }
+    return pool;
+  }
 
-    const wSegs = Math.max(2, (w / 1.5) | 0);
-    const dSegs = Math.max(2, (d / 1.5) | 0);
+  /** Create a procedural Chicago building using shared texture pool (single material). */
+  _createChicagoBuilding(w, h, d, texPool) {
+    // Random architectural style → map to 3 groups
+    const styleGroups = [0, 0, 1, 1, 2, 1, 0]; // brick, brick, concrete, concrete, glass, concrete, brick
+    const gi = styleGroups[(Math.random() * styleGroups.length) | 0];
+
+    const segs = Math.max(2, (Math.max(w, d) / 1.5) | 0);
     const hSegs = Math.max(3, (h / 2.5) | 0);
+    const REF = 6;
 
-    const sunFront = this._buildingWindowTex(wSegs, hSegs, style.color, true);
-    const shadeFront = this._buildingWindowTex(wSegs, hSegs, style.color, false);
-    const sunSide = this._buildingWindowTex(dSegs, hSegs, style.color, true);
-    const shadeSide = this._buildingWindowTex(dSegs, hSegs, style.color, false);
+    // Single sun-facing texture for all faces (player moves fast, difference imperceptible)
+    const tex = texPool[`${gi}_${true}`].clone();
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    tex.repeat.set(segs / REF, hSegs / REF);
 
-    const roofMat = new THREE.MeshStandardMaterial({ color: 0x3a3a3a, roughness: 0.9 });
-    const baseMat = new THREE.MeshStandardMaterial({ color: style.color, roughness: style.r, metalness: style.m });
-
-    // BoxGeometry face order: [+X, -X, +Y, -Y, +Z, -Z]
-    // Sun comes from -Z, -X direction
-    const mats = [
-      new THREE.MeshBasicMaterial({ map: shadeSide }),  // +X shadow
-      new THREE.MeshBasicMaterial({ map: sunSide }),    // -X sun
-      roofMat,
-      baseMat,
-      new THREE.MeshBasicMaterial({ map: sunFront }),   // +Z sun
-      new THREE.MeshBasicMaterial({ map: shadeFront }), // -Z shadow
-    ];
-
-    const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mats);
+    const mat = new THREE.MeshBasicMaterial({ map: tex });
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
     mesh.position.y = h / 2;
     return mesh;
   }
@@ -793,19 +787,10 @@ export class Environment {
   _buildUSA() {
     const RH = ROAD_WIDTH / 2;
 
-    // ── Warm fill light ──
-    const warmFill = new THREE.DirectionalLight(0xff8844, 0.6);
-    warmFill.position.set(20, 10, 50);
-    this.scene.add(warmFill);
-    this.themeObjects.push(warmFill);
-
     // ── Lake Michigan ──
     const lake = new THREE.Mesh(
       new THREE.PlaneGeometry(200, 600),
-      new THREE.MeshStandardMaterial({
-        color: 0x2a5577, roughness: 0.3, metalness: 0.2,
-        emissive: 0x332211, emissiveIntensity: 0.15,
-      }),
+      new THREE.MeshBasicMaterial({ color: 0x2a5577 }),
     );
     lake.rotation.x = -Math.PI / 2;
     lake.position.set(RH + 80, -0.2, -150);
@@ -813,46 +798,31 @@ export class Environment {
     this.themeObjects.push(lake);
 
     // ══════════════════════════════════════════
-    //  BACKGROUND SKYLINE — GLTF skyscrapers (far, 20% scroll)
+    //  ROADSIDE PROPS
     // ══════════════════════════════════════════
     if (this.modelsReady) {
-      const skyscrapers = [
-        MODEL_URLS.chicagoSkyscraperA, MODEL_URLS.chicagoSkyscraperB,
-        MODEL_URLS.chicagoSkyscraperC, MODEL_URLS.chicagoSkyscraperD,
-        MODEL_URLS.chicagoSkyscraperE,
-      ];
-      for (const side of [-1, 1]) {
-        for (let i = 0; i < 12; i++) {
-          const url = skyscrapers[(Math.random() * skyscrapers.length) | 0];
-          this._placeModel(url, side * (RH + 30 + Math.random() * 25), 0,
-            -i * 30 - Math.random() * 15, side > 0 ? Math.PI : 0,
-            0.7 + Math.random() * 0.6, 'bg');
-        }
-      }
-
-      // Roadside props
       this._scatterProps(
         [MODEL_URLS.dumpster, MODEL_URLS.trafficLight, MODEL_URLS.bench,
          MODEL_URLS.firehydrant, MODEL_URLS.trashcan, MODEL_URLS.mailbox],
-        12, [2, 5], 28, 'fg',
+        6, [2, 5], 55, 'fg',
       );
-      this._scatterProps([MODEL_URLS.trafficCone], 8, [1.5, 2.5], 35, 'fg');
-      this._scatterProps([MODEL_URLS.tires, MODEL_URLS.raceBarrier], 4, [2.5, 5], 65, 'fg');
-      this._scatterProps([MODEL_URLS.carSedan, MODEL_URLS.carTaxi, MODEL_URLS.carHatchback], 6, [2, 4], 50, 'fg');
+      this._scatterProps([MODEL_URLS.trafficCone], 3, [1.5, 2.5], 85, 'fg');
+      this._scatterProps([MODEL_URLS.tires, MODEL_URLS.raceBarrier], 2, [2.5, 5], 110, 'fg');
     }
 
     // ══════════════════════════════════════════
-    //  MIDGROUND — Procedural buildings with varied facades (60% scroll)
+    //  MIDGROUND — Procedural buildings, single material each (60% scroll)
     // ══════════════════════════════════════════
+    const texPool = this._buildWindowTexPool();
     for (const side of [-1, 1]) {
       let z = 10;
-      while (z > -320) {
-        const w = 4 + Math.random() * 6;
+      while (z > -370) {
+        const w = 6 + Math.random() * 8;
         const h = 6 + Math.random() * 14;
         const d = 4 + Math.random() * 5;
-        const gap = 0.5 + Math.random() * 1.5;
+        const gap = 3 + Math.random() * 5;
 
-        const bldg = this._createChicagoBuilding(w, h, d);
+        const bldg = this._createChicagoBuilding(w, h, d, texPool);
         bldg.position.x = side * (RH + 8 + d / 2 + Math.random() * 4);
         bldg.position.z = z - w / 2;
         this.scene.add(bldg);
@@ -869,8 +839,8 @@ export class Environment {
 
     // ── The Bean ──
     const bean = new THREE.Mesh(
-      new THREE.SphereGeometry(4, 12, 8),
-      new THREE.MeshStandardMaterial({ color: 0xaa9988, metalness: 1.0, roughness: 0.05, envMapIntensity: 2.0 }),
+      new THREE.SphereGeometry(4, 8, 6),
+      new THREE.MeshBasicMaterial({ color: 0xaa9988 }),
     );
     bean.scale.set(1.4, 0.7, 1.0);
     bean.position.set(-(RH + 22), 2.5, -120);
@@ -879,7 +849,7 @@ export class Environment {
     this.midground.push(bean);
 
     // ── Grass strips along roadside (blends ground into vegetation) ──
-    const grassMat = new THREE.MeshStandardMaterial({ color: 0x4a7a35, roughness: 0.95 });
+    const grassMat = new THREE.MeshBasicMaterial({ color: 0x3a6a28 });
     for (const side of [-1, 1]) {
       const strip = new THREE.Mesh(new THREE.PlaneGeometry(5, 600), grassMat);
       strip.rotation.x = -Math.PI / 2;
@@ -888,89 +858,37 @@ export class Environment {
       this.themeObjects.push(strip);
     }
 
-    // ── Deciduous trees — dense along sidewalks + second row behind ──
-    const treeTrunkMat = new THREE.MeshStandardMaterial({ color: 0x3a2a18 });
-    const canopyColors = [0x3d6b2e, 0x4a7a3a, 0x356328, 0x4d7040, 0x3a5c2a];
-    const canopyMats = canopyColors.map(c => new THREE.MeshStandardMaterial({ color: c, roughness: 0.9, flatShading: true }));
-    const trunkGeo = new THREE.CylinderGeometry(0.1, 0.15, 2.5, 5);
-    const canopyGeo = new THREE.SphereGeometry(1, 4, 3);
-
-    // Front row — close to road (sidewalk trees)
-    for (const side of [-1, 1]) {
-      for (let z = 10; z > -320; z -= 6 + Math.random() * 8) {
-        if (Math.random() > 0.7) continue;
-        const treeG = new THREE.Group();
-        const trunk = new THREE.Mesh(trunkGeo, treeTrunkMat);
-        trunk.position.y = 1.25;
-        treeG.add(trunk);
-        const canopy = new THREE.Mesh(canopyGeo,
-          canopyMats[(Math.random() * canopyMats.length) | 0]);
-        canopy.position.y = 3.2 + Math.random() * 0.5;
-        canopy.scale.set(0.8 + Math.random() * 0.5, 0.6 + Math.random() * 0.3, 0.8 + Math.random() * 0.5);
-        treeG.add(canopy);
-        treeG.position.set(side * (RH + 2.5 + Math.random() * 2), 0, z);
-        treeG.scale.setScalar(0.8 + Math.random() * 0.4);
-        this.scene.add(treeG);
-        this.themeObjects.push(treeG);
-        this.foreground.push(treeG);
-      }
-    }
-
-    // Back row — behind buildings (park trees, larger)
-    for (const side of [-1, 1]) {
-      for (let z = 0; z > -320; z -= 12 + Math.random() * 18) {
-        if (Math.random() > 0.6) continue;
-        const treeG = new THREE.Group();
-        const trunk = new THREE.Mesh(trunkGeo, treeTrunkMat);
-        trunk.position.y = 1.25;
-        treeG.add(trunk);
-        const canopy = new THREE.Mesh(canopyGeo,
-          canopyMats[(Math.random() * canopyMats.length) | 0]);
-        canopy.position.y = 3.5 + Math.random() * 0.5;
-        canopy.scale.set(1.0 + Math.random() * 0.6, 0.7 + Math.random() * 0.3, 1.0 + Math.random() * 0.6);
-        treeG.add(canopy);
-        treeG.position.set(side * (RH + 18 + Math.random() * 8), 0, z);
-        treeG.scale.setScalar(1.0 + Math.random() * 0.5);
-        this.scene.add(treeG);
-        this.themeObjects.push(treeG);
-        this.midground.push(treeG);
-      }
-    }
-
-    // ── Street lamps ──
-    const poleMat = new THREE.MeshStandardMaterial({ color: 0x333333, metalness: 0.5 });
-    const fixtureMat = new THREE.MeshBasicMaterial({ color: 0xffdd88 });
+    // ── Street lamps (merged pole+fixture per lamp) ──
+    const poleMat = new THREE.MeshStandardMaterial({ color: 0x333333, metalness: 0.5, emissive: 0xffdd88, emissiveIntensity: 0.15 });
+    const poleGeo = new THREE.CylinderGeometry(0.05, 0.06, 4, 5);
+    const fixtureGeo = new THREE.SphereGeometry(0.15, 4, 3);
+    poleGeo.translate(0, 2, 0);
+    fixtureGeo.translate(0, 4.1, 0);
+    const lampMerged = mergeGeometries([poleGeo, fixtureGeo], false);
     for (let i = 0; i < 8; i++) {
       const side = i % 2 === 0 ? -1 : 1;
-      const lampGroup = new THREE.Group();
-      lampGroup.add((() => {
-        const p = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.06, 4, 5), poleMat);
-        p.position.y = 2; return p;
-      })());
-      lampGroup.add((() => {
-        const f = new THREE.Mesh(new THREE.SphereGeometry(0.15, 4, 3), fixtureMat);
-        f.position.y = 4.1; return f;
-      })());
-      lampGroup.position.set(side * (RH + 1.5), 0, -i * 35 - Math.random() * 10);
-      this.scene.add(lampGroup);
-      this.themeObjects.push(lampGroup);
-      this.foreground.push(lampGroup);
+      const lamp = new THREE.Mesh(lampMerged, poleMat);
+      lamp.position.set(side * (RH + 1.5), 0, -i * 35 - Math.random() * 10);
+      this.scene.add(lamp);
+      this.themeObjects.push(lamp);
+      this.foreground.push(lamp);
     }
 
-    // ── Signs ──
+    // ── Signs (merged backing+pole per sign) ──
     const signColors = [0xcc4444, 0x3366aa, 0xddaa33, 0x448844, 0xcc6633];
     const signMat = new THREE.MeshStandardMaterial({ color: 0x555555 });
-    for (let i = 0; i < 6; i++) {
+    const signBackGeo = new THREE.BoxGeometry(2.5, 1.0, 0.1);
+    const signPoleGeo = new THREE.CylinderGeometry(0.04, 0.04, 3, 4);
+    signPoleGeo.translate(0, -2, 0);
+    const signMerged = mergeGeometries([signBackGeo, signPoleGeo], false);
+    for (let i = 0; i < 3; i++) {
       const side = i % 2 === 0 ? -1 : 1;
       const sg = new THREE.Group();
-      sg.add(new THREE.Mesh(new THREE.BoxGeometry(2.5, 1.0, 0.1), signMat));
+      sg.add(new THREE.Mesh(signMerged, signMat));
       const face = new THREE.Mesh(new THREE.PlaneGeometry(2.2, 0.7),
-        new THREE.MeshStandardMaterial({ color: signColors[(Math.random() * signColors.length) | 0], roughness: 0.5 }));
+        new THREE.MeshBasicMaterial({ color: signColors[(Math.random() * signColors.length) | 0] }));
       face.position.z = 0.06;
       sg.add(face);
-      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 3, 4), signMat);
-      pole.position.y = -2;
-      sg.add(pole);
       sg.position.set(side * (RH + 5), 4.5 + Math.random() * 1.5, -i * 45 - 20);
       this.scene.add(sg);
       this.themeObjects.push(sg);
@@ -1136,29 +1054,7 @@ export class Environment {
 
     // Houses removed for performance — GLTF building models provide structures
 
-    // ══════════════════════════════════════════
-    //  TREES — dense, 3 types (foreground + midground)
-    // ══════════════════════════════════════════
-    // Trunks removed for performance — trees are canopy-only blobs
-    const pineGeo = new THREE.ConeGeometry(1.2, 3.5, 5);
-    const bushGeo = new THREE.SphereGeometry(0.8, 4, 3);
-    const roundGeo = new THREE.SphereGeometry(1.0, 4, 3);
-    const canopyColors = [0x2d5a1e, 0x3a6a2a, 0x4a7a35, 0x356328, 0x4d7040];
-
-    // Pre-create shared canopy materials (5 shades)
-    const canopyMats = canopyColors.map(
-      c => new THREE.MeshStandardMaterial({ color: c, roughness: 0.9, flatShading: true })
-    );
-    const pickCanopy = () => canopyMats[(Math.random() * canopyMats.length) | 0];
-
-    // Procedural trees removed for performance — GLTF tree models provide vegetation
-
-    // Rocks removed for performance
-
-    // ══════════════════════════════════════════
-    //  LOADED MODELS (if available)
-    // ══════════════════════════════════════════
-    // All GLTF buildings/models removed for performance
+    // Trees, rocks, and GLTF buildings removed for performance
   }
 
   // =====================================================================

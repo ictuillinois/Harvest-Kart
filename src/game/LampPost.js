@@ -1,14 +1,15 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { Tween, Easing } from '@tweenjs/tween.js';
 import { tweenGroup } from '../utils/tweenGroup.js';
 import { ROAD_WIDTH, PLATES_TO_FILL_BAR } from '../utils/constants.js';
 
 // ── Layout ──
-const LAMP_PAIRS   = 10;
+const LAMP_PAIRS   = 6;
 const LAMP_SPACING = 35;
 const TOTAL_SPAN   = LAMP_SPACING * LAMP_PAIRS;
 const RECYCLE_Z    = 20;
-const MAX_ACTIVE_LIGHTS = (navigator.maxTouchPoints > 0) ? 4 : 6;
+const MAX_ACTIVE_LIGHTS = (navigator.maxTouchPoints > 0) ? 2 : 3;
 const LAMP_HEAD_Y  = 4.15;
 const CONE_HEIGHT  = 4.0;   // from lamp head to road
 
@@ -68,29 +69,22 @@ export class LampPost {
     });
     const poolTex = _makePoolTexture();
 
+    // Pre-merge pole + arm + housing into one shared geometry
+    const poleGeo = new THREE.CylinderGeometry(0.08, 0.1, 4.5, 6);
+    poleGeo.translate(0, 2.25, 0);
+    const armGeo = new THREE.CylinderGeometry(0.04, 0.04, 1.8, 5);
+    armGeo.rotateZ(Math.PI / 2);
+    armGeo.translate(-0.9, 4.3, 0);
+    const housingGeo = new THREE.BoxGeometry(0.5, 0.2, 0.35);
+    housingGeo.translate(-1.8, 4.35, 0);
+    const mergedStructure = mergeGeometries([poleGeo, armGeo, housingGeo], false);
+
     for (let pair = 0; pair < LAMP_PAIRS; pair++) {
       for (const side of [-1, 1]) {
         const group = new THREE.Group();
 
-        // Pole
-        group.add((() => {
-          const m = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 4.5, 8), poleMat);
-          m.position.y = 2.25; return m;
-        })());
-
-        // Arm
-        group.add((() => {
-          const m = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 1.8, 6), poleMat);
-          m.rotation.z = Math.PI / 2; m.position.set(-0.9, 4.3, 0); return m;
-        })());
-
-        // Housing
-        group.add((() => {
-          const m = new THREE.Mesh(
-            new THREE.BoxGeometry(0.5, 0.2, 0.35),
-            new THREE.MeshStandardMaterial({ color: 0x555555, metalness: 0.4 }));
-          m.position.set(-1.8, 4.35, 0); return m;
-        })());
+        // Merged pole + arm + housing (1 draw call)
+        group.add(new THREE.Mesh(mergedStructure, poleMat));
 
         // Lamp head (bulb)
         const headMat = new THREE.MeshStandardMaterial({
@@ -99,7 +93,7 @@ export class LampPost {
           emissiveIntensity: TIER[0].emissive,
           metalness: 0.2, roughness: 0.4,
         });
-        const head = new THREE.Mesh(new THREE.SphereGeometry(0.25, 10, 10), headMat);
+        const head = new THREE.Mesh(new THREE.SphereGeometry(0.25, 6, 6), headMat);
         head.position.set(-1.8, LAMP_HEAD_Y, 0);
         group.add(head);
 
@@ -143,10 +137,18 @@ export class LampPost {
         group.position.set(side * (ROAD_WIDTH / 2 + 1.5), 0, -30 - pair * LAMP_SPACING);
         if (side === -1) group.scale.x = -1;
 
+        // Start hidden — revealed progressively via setVisible()
+        group.visible = false;
+
         scene.add(group);
         this.posts.push({ group, head, headMat, light, cone, coneMat, pool, poolMat });
       }
     }
+  }
+
+  /** Show or hide all lamp post geometry. */
+  setVisible(visible) {
+    for (const p of this.posts) p.group.visible = visible;
   }
 
   // ── Apply state to a single post instantly ──
@@ -350,6 +352,9 @@ export class LampPost {
   // ── Update / recycle ──
 
   update(delta, speed) {
+    // Skip all work when lamps are hidden (tier 0, no plates collected yet)
+    if (!this.posts[0].group.visible) return;
+
     const move = speed * delta;
 
     for (const p of this.posts) {
@@ -384,7 +389,10 @@ export class LampPost {
       this.posts[i + 1].group.position.z = z;
       pair++;
     }
-    for (const p of this.posts) this._snapPost(p, st);
+    for (const p of this.posts) {
+      this._snapPost(p, st);
+      p.group.visible = false; // hidden until first plate hit
+    }
   }
 
   // Legacy compat

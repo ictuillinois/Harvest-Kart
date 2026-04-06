@@ -145,8 +145,24 @@ export class Kart {
 
     this._buildCar(DRIVER_TYPES[0]);
     this.group.position.set(LANE_POSITIONS[1], 0, 0);
-    this.group.traverse(c => { if (c.isMesh) c.castShadow = true; });
+    this._enableBodyShadows();
     scene.add(this.group);
+  }
+
+  /** Only body + wheel meshes cast shadows (skip lights, chrome, particles, glass). */
+  _enableBodyShadows() {
+    const cfg = VEHICLE_MESH_CONFIG[this._currentDriver?.vehicleType] || {};
+    const shadowNames = new Set([
+      ...(cfg.bodyNames || []).map(n => n.toLowerCase()),
+      ...(cfg.wheelNames || []).map(n => n.toLowerCase()),
+    ]);
+    this.group.traverse(c => {
+      if (c.isMesh) {
+        c.castShadow = shadowNames.size > 0
+          ? shadowNames.has((c.name || '').toLowerCase())
+          : false;
+      }
+    });
   }
 
   // ═══════════════════════════════════════════
@@ -375,6 +391,7 @@ export class Kart {
   // ═══════════════════════════════════════════
 
   _buildCar(driver) {
+    this._currentDriver = driver;
     // Clear previous model
     while (this.group.children.length) this.group.remove(this.group.children[0]);
     this.wheels = [];
@@ -1042,7 +1059,7 @@ export class Kart {
     this.currentLane = 1;
     this.isSwitching = false;
     this.group.position.x = LANE_POSITIONS[1];
-    this.group.traverse(c => { if (c.isMesh) c.castShadow = true; });
+    this._enableBodyShadows();
   }
 
   /** Pre-create particle pools so they don't lazy-init during gameplay */

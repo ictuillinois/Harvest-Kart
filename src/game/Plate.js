@@ -7,7 +7,7 @@ import {
   PLATE_COLLISION_Z_THRESHOLD, ROAD_SEGMENT_LENGTH
 } from '../utils/constants.js';
 
-const POOL_SIZE = 10;
+const POOL_SIZE = 7;
 const PLATE_W = 2.4;
 const PLATE_L = 1.5;
 const PLATE_H = 0.18;
