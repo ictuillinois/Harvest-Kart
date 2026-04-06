@@ -39,6 +39,9 @@ const _sharedAmber = new THREE.MeshStandardMaterial({
 const _sharedRedMarker = new THREE.MeshStandardMaterial({
   color: 0xff2200, emissive: 0xff1100, emissiveIntensity: 0.6, metalness: 0.2, roughness: 0.3,
 });
+const _sharedWheel = new THREE.MeshStandardMaterial({
+  color: 0x2a2a2a, roughness: 0.7, metalness: 0.15, envMapIntensity: 0.3,
+});
 
 // Per-vehicle material finish profiles
 const MATERIAL_PROFILES = {
@@ -87,24 +90,15 @@ const VEHICLE_MESH_CONFIG = {
     taillightXFrac: 0.38,
   },
   formula: {
-    // Destiny: AMG GT, 4 individual wheels, palette texture
+    // Destiny: AMG GT
     bodyNames: ['amg_gt_body'],
     wheelNames: ['lfwheel001', 'rrwheel', 'rfwheel001', 'lrwheel002'],
-    wheelRotation: true,
-    wheelAxis: 'z',
+    wheelRotation: false,
     hiddenNames: [],
     rotationY: -Math.PI / 2,
     hasTexture: true,
-    paintIndices: [0],
-    accentIndices: [1],
-    glassIndices: [2],
-    glassTint: 0x080810,       // near-black glass — contrasts with blue body
     materialProfile: 'raceMetal',
-    emissiveOnlyTint: true,
-    skipExhaust: true,         // exhaust pipes not visible from chase cam
-    // Low sports car — headlights low and wide
-    headlightYFrac: 0.22,
-    headlightXFrac: 0.65,
+    skipExhaust: true,
     taillightYFrac: 0.25,
     taillightXFrac: 0.55,
   },
@@ -391,7 +385,7 @@ export class Kart {
     const modelUrl = DRIVER_VEHICLES[driver.vehicleType];
 
     // Load GLTF model (preloaded, returns normalized clone)
-    let model = modelUrl ? getModel(modelUrl) : null;
+    let model = modelUrl ? getModel(modelUrl, true) : null; // skip material clone — we replace all materials
 
     // Fallback if model not loaded
     if (!model || model.children.length === 0) {
@@ -602,23 +596,12 @@ export class Kart {
         return;
       }
 
-      // ── Wheel meshes ──
+      // ── Wheel meshes (shared material, no per-wheel allocation) ──
       if (wheelSet.has(name)) {
         if (Array.isArray(child.material)) {
-          child.material = child.material.map(m => {
-            const std = upgradeMat(m);
-            std.color.set(0x2a2a2a);
-            std.roughness = 0.7;
-            std.metalness = 0.15;
-            std.envMapIntensity = 0.3;
-            return std;
-          });
+          child.material = child.material.map(() => _sharedWheel);
         } else {
-          child.material = upgradeMat(child.material);
-          child.material.color.set(0x2a2a2a);
-          child.material.roughness = 0.7;
-          child.material.metalness = 0.15;
-          child.material.envMapIntensity = 0.3;
+          child.material = _sharedWheel;
         }
         this._wheelMeshes.push(child);
         return;
@@ -712,7 +695,7 @@ export class Kart {
 
     // ── Underglow — single consolidated light ──
     const underglowColor = dark ? 0x88bbff : driver.carBody;
-    const underglowInt = (dark || meshConfig.emissiveOnlyTint) ? 6.0 : 2.5;
+    const underglowInt = dark ? 6.0 : (meshConfig.emissiveOnlyTint ? 4.0 : 2.5);
     this._underglow = new THREE.PointLight(underglowColor, underglowInt, 8, 2);
     this._underglow.position.set(0, 0.12, 0);
     this.group.add(this._underglow);
@@ -724,7 +707,7 @@ export class Kart {
       modelHlLight.position.set(0, height * 0.35, -(halfL + 0.2));
       this.group.add(modelHlLight);
     }
-    if (!meshConfig.hasModelHeadlights) {
+    if (!meshConfig.hasModelHeadlights && !meshConfig.skipHeadlightMesh) {
       const hlYFrac = meshConfig.headlightYFrac || 0.35;
       const hlXFrac = meshConfig.headlightXFrac || 0.55;
       const hlY = height * hlYFrac;
@@ -754,29 +737,21 @@ export class Kart {
     const tlY = height * tlYFrac;
     const tlZ = halfL - 0.02;
 
-    if (meshConfig.compactLights) {
-      // ── Compact taillights — round LED clusters ──
-      Kart._addCompactTaillights(this.group, halfW, tlY, tlZ, tlXFrac, height);
-    } else if (meshConfig.rallyLights) {
-      // ── SUV taillights — vertical LED bars ──
-      Kart._addSUVTaillights(this.group, halfW, tlY, tlZ, tlXFrac, height);
-    } else if (meshConfig.sportsLights) {
-      // ── Sports taillights — full-width LED bar (AMG signature) ──
-      Kart._addSportsTaillights(this.group, halfW, tlY, tlZ, height);
-    } else {
-      // ── Standard taillights — clusters + strip ──
-      const tlMat = new THREE.MeshStandardMaterial({
-        color: 0xff0000, emissive: 0xff0000, emissiveIntensity: 1.0,
-      });
-      for (const x of [-halfW * tlXFrac, halfW * tlXFrac]) {
-        const tl = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.05, 0.02), tlMat);
-        tl.position.set(x, tlY, tlZ);
-        this.group.add(tl);
+    if (!meshConfig.skipTaillight) {
+      if (meshConfig.compactLights) {
+        Kart._addCompactTaillights(this.group, halfW, tlY, tlZ, tlXFrac, height);
+      } else if (meshConfig.rallyLights) {
+        Kart._addSUVTaillights(this.group, halfW, tlY, tlZ, tlXFrac, height);
+      } else if (meshConfig.sportsLights) {
+        Kart._addSportsTaillights(this.group, halfW, tlY, tlZ, height);
+      } else {
+        // Standard taillights
+        for (const x of [-halfW * tlXFrac, halfW * tlXFrac]) {
+          const tl = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.05, 0.02), _sharedLedRed);
+          tl.position.set(x, tlY, tlZ);
+          this.group.add(tl);
+        }
       }
-      const strip = new THREE.Mesh(
-        new THREE.BoxGeometry(halfW * (tlXFrac * 1.5), 0.025, 0.02), tlMat);
-      strip.position.set(0, tlY - 0.04, tlZ);
-      this.group.add(strip);
     }
 
     const tailLight = new THREE.PointLight(0xff2200, dark ? 2.5 : 1.5, 6, 2);

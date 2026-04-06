@@ -69,26 +69,27 @@ export async function preloadAll(urls) {
  * Get a clone of a preloaded model, auto-normalized to its registry height.
  * No scale parameter needed — the registry defines the target height.
  */
-export function getModel(url) {
+export function getModel(url, skipMaterialClone = false) {
   const gltf = cache.get(url);
   if (!gltf) {
     console.warn(`Model not preloaded: ${url}`);
-    return new THREE.Group(); // Return empty group instead of crashing
+    return new THREE.Group();
   }
   const clone = gltf.scene.clone(true);
 
-  // Deep-clone all materials so modifications don't contaminate other instances.
-  // This prevents color bleeding when one model is tinted (e.g. kart color
-  // leaking to every building that shares the same material).
-  clone.traverse((child) => {
-    if (child.isMesh && child.material) {
-      if (Array.isArray(child.material)) {
-        child.material = child.material.map(m => m.clone());
-      } else {
-        child.material = child.material.clone();
+  // Deep-clone materials to prevent color bleeding between instances.
+  // Skip for vehicles since _buildCar replaces all materials anyway.
+  if (!skipMaterialClone) {
+    clone.traverse((child) => {
+      if (child.isMesh && child.material) {
+        if (Array.isArray(child.material)) {
+          child.material = child.material.map(m => m.clone());
+        } else {
+          child.material = child.material.clone();
+        }
       }
-    }
-  });
+    });
+  }
 
   // Apply target height from registry
   const targetHeight = MODEL_HEIGHTS[url];

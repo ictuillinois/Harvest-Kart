@@ -287,6 +287,8 @@ Object.assign(loadingOverlay.style, {
   position: 'fixed', inset: '0', zIndex: '200',
   background: '#000', opacity: '0', pointerEvents: 'none',
   transition: 'opacity 0.5s ease', display: 'none',
+  willChange: 'opacity',
+  contain: 'strict',
 });
 
 const loStyle = document.createElement('style');
@@ -398,6 +400,9 @@ const mapSelect = new MapSelect(
     await new Promise(r => requestAnimationFrame(r));
     await environment.build(mapIndex);
 
+    // Yield to let browser GC after heavy build allocations
+    await new Promise(r => setTimeout(r, 50));
+
     // ── Stage 3: Road + env map ──
     setLoadProgress(50, 'Generating reflections...');
     await new Promise(r => requestAnimationFrame(r));
@@ -464,17 +469,23 @@ const mapSelect = new MapSelect(
     composer.render();
     await new Promise(r => requestAnimationFrame(r));
 
-    // ── Stage 8: Game loop dry run to warm JIT ──
-    setLoadProgress(95, 'Finalizing...');
+    // ── Stage 8: Multiple game loop dry runs to fully warm JIT + GPU ──
+    setLoadProgress(92, 'Finalizing...');
     const fakeDelta = 0.016;
     const fakeSpeed = 40 * SCROLL_FACTOR;
-    road.update(fakeDelta, fakeSpeed);
-    kart.update(fakeDelta, fakeSpeed, false);
-    plates.update(fakeDelta, fakeSpeed);
-    lampPosts.update(fakeDelta, fakeSpeed);
-    environment.update(fakeDelta, fakeSpeed);
-    composer.render();
-    await new Promise(r => requestAnimationFrame(r));
+    for (let i = 0; i < 3; i++) {
+      road.update(fakeDelta, fakeSpeed);
+      kart.update(fakeDelta, fakeSpeed, false);
+      plates.update(fakeDelta, fakeSpeed);
+      lampPosts.update(fakeDelta, fakeSpeed);
+      environment.update(fakeDelta, fakeSpeed);
+      composer.render();
+      await new Promise(r => requestAnimationFrame(r));
+    }
+
+    // ── Stage 9: Settle — give browser time to finish async GPU uploads + GC ──
+    setLoadProgress(98, 'Ready!');
+    await new Promise(r => setTimeout(r, 300));
 
     // ── Done ──
     clearLoadingOverlay();

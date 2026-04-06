@@ -56,10 +56,6 @@ const VEHICLE_MESH_CONFIG = {
     wheelNames: ['lfwheel001', 'rrwheel', 'rfwheel001', 'lrwheel002'],
     hiddenNames: [],
     hasTexture: true,
-    paintIndices: [0],
-    accentIndices: [1],
-    glassIndices: [2],
-    glassTint: 0x080810,
     materialProfile: 'raceMetal',
   },
   rally: {

@@ -44,6 +44,8 @@ export class RaceStartSequence {
       this._overlay.style.zIndex = '200';
       this._overlay.style.opacity = '1';
       this._overlay.style.transition = 'none';
+      this._overlay.style.willChange = 'opacity';
+      this._overlay.style.contain = 'strict';
       this._overlayReused = true;
     } else {
       this._overlay = document.createElement('div');
@@ -251,15 +253,15 @@ export class RaceStartSequence {
     // ── T+0.0: start music (skip if already playing from loading screen) ──
     playMusic();
 
-    // ── T+0.5: begin fade out of black overlay ──
+    // ── T+0.5: begin fade out of black overlay (fast fade reduces GPU compositing load) ──
     this._at(500, () => {
-      this._overlay.style.transition = 'opacity 1.5s ease-in-out';
+      this._overlay.style.transition = 'opacity 0.6s ease-out';
       this._overlay.style.opacity = '0';
       startEngine();
     });
 
-    // ── T+2.0: hide overlay, show traffic light ──
-    this._at(2000, () => {
+    // ── T+1.2: hide overlay, show traffic light ──
+    this._at(1200, () => {
       if (this._overlayReused) {
         this._overlay.style.display = 'none';
         this._overlay.style.pointerEvents = 'none';

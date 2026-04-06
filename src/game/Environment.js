@@ -1044,75 +1044,35 @@ export class Environment {
   // =====================================================================
 
   /** Create a mountain with vertex displacement + altitude gradient colors. */
-  _createAndeanMountain(radius, height, segments) {
-    const seg = Math.max(segments || 7, 6); // optimized poly count
-    const geo = new THREE.ConeGeometry(radius, height, seg);
+  _createAndeanMountain(radius, height) {
+    // Simple cone with solid color (no vertexColors — avoids unique shader variant)
+    const geo = new THREE.ConeGeometry(radius, height, 6);
     const pos = geo.attributes.position;
 
-    // Vertex displacement for organic rocky shape
+    // Light vertex displacement for organic shape
     for (let i = 0; i < pos.count; i++) {
       const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
       const hNorm = (y + height / 2) / height;
-      if (hNorm > 0.95) continue; // preserve clean peak
-      const strength = hNorm < 0.1 ? 0.3 : 1.0;
+      if (hNorm > 0.95) continue;
       const noise = Math.sin(x * 3.7 + z * 2.3) * Math.cos(y * 1.8 + x * 4.1);
-      const disp = noise * radius * 0.1 * strength;
+      const disp = noise * radius * 0.08;
       const dist = Math.sqrt(x * x + z * z);
       if (dist > 0.01) {
         pos.setX(i, x + (x / dist) * disp);
         pos.setZ(i, z + (z / dist) * disp);
       }
-      pos.setY(i, y + noise * height * 0.015);
     }
     geo.computeVertexNormals();
 
-    // Altitude gradient colors
-    const colors = new Float32Array(pos.count * 3);
-    const zones = [
-      { max: 0.30, from: new THREE.Color(0x4a7a33), to: new THREE.Color(0x5a7a3a) },
-      { max: 0.50, from: new THREE.Color(0x5a7a3a), to: new THREE.Color(0x7a6b50) },
-      { max: 0.70, from: new THREE.Color(0x7a6b50), to: new THREE.Color(0x8a7a65) },
-      { max: 0.85, from: new THREE.Color(0x8a7a65), to: new THREE.Color(0xa09888) },
-      { max: 1.00, from: new THREE.Color(0xa09888), to: new THREE.Color(0xe8e4e0) },
-    ];
-    const tmp = new THREE.Color();
-    for (let i = 0; i < pos.count; i++) {
-      const t = Math.max(0, Math.min(1, (pos.getY(i) + height / 2) / height));
-      tmp.set(0x4a7a33);
-      for (let zi = 0; zi < zones.length; zi++) {
-        if (t <= zones[zi].max) {
-          const prev = zi > 0 ? zones[zi - 1].max : 0;
-          const local = (t - prev) / (zones[zi].max - prev);
-          tmp.copy(zones[zi].from).lerp(zones[zi].to, local);
-          break;
-        }
-      }
-      tmp.r += (Math.random() - 0.5) * 0.03;
-      tmp.g += (Math.random() - 0.5) * 0.03;
-      tmp.b += (Math.random() - 0.5) * 0.03;
-      colors[i * 3] = tmp.r;
-      colors[i * 3 + 1] = tmp.g;
-      colors[i * 3 + 2] = tmp.b;
-    }
-    geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    // Solid color based on height (green for short, gray-brown for tall)
+    const t = Math.min(1, height / 50);
+    const col = new THREE.Color(0x4a7a33).lerp(new THREE.Color(0x8a7a65), t);
     return new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
-      vertexColors: true, roughness: 0.88, flatShading: true,
+      color: col, roughness: 0.88,
     }));
   }
 
-  /** Apply atmospheric perspective (blue-tint) to distant mountain vertex colors. */
-  _applyAtmosphere(mesh, amount) {
-    const fogCol = new THREE.Color(0xaabbcc);
-    const colors = mesh.geometry.attributes.color;
-    for (let i = 0; i < colors.count; i++) {
-      colors.setXYZ(i,
-        colors.getX(i) + (fogCol.r - colors.getX(i)) * amount,
-        colors.getY(i) + (fogCol.g - colors.getY(i)) * amount,
-        colors.getZ(i) + (fogCol.b - colors.getZ(i)) * amount,
-      );
-    }
-    colors.needsUpdate = true;
-  }
+  // _applyAtmosphere removed (mountains use solid colors now)
 
   _buildPeru() {
     const RH = ROAD_WIDTH / 2;
@@ -1135,9 +1095,9 @@ export class Environment {
       new THREE.MeshStandardMaterial({ color: 0x3a5a25, roughness: 0.95 }), // dark grass
       new THREE.MeshStandardMaterial({ color: 0x7a7a6a, roughness: 0.92 }), // rock
     ];
-    for (let z = 15; z > -300; z -= 6 + Math.random() * 8) {
+    for (let z = 15; z > -300; z -= 25 + Math.random() * 20) {
       for (const side of [-1, 1]) {
-        if (Math.random() > 0.35) continue;
+        if (Math.random() > 0.25) continue;
         const patch = new THREE.Mesh(patchGeo, patchMats[(Math.random() * patchMats.length) | 0]);
         patch.rotation.x = -Math.PI / 2;
         patch.position.set(side * (RH + 5 + Math.random() * 18), 0.01 + Math.random() * 0.01, z);
@@ -1164,7 +1124,8 @@ export class Environment {
       const mt = this._createAndeanMountain(cfg.r, cfg.h);
       mt.position.set(cfg.x, cfg.h / 2 - 4, cfg.z);
       const dist = Math.abs(cfg.z) / 350;
-      if (dist > 0.3) this._applyAtmosphere(mt, dist * 0.35);
+      // Atmospheric tint via material color instead of vertex colors
+      if (dist > 0.3) mt.material.color.lerp(new THREE.Color(0xaabbcc), dist * 0.25);
       this.scene.add(mt);
       this.themeObjects.push(mt);
       this.background.push(mt);
@@ -1175,7 +1136,7 @@ export class Environment {
         const rh = cfg.h * 0.5;
         const ridge = this._createAndeanMountain(rr, rh);
         ridge.position.set(cfg.x + cfg.r * 0.3, rh / 2 - 4, cfg.z - 8);
-        if (dist > 0.3) this._applyAtmosphere(ridge, dist * 0.35);
+        if (dist > 0.3) ridge.material.color.lerp(new THREE.Color(0xaabbcc), dist * 0.25);
         this.scene.add(ridge);
         this.themeObjects.push(ridge);
         this.background.push(ridge);
@@ -1186,28 +1147,24 @@ export class Environment {
     const mistMat = new THREE.MeshBasicMaterial({
       color: 0xccddee, transparent: true, opacity: 0.2, depthWrite: false, side: THREE.DoubleSide,
     });
-    for (let i = 0; i < 6; i++) {
-      const mist = new THREE.Mesh(new THREE.PlaneGeometry(60 + Math.random() * 40, 5 + Math.random() * 4), mistMat);
-      mist.position.set((Math.random() - 0.5) * 100, 8 + Math.random() * 12, -80 - i * 45 - Math.random() * 25);
-      mist.lookAt(0, mist.position.y, 0);
-      this.scene.add(mist);
-      this.themeObjects.push(mist);
-      this.background.push(mist);
-    }
+    const mist = new THREE.Mesh(new THREE.PlaneGeometry(120, 8), mistMat);
+    mist.position.set(0, 12, -180);
+    mist.lookAt(0, mist.position.y, 0);
+    this.scene.add(mist);
+    this.themeObjects.push(mist);
+    this.background.push(mist);
 
     // ══════════════════════════════════════════
     //  ROLLING HILLS (midground)
     // ══════════════════════════════════════════
-    const hillColors = [0x5a8a3a, 0x4a7a2a, 0x6a9a4a];
+    const hillMats = [0x5a8a3a, 0x4a7a2a, 0x6a9a4a].map(
+      c => new THREE.MeshStandardMaterial({ color: c, roughness: 0.9 }));
+    const hillGeo = new THREE.SphereGeometry(6, 6, 4);
     for (const side of [-1, 1]) {
-      for (let i = 0; i < 7; i++) {
-        const r = 4 + Math.random() * 5;
-        const hill = new THREE.Mesh(
-          new THREE.SphereGeometry(r, 8, 5),
-          new THREE.MeshStandardMaterial({ color: hillColors[i % hillColors.length], roughness: 0.9 }),
-        );
-        hill.scale.y = 0.3;
-        hill.position.set(side * (RH + 14 + Math.random() * 14), -1.5, -i * 40 - Math.random() * 20);
+      for (let i = 0; i < 4; i++) {
+        const hill = new THREE.Mesh(hillGeo, hillMats[i % hillMats.length]);
+        hill.scale.set(0.7 + Math.random() * 0.6, 0.3, 0.7 + Math.random() * 0.6);
+        hill.position.set(side * (RH + 14 + Math.random() * 14), -1.5, -i * 70 - Math.random() * 30);
         this.scene.add(hill);
         this.themeObjects.push(hill);
         this.midground.push(hill);
@@ -1251,10 +1208,8 @@ export class Environment {
     const doorMat = new THREE.MeshBasicMaterial({ color: 0x2a1a0a });
 
     const clusters = [
-      { z: -30, side: -1, count: 5 },
-      { z: -95, side: 1, count: 5 },
-      { z: -170, side: -1, count: 5 },
-      { z: -240, side: 1, count: 4 },
+      { z: -60, side: -1, count: 4 },
+      { z: -200, side: 1, count: 3 },
     ];
     for (const cl of clusters) {
       for (let j = 0; j < cl.count; j++) {
@@ -1284,33 +1239,6 @@ export class Environment {
     }
 
     // ══════════════════════════════════════════
-    //  LLAMAS (midground)
-    // ══════════════════════════════════════════
-    const llamaMat = new THREE.MeshStandardMaterial({ color: 0xeeddcc, roughness: 0.9 });
-    const llamaMat2 = new THREE.MeshStandardMaterial({ color: 0xccbb99, roughness: 0.9 });
-    const llamaSpots = [{ x: -22, z: -45, n: 2 }, { x: 35, z: -170, n: 2 }];
-    for (const spot of llamaSpots) {
-      for (let j = 0; j < spot.n; j++) {
-        const lg = new THREE.Group();
-        const mat = Math.random() > 0.5 ? llamaMat : llamaMat2;
-        // Simplified: body blob + neck (2 meshes instead of 7)
-        const body = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.7, 1.2), mat);
-        body.position.y = 0.7;
-        lg.add(body);
-        const neck = new THREE.Mesh(new THREE.BoxGeometry(0.2, 1.2, 0.2), mat);
-        neck.position.set(0, 1.4, -0.4);
-        neck.rotation.x = -0.15;
-        lg.add(neck);
-        lg.position.set(spot.x + (Math.random() - 0.5) * 6, 0, spot.z + (Math.random() - 0.5) * 8);
-        lg.rotation.y = Math.random() * Math.PI * 2;
-        lg.scale.setScalar(0.6 + Math.random() * 0.3);
-        this.scene.add(lg);
-        this.themeObjects.push(lg);
-        this.midground.push(lg);
-      }
-    }
-
-    // ══════════════════════════════════════════
     //  TREES — dense, 3 types (foreground + midground)
     // ══════════════════════════════════════════
     const trunkMat = new THREE.MeshStandardMaterial({ color: 0x5c3d1e, roughness: 0.9 });
@@ -1326,10 +1254,10 @@ export class Environment {
     );
     const pickCanopy = () => canopyMats[(Math.random() * canopyMats.length) | 0];
 
-    // Foreground trees (spacing 5-10 units, 45% fill — optimized density)
+    // Foreground trees (sparse)
     for (const side of [-1, 1]) {
-      for (let z = 15; z > -320; z -= 5 + Math.random() * 5) {
-        if (Math.random() > 0.45) continue;
+      for (let z = 15; z > -320; z -= 10 + Math.random() * 10) {
+        if (Math.random() > 0.4) continue;
         const tg = new THREE.Group();
         const type = Math.random();
         if (type < 0.4) {
@@ -1349,10 +1277,10 @@ export class Environment {
       }
     }
 
-    // Midground trees (spacing 5-10 units, 35% fill — optimized density)
+    // Midground trees (sparse)
     for (const side of [-1, 1]) {
-      for (let z = 15; z > -320; z -= 5 + Math.random() * 5) {
-        if (Math.random() > 0.35) continue;
+      for (let z = 15; z > -320; z -= 12 + Math.random() * 10) {
+        if (Math.random() > 0.3) continue;
         const tg = new THREE.Group();
         tg.add((() => { const t = new THREE.Mesh(trunkGeo, trunkMat); t.position.y = 1; return t; })());
         const geoType = Math.random() > 0.5 ? pineGeo : roundGeo;
@@ -1366,7 +1294,7 @@ export class Environment {
     }
 
     // Hillside trees (background — canopy blobs on mountain bases, no trunk)
-    for (let i = 0; i < 18; i++) {
+    for (let i = 0; i < 10; i++) {
       const canopy = new THREE.Mesh(pineGeo, pickCanopy());
       canopy.position.set(
         (Math.random() > 0.5 ? 1 : -1) * (30 + Math.random() * 45),
@@ -1386,7 +1314,7 @@ export class Environment {
       c => new THREE.MeshStandardMaterial({ color: c, roughness: 0.9 })
     );
     const clumpGeo = new THREE.SphereGeometry(0.3, 4, 3);
-    for (let i = 0; i < 15; i++) {
+    for (let i = 0; i < 8; i++) {
       const side = i % 2 === 0 ? -1 : 1;
       const clump = new THREE.Mesh(clumpGeo, ichuMats[i % ichuMats.length]);
       const s = 0.6 + Math.random() * 0.8;
@@ -1397,21 +1325,7 @@ export class Environment {
       this.foreground.push(clump);
     }
 
-    const rockMats = [0x6b5b45, 0x7a6b55, 0x5a4a35].map(
-      c => new THREE.MeshStandardMaterial({ color: c, roughness: 1.0 })
-    );
-    const rockGeo = new THREE.DodecahedronGeometry(0.5, 0);
-    for (let i = 0; i < 10; i++) {
-      const side = i % 2 === 0 ? -1 : 1;
-      const s = 0.6 + Math.random() * 1.0;
-      const rock = new THREE.Mesh(rockGeo, rockMats[i % rockMats.length]);
-      rock.scale.setScalar(s);
-      rock.position.set(side * (RH + 4 + Math.random() * 7), s * 0.2, -i * 28 - Math.random() * 10);
-      rock.rotation.set(Math.random(), Math.random(), Math.random());
-      this.scene.add(rock);
-      this.themeObjects.push(rock);
-      this.foreground.push(rock);
-    }
+    // Rocks removed for performance
 
     // ══════════════════════════════════════════
     //  LOADED MODELS (if available)
@@ -1422,32 +1336,25 @@ export class Environment {
         MODEL_URLS.peruBuildingD, MODEL_URLS.peruBuildingE, MODEL_URLS.peruBuildingF,
         MODEL_URLS.peruBuildingR, MODEL_URLS.peruBuildingS, MODEL_URLS.peruBuildingT,
       ];
-      for (let i = 0; i < 10; i++) {
+      // GLTF models — reduced from 57 to 18 instances for performance
+      for (let i = 0; i < 5; i++) {
         const side = i % 2 === 0 ? -1 : 1;
         const url = peruBldgs[(Math.random() * peruBldgs.length) | 0];
         this._placeModel(url, side * (RH + 10 + Math.random() * 10), 0,
-          -i * 30 - Math.random() * 15, Math.random() * Math.PI * 2, 0.7 + Math.random() * 0.4, 'mg');
+          -i * 55 - Math.random() * 20, Math.random() * Math.PI * 2, 0.7 + Math.random() * 0.4, 'mg');
       }
-
-      for (let i = 0; i < 10; i++) {
-        const side = i % 2 === 0 ? -1 : 1;
-        const url = Math.random() > 0.5 ? MODEL_URLS.peruTreeLarge : MODEL_URLS.peruTreeSmall;
-        this._placeModel(url, side * (RH + 5 + Math.random() * 8), 0,
-          -i * 28 - Math.random() * 12, Math.random() * Math.PI * 2, 0.8 + Math.random() * 0.4, 'fg');
-      }
-
-      this._scatterProps([MODEL_URLS.peruPlanter], 6, [2, 5], 45, 'fg');
-      this._scatterProps([MODEL_URLS.bush], 8, [4, 9], 30, 'fg');
-      this._scatterProps([MODEL_URLS.flowers], 8, [3, 12], 30, 'fg');
-      this._scatterProps([MODEL_URLS.stoneWall], 6, [4, 10], 45, 'fg');
 
       for (let i = 0; i < 5; i++) {
         const side = i % 2 === 0 ? -1 : 1;
-        this._placeModel(MODEL_URLS.hut, side * (RH + 12 + Math.random() * 6), 0,
-          -i * 65 - 25, Math.random() * Math.PI * 2, 0.9 + Math.random() * 0.2, 'mg');
+        const url = Math.random() > 0.5 ? MODEL_URLS.peruTreeLarge : MODEL_URLS.peruTreeSmall;
+        this._placeModel(url, side * (RH + 5 + Math.random() * 8), 0,
+          -i * 55 - Math.random() * 20, Math.random() * Math.PI * 2, 0.8 + Math.random() * 0.4, 'fg');
       }
 
-      this._scatterProps([MODEL_URLS.tires, MODEL_URLS.raceBarrier], 4, [2, 4], 70, 'fg');
+      this._scatterProps([MODEL_URLS.peruPlanter], 3, [2, 5], 90, 'fg');
+      this._scatterProps([MODEL_URLS.bush], 3, [4, 9], 80, 'fg');
+
+      this._scatterProps([MODEL_URLS.tires, MODEL_URLS.raceBarrier], 2, [2, 4], 120, 'fg');
     }
   }
 
