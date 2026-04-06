@@ -636,14 +636,8 @@ export class Environment {
         Math.random() * Math.PI * 2, 0.8 + Math.random() * 0.4, 'mg');
     }
 
-    // ── Bushes along road edge → foreground ──
-    for (let i = 0; i < 5; i++) {
-      this._placeModel(MODEL_URLS.bush, -(RH + 2 + Math.random() * 1.5), 0,
-        -i * 28 - Math.random() * 12, Math.random() * Math.PI * 2, 1, 'fg');
-    }
-
     // ══════════════════════════════════════════
-    //  RIGHT — Beach palms, bushes, boats
+    //  RIGHT — Beach palms, boats
     // ══════════════════════════════════════════
 
     // Beach palms → foreground
@@ -653,12 +647,6 @@ export class Environment {
       const model = this._placeModel(MODEL_URLS.palmTree, x, 0,
         -i * 20 - Math.random() * 10, Math.random() * Math.PI * 2, 0.8 + Math.random() * 0.3, 'fg');
       model.rotation.z = lean;
-    }
-
-    // Beach bushes → foreground
-    for (let i = 0; i < 4; i++) {
-      this._placeModel(MODEL_URLS.bush, RH + 2.5 + Math.random() * 3, 0,
-        -i * 35 - Math.random() * 15, Math.random() * Math.PI * 2, 1, 'fg');
     }
 
     // ── Boats on ocean → background ──
