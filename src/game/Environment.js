@@ -627,26 +627,7 @@ export class Environment {
 
     if (!this.modelsReady) return;
 
-    // ══════════════════════════════════════════
-    //  LEFT — Favela buildings (dense, colorful, stacked on hillside)
-    // ══════════════════════════════════════════
-    const brazilBldgs = [
-      MODEL_URLS.brazilE, MODEL_URLS.brazilF, MODEL_URLS.brazilG, MODEL_URLS.brazilI,
-      MODEL_URLS.brazilL,
-    ];
-    const favelaColors = [0xcc4444, 0xe88833, 0xddcc33, 0x44aa66, 0x4488cc, 0xcc5599, 0xeeeecc, 0x66ccaa];
-
-    // Front row (closest to road) → midground
-    for (let i = 0; i < 4; i++) {
-      const url = brazilBldgs[Math.floor(Math.random() * brazilBldgs.length)];
-      const x = -(RH + 5 + Math.random() * 6);
-      const model = this._placeModel(url, x, 0, -i * 22 - Math.random() * 8, Math.random() * Math.PI, 0.7 + Math.random() * 0.4, 'mg');
-      // Tint with favela color
-      const tintColor = favelaColors[Math.floor(Math.random() * favelaColors.length)];
-      this._tintModel(model, tintColor);
-    }
-
-    // Back rows removed for performance (only roadside buildings kept)
+    // All buildings removed for performance
 
     // ── Palms between buildings → midground ──
     for (let i = 0; i < 6; i++) {
