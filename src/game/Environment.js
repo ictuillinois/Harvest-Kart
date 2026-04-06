@@ -1219,26 +1219,7 @@ export class Environment {
     // ══════════════════════════════════════════
     //  LOADED MODELS (if available)
     // ══════════════════════════════════════════
-    if (this.modelsReady) {
-      const peruBldgs = [
-        MODEL_URLS.peruBuildingA, MODEL_URLS.peruBuildingB, MODEL_URLS.peruBuildingC,
-        MODEL_URLS.peruBuildingD, MODEL_URLS.peruBuildingE, MODEL_URLS.peruBuildingF,
-        MODEL_URLS.peruBuildingR, MODEL_URLS.peruBuildingS, MODEL_URLS.peruBuildingT,
-      ];
-      // GLTF models — absolute minimum
-      for (let i = 0; i < 2; i++) {
-        const side = i % 2 === 0 ? -1 : 1;
-        const url = peruBldgs[(Math.random() * peruBldgs.length) | 0];
-        this._placeModel(url, side * (RH + 10 + Math.random() * 10), 0,
-          -i * 140 - 40, Math.random() * Math.PI * 2, 0.7 + Math.random() * 0.4, 'mg');
-      }
-
-      for (let i = 0; i < 2; i++) {
-        const side = i % 2 === 0 ? -1 : 1;
-        this._placeModel(MODEL_URLS.peruTreeLarge, side * (RH + 5 + Math.random() * 8), 0,
-          -i * 140 - 60, Math.random() * Math.PI * 2, 0.8 + Math.random() * 0.4, 'fg');
-      }
-    }
+    // All GLTF buildings/models removed for performance
   }
 
   // =====================================================================

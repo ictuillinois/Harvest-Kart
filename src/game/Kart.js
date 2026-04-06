@@ -628,6 +628,7 @@ export class Kart {
     // Store wheel rotation config
     this._wheelCanRotate = meshConfig.wheelRotation !== false;
     this._wheelAxis = meshConfig.wheelAxis || 'x';
+    this._skipExhaust = !!meshConfig.skipExhaust;
 
     // Position model so bottom sits on Y=0 (road surface)
     const bbox = new THREE.Box3().setFromObject(model);
@@ -1179,8 +1180,8 @@ export class Kart {
         w.rotation[axis] += rotationSpeed;
       });
     }
-    if (isAccelerating && speed > 20) this._emitExhaust(delta);
-    this._updateExhaust(delta, speed);
+    if (!this._skipExhaust && isAccelerating && speed > 20) this._emitExhaust(delta);
+    if (!this._skipExhaust) this._updateExhaust(delta, speed);
     if (this._turboActive) this._updateTurboFlame(delta, speed);
   }
 
