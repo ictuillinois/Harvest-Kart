@@ -632,7 +632,7 @@ export class Environment {
     // ══════════════════════════════════════════
     const brazilBldgs = [
       MODEL_URLS.brazilE, MODEL_URLS.brazilF, MODEL_URLS.brazilG, MODEL_URLS.brazilI,
-      MODEL_URLS.brazilL, MODEL_URLS.brazilM, MODEL_URLS.brazilN,
+      MODEL_URLS.brazilL,
     ];
     const favelaColors = [0xcc4444, 0xe88833, 0xddcc33, 0x44aa66, 0x4488cc, 0xcc5599, 0xeeeecc, 0x66ccaa];
 
