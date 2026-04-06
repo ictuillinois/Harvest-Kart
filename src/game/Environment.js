@@ -628,7 +628,7 @@ export class Environment {
       color: 0x7799bb, roughness: 0.6, metalness: 0.1,
       emissive: 0x445566, emissiveIntensity: 0.1,
     });
-    for (let i = 0; i < 15; i++) {
+    for (let i = 0; i < 10; i++) {
       const h = 5 + Math.random() * 15;
       const tower = new THREE.Mesh(new THREE.BoxGeometry(3 + Math.random() * 3, h, 3), skylineMat);
       tower.position.set(
@@ -651,7 +651,7 @@ export class Environment {
     const favelaColors = [0xcc4444, 0xe88833, 0xddcc33, 0x44aa66, 0x4488cc, 0xcc5599, 0xeeeecc, 0x66ccaa];
 
     // Front row (closest to road) → midground
-    for (let i = 0; i < 14; i++) {
+    for (let i = 0; i < 8; i++) {
       const url = brazilBldgs[Math.floor(Math.random() * brazilBldgs.length)];
       const x = -(RH + 5 + Math.random() * 6);
       const model = this._placeModel(url, x, 0, -i * 22 - Math.random() * 8, Math.random() * Math.PI, 0.7 + Math.random() * 0.4, 'mg');
@@ -661,7 +661,7 @@ export class Environment {
     }
 
     // Back row (further from road) → midground
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < 6; i++) {
       const url = brazilBldgs[Math.floor(Math.random() * brazilBldgs.length)];
       const x = -(RH + 14 + Math.random() * 10);
       const model = this._placeModel(url, x, 0, -i * 28 - Math.random() * 12, Math.random() * Math.PI, 0.6 + Math.random() * 0.3, 'mg');
@@ -679,14 +679,14 @@ export class Environment {
     }
 
     // ── Palms between buildings → midground ──
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < 6; i++) {
       const x = -(RH + 4 + Math.random() * 4);
       this._placeModel(MODEL_URLS.palmTree, x, 0, -i * 28 - Math.random() * 12,
         Math.random() * Math.PI * 2, 0.8 + Math.random() * 0.4, 'mg');
     }
 
     // ── Bushes along road edge → foreground ──
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < 5; i++) {
       this._placeModel(MODEL_URLS.bush, -(RH + 2 + Math.random() * 1.5), 0,
         -i * 28 - Math.random() * 12, Math.random() * Math.PI * 2, 1, 'fg');
     }
@@ -696,7 +696,7 @@ export class Environment {
     // ══════════════════════════════════════════
 
     // Beach palms → foreground
-    for (let i = 0; i < 15; i++) {
+    for (let i = 0; i < 8; i++) {
       const x = RH + 3 + Math.random() * 5;
       const lean = (Math.random() - 0.5) * 0.1; // slight lean
       const model = this._placeModel(MODEL_URLS.palmTree, x, 0,
@@ -705,14 +705,14 @@ export class Environment {
     }
 
     // Beach bushes → foreground
-    for (let i = 0; i < 8; i++) {
+    for (let i = 0; i < 4; i++) {
       this._placeModel(MODEL_URLS.bush, RH + 2.5 + Math.random() * 3, 0,
         -i * 35 - Math.random() * 15, Math.random() * Math.PI * 2, 1, 'fg');
     }
 
     // ── Boats on ocean → background ──
     const boatColors = [0xcc3333, 0x3366cc, 0xeeeedd, 0x33aa66, 0xdd8833];
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 3; i++) {
       const boatGroup = new THREE.Group();
       const boatColor = boatColors[Math.floor(Math.random() * boatColors.length)];
       // Hull
@@ -742,7 +742,7 @@ export class Environment {
     }
 
     // ── Left road additional palms (sparser, inland) ──
-    for (let i = 0; i < 6; i++) {
+    for (let i = 0; i < 3; i++) {
       const x = -(RH + 4 + Math.random() * 6);
       this._placeModel(MODEL_URLS.palmTree, x, 0,
         -i * 35 - Math.random() * 15, Math.random() * Math.PI * 2, 0.7 + Math.random() * 0.3, 'fg');
@@ -1095,9 +1095,9 @@ export class Environment {
       new THREE.MeshStandardMaterial({ color: 0x3a5a25, roughness: 0.95 }), // dark grass
       new THREE.MeshStandardMaterial({ color: 0x7a7a6a, roughness: 0.92 }), // rock
     ];
-    for (let z = 15; z > -300; z -= 25 + Math.random() * 20) {
+    for (let z = 15; z > -300; z -= 40 + Math.random() * 30) {
       for (const side of [-1, 1]) {
-        if (Math.random() > 0.25) continue;
+        if (Math.random() > 0.2) continue;
         const patch = new THREE.Mesh(patchGeo, patchMats[(Math.random() * patchMats.length) | 0]);
         patch.rotation.x = -Math.PI / 2;
         patch.position.set(side * (RH + 5 + Math.random() * 18), 0.01 + Math.random() * 0.01, z);
@@ -1112,12 +1112,10 @@ export class Environment {
     //  MOUNTAINS — vertex-colored + displaced (background)
     // ══════════════════════════════════════════
     const mtConfigs = [
-      { r: 25, h: 55, x: -50, z: -250 },
-      { r: 20, h: 48, x: 55, z: -280 },
-      { r: 18, h: 38, x: -75, z: -200 },
-      { r: 15, h: 32, x: 70, z: -230 },
-      { r: 22, h: 42, x: -90, z: -310 },
-      { r: 14, h: 22, x: 45, z: -160 },
+      { r: 28, h: 55, x: -55, z: -250 },
+      { r: 22, h: 48, x: 60, z: -280 },
+      { r: 20, h: 40, x: -80, z: -200 },
+      { r: 24, h: 44, x: -90, z: -310 },
     ];
     for (const cfg of mtConfigs) {
       // Main peak
@@ -1161,7 +1159,7 @@ export class Environment {
       c => new THREE.MeshStandardMaterial({ color: c, roughness: 0.9 }));
     const hillGeo = new THREE.SphereGeometry(6, 6, 4);
     for (const side of [-1, 1]) {
-      for (let i = 0; i < 4; i++) {
+      for (let i = 0; i < 2; i++) {
         const hill = new THREE.Mesh(hillGeo, hillMats[i % hillMats.length]);
         hill.scale.set(0.7 + Math.random() * 0.6, 0.3, 0.7 + Math.random() * 0.6);
         hill.position.set(side * (RH + 14 + Math.random() * 14), -1.5, -i * 70 - Math.random() * 30);
@@ -1176,9 +1174,9 @@ export class Environment {
     // ══════════════════════════════════════════
     const terrMat = new THREE.MeshStandardMaterial({ color: 0x7a6b4f, roughness: 0.9 });
     const tGrassMat = new THREE.MeshStandardMaterial({ color: 0x5a9a3a, roughness: 0.85 });
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 1; i++) {
       const terrGroup = new THREE.Group();
-      const levels = 4 + Math.floor(Math.random() * 2);
+      const levels = 3;
       const baseW = 8 + Math.random() * 4;
       for (let level = 0; level < levels; level++) {
         const w = baseW - level * (baseW * 0.12);
@@ -1208,8 +1206,7 @@ export class Environment {
     const doorMat = new THREE.MeshBasicMaterial({ color: 0x2a1a0a });
 
     const clusters = [
-      { z: -60, side: -1, count: 4 },
-      { z: -200, side: 1, count: 3 },
+      { z: -120, side: -1, count: 3 },
     ];
     for (const cl of clusters) {
       for (let j = 0; j < cl.count; j++) {
@@ -1241,8 +1238,7 @@ export class Environment {
     // ══════════════════════════════════════════
     //  TREES — dense, 3 types (foreground + midground)
     // ══════════════════════════════════════════
-    const trunkMat = new THREE.MeshStandardMaterial({ color: 0x5c3d1e, roughness: 0.9 });
-    const trunkGeo = new THREE.CylinderGeometry(0.1, 0.15, 2, 5);
+    // Trunks removed for performance — trees are canopy-only blobs
     const pineGeo = new THREE.ConeGeometry(1.2, 3.5, 5);
     const bushGeo = new THREE.SphereGeometry(0.8, 4, 3);
     const roundGeo = new THREE.SphereGeometry(1.0, 4, 3);
@@ -1254,75 +1250,46 @@ export class Environment {
     );
     const pickCanopy = () => canopyMats[(Math.random() * canopyMats.length) | 0];
 
-    // Foreground trees (sparse)
+    // Foreground vegetation — very sparse
     for (const side of [-1, 1]) {
-      for (let z = 15; z > -320; z -= 10 + Math.random() * 10) {
-        if (Math.random() > 0.4) continue;
-        const tg = new THREE.Group();
-        const type = Math.random();
-        if (type < 0.4) {
-          tg.add((() => { const t = new THREE.Mesh(trunkGeo, trunkMat); t.position.y = 1; return t; })());
-          tg.add((() => { const c = new THREE.Mesh(pineGeo, pickCanopy()); c.position.y = 3.5; return c; })());
-        } else if (type < 0.65) {
-          tg.add((() => { const b = new THREE.Mesh(bushGeo, pickCanopy()); b.position.y = 0.5; b.scale.y = 0.6; return b; })());
-        } else {
-          tg.add((() => { const t = new THREE.Mesh(trunkGeo, trunkMat); t.position.y = 1; return t; })());
-          tg.add((() => { const c = new THREE.Mesh(roundGeo, pickCanopy()); c.position.y = 3; c.scale.set(0.8, 1.1, 0.8); return c; })());
-        }
-        tg.position.set(side * (RH + 3 + Math.random() * 5), 0, z);
-        tg.scale.setScalar(0.6 + Math.random() * 0.6);
-        this.scene.add(tg);
-        this.themeObjects.push(tg);
-        this.foreground.push(tg);
-      }
-    }
-
-    // Midground trees (sparse)
-    for (const side of [-1, 1]) {
-      for (let z = 15; z > -320; z -= 12 + Math.random() * 10) {
+      for (let z = 15; z > -320; z -= 30 + Math.random() * 25) {
         if (Math.random() > 0.3) continue;
-        const tg = new THREE.Group();
-        tg.add((() => { const t = new THREE.Mesh(trunkGeo, trunkMat); t.position.y = 1; return t; })());
-        const geoType = Math.random() > 0.5 ? pineGeo : roundGeo;
-        tg.add((() => { const c = new THREE.Mesh(geoType, pickCanopy()); c.position.y = geoType === pineGeo ? 3.5 : 3; return c; })());
-        tg.position.set(side * (RH + 16 + Math.random() * 22), 0, z);
-        tg.scale.setScalar(0.5 + Math.random() * 0.8);
-        this.scene.add(tg);
-        this.themeObjects.push(tg);
-        this.midground.push(tg);
+        const geo = Math.random() > 0.5 ? pineGeo : bushGeo;
+        const tree = new THREE.Mesh(geo, pickCanopy());
+        const s = 0.5 + Math.random() * 0.6;
+        tree.scale.setScalar(s);
+        tree.position.set(side * (RH + 3 + Math.random() * 5), s * 1.5, z);
+        this.scene.add(tree);
+        this.themeObjects.push(tree);
+        this.foreground.push(tree);
       }
     }
 
-    // Hillside trees (background — canopy blobs on mountain bases, no trunk)
-    for (let i = 0; i < 10; i++) {
+    // Midground vegetation — very sparse
+    for (const side of [-1, 1]) {
+      for (let z = 15; z > -320; z -= 35 + Math.random() * 25) {
+        if (Math.random() > 0.25) continue;
+        const geo = Math.random() > 0.5 ? pineGeo : roundGeo;
+        const tree = new THREE.Mesh(geo, pickCanopy());
+        const s = 0.5 + Math.random() * 0.7;
+        tree.scale.setScalar(s);
+        tree.position.set(side * (RH + 16 + Math.random() * 22), s * 1.5, z);
+        this.scene.add(tree);
+        this.themeObjects.push(tree);
+        this.midground.push(tree);
+      }
+    }
+
+    // Hillside canopies (background)
+    for (let i = 0; i < 3; i++) {
       const canopy = new THREE.Mesh(pineGeo, pickCanopy());
       canopy.position.set(
         (Math.random() > 0.5 ? 1 : -1) * (30 + Math.random() * 45),
-        Math.random() * 6,
-        -80 - Math.random() * 200,
-      );
+        Math.random() * 6, -80 - Math.random() * 200);
       canopy.scale.setScalar(0.3 + Math.random() * 0.5);
       this.scene.add(canopy);
       this.themeObjects.push(canopy);
       this.midground.push(canopy);
-    }
-
-    // ══════════════════════════════════════════
-    //  GRASS CLUMPS + ROCKS (foreground)
-    // ══════════════════════════════════════════
-    const ichuMats = [0x9aaa3a, 0x8a9a2a, 0x7a8a1a, 0xaaaa4a].map(
-      c => new THREE.MeshStandardMaterial({ color: c, roughness: 0.9 })
-    );
-    const clumpGeo = new THREE.SphereGeometry(0.3, 4, 3);
-    for (let i = 0; i < 8; i++) {
-      const side = i % 2 === 0 ? -1 : 1;
-      const clump = new THREE.Mesh(clumpGeo, ichuMats[i % ichuMats.length]);
-      const s = 0.6 + Math.random() * 0.8;
-      clump.scale.set(s, s * 0.5, s);
-      clump.position.set(side * (RH + 4 + Math.random() * 14), 0, -i * 15 - Math.random() * 5);
-      this.scene.add(clump);
-      this.themeObjects.push(clump);
-      this.foreground.push(clump);
     }
 
     // Rocks removed for performance
@@ -1336,25 +1303,19 @@ export class Environment {
         MODEL_URLS.peruBuildingD, MODEL_URLS.peruBuildingE, MODEL_URLS.peruBuildingF,
         MODEL_URLS.peruBuildingR, MODEL_URLS.peruBuildingS, MODEL_URLS.peruBuildingT,
       ];
-      // GLTF models — reduced from 57 to 18 instances for performance
-      for (let i = 0; i < 5; i++) {
+      // GLTF models — absolute minimum
+      for (let i = 0; i < 2; i++) {
         const side = i % 2 === 0 ? -1 : 1;
         const url = peruBldgs[(Math.random() * peruBldgs.length) | 0];
         this._placeModel(url, side * (RH + 10 + Math.random() * 10), 0,
-          -i * 55 - Math.random() * 20, Math.random() * Math.PI * 2, 0.7 + Math.random() * 0.4, 'mg');
+          -i * 140 - 40, Math.random() * Math.PI * 2, 0.7 + Math.random() * 0.4, 'mg');
       }
 
-      for (let i = 0; i < 5; i++) {
+      for (let i = 0; i < 2; i++) {
         const side = i % 2 === 0 ? -1 : 1;
-        const url = Math.random() > 0.5 ? MODEL_URLS.peruTreeLarge : MODEL_URLS.peruTreeSmall;
-        this._placeModel(url, side * (RH + 5 + Math.random() * 8), 0,
-          -i * 55 - Math.random() * 20, Math.random() * Math.PI * 2, 0.8 + Math.random() * 0.4, 'fg');
+        this._placeModel(MODEL_URLS.peruTreeLarge, side * (RH + 5 + Math.random() * 8), 0,
+          -i * 140 - 60, Math.random() * Math.PI * 2, 0.8 + Math.random() * 0.4, 'fg');
       }
-
-      this._scatterProps([MODEL_URLS.peruPlanter], 3, [2, 5], 90, 'fg');
-      this._scatterProps([MODEL_URLS.bush], 3, [4, 9], 80, 'fg');
-
-      this._scatterProps([MODEL_URLS.tires, MODEL_URLS.raceBarrier], 2, [2, 4], 120, 'fg');
     }
   }
 
@@ -1364,19 +1325,7 @@ export class Environment {
   update(delta, speed) {
     if (this.sky && this.sky.material.uniforms['time']) this.sky.material.uniforms['time'].value += delta;
     if (this.starField) this.starField.material.uniforms.time.value += delta;
-    // Animate ocean waves every other frame (400 verts is costly per frame)
-    this._waveFrame = (this._waveFrame || 0) + 1;
-    if (this.water && this.water.userData.basePositions && this._waveFrame % 2 === 0) {
-      const pos = this.water.geometry.attributes.position;
-      const base = this.water.userData.basePositions;
-      const time = performance.now() * 0.001;
-      for (let i = 0; i < pos.count; i++) {
-        const bx = base[i * 3];
-        const by = base[i * 3 + 1];
-        pos.array[i * 3 + 2] = base[i * 3 + 2] + Math.sin(time * 1.5 + bx * 0.3 + by * 0.2) * 0.15;
-      }
-      pos.needsUpdate = true;
-    }
+    // Ocean wave animation removed for performance
 
     const move = speed * delta;
     this._parFrame = (this._parFrame || 0) + 1;

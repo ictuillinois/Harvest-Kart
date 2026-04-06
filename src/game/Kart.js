@@ -90,7 +90,7 @@ const VEHICLE_MESH_CONFIG = {
     taillightXFrac: 0.38,
   },
   formula: {
-    // Destiny: AMG GT
+    // Destiny: AMG GT — all materials use same paint path for GPU efficiency
     bodyNames: ['amg_gt_body'],
     wheelNames: ['lfwheel001', 'rrwheel', 'rfwheel001', 'lrwheel002'],
     wheelRotation: false,
@@ -385,7 +385,7 @@ export class Kart {
     const modelUrl = DRIVER_VEHICLES[driver.vehicleType];
 
     // Load GLTF model (preloaded, returns normalized clone)
-    let model = modelUrl ? getModel(modelUrl, true) : null; // skip material clone — we replace all materials
+    let model = modelUrl ? getModel(modelUrl) : null;
 
     // Fallback if model not loaded
     if (!model || model.children.length === 0) {

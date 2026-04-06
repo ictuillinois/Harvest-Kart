@@ -49,6 +49,13 @@ export async function preloadAll(urls) {
                 }
               });
             }
+            // Set colorSpace on ALL embedded textures at preload time (avoids re-upload during build)
+            group.traverse(child => {
+              if (child.isMesh) {
+                const mats = Array.isArray(child.material) ? child.material : [child.material];
+                mats.forEach(m => { if (m.map) m.map.colorSpace = THREE.SRGBColorSpace; });
+              }
+            });
             // Normalize to same shape as GLTF ({ scene: ... }) so getModel() works unchanged
             cache.set(url, { scene: group });
           } else {
@@ -182,7 +189,7 @@ export const MODEL_URLS = {
 
 // Sidecar textures for FBX models that don't embed their textures
 const FBX_TEXTURES = {};
-FBX_TEXTURES[MODEL_URLS.vehicleDestiny] = asset('models/vehicles/fbx/destiny.png');
+// Destiny: embedded textures sufficient, sidecar removed for performance
 FBX_TEXTURES[MODEL_URLS.vehicleLuke] = asset('models/vehicles/fbx/luke.png');
 
 // Target heights in world units (auto-applied by getModel)

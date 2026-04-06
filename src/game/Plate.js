@@ -7,7 +7,7 @@ import {
   PLATE_COLLISION_Z_THRESHOLD, ROAD_SEGMENT_LENGTH
 } from '../utils/constants.js';
 
-const POOL_SIZE = 15;
+const POOL_SIZE = 10;
 const PLATE_W = 2.4;
 const PLATE_L = 1.5;
 const PLATE_H = 0.18;
@@ -147,29 +147,13 @@ function createPlate() {
 // ── Lane sequence generator ──
 function generateLaneSequence(count) {
   const seq = [];
-  let last = 1, lastLast = 1;
+  let last = 1;
 
   for (let i = 0; i < count; i++) {
-    const options = [0, 1, 2].filter(l => {
-      if (l === last && l === lastLast) return false;
-      if (Math.abs(l - last) === 2 && Math.abs(last - lastLast) === 2) return false;
-      return true;
-    });
-
-    const weights = options.map(l => {
-      const d = Math.abs(l - last);
-      return d === 0 ? 0.15 : d === 1 ? 0.6 : 0.25;
-    });
-    const total = weights.reduce((a, b) => a + b, 0);
-    let r = Math.random() * total;
-    let lane = options[0];
-    for (let j = 0; j < options.length; j++) {
-      r -= weights[j];
-      if (r <= 0) { lane = options[j]; break; }
-    }
-
+    // Each plate must be in a DIFFERENT lane from the previous one
+    const options = [0, 1, 2].filter(l => l !== last);
+    const lane = options[Math.floor(Math.random() * options.length)];
     seq.push(lane);
-    lastLast = last;
     last = lane;
   }
   return seq;
@@ -275,8 +259,14 @@ export class Plate {
 
     if (this.timeSinceSpawn >= this.spawnInterval) {
       this.timeSinceSpawn = 0;
-      const spawnZ = -(ROAD_SEGMENT_LENGTH * 0.8 + Math.random() * 40);
-      this.spawnPlate(spawnZ);
+      const spawnZ = -(ROAD_SEGMENT_LENGTH * 0.9 + Math.random() * 30);
+      if (spawnZ < -20) {
+        // Enforce minimum gap — no plate within 25 units of any active plate
+        const tooClose = this.plates.some(p =>
+          p.userData.active && Math.abs(p.position.z - spawnZ) < 25
+        );
+        if (!tooClose) this.spawnPlate(spawnZ);
+      }
     }
 
     this._pulseFrame = (this._pulseFrame || 0) + 1;
