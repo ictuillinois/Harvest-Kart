@@ -623,21 +623,7 @@ export class Environment {
     this.themeObjects.push(corcovadoGroup);
     this.background.push(corcovadoGroup);
 
-    // ── DISTANT CITY SKYLINE — faded boxes along horizon ──
-    const skylineMat = new THREE.MeshStandardMaterial({
-      color: 0x7799bb, roughness: 0.6, metalness: 0.1,
-      emissive: 0x445566, emissiveIntensity: 0.1,
-    });
-    for (let i = 0; i < 10; i++) {
-      const h = 5 + Math.random() * 15;
-      const tower = new THREE.Mesh(new THREE.BoxGeometry(3 + Math.random() * 3, h, 3), skylineMat);
-      tower.position.set(
-        -(RH + 50 + Math.random() * 40), h / 2, -i * 25 - Math.random() * 10,
-      );
-      this.scene.add(tower);
-      this.themeObjects.push(tower);
-      this.background.push(tower);
-    }
+    // Distant city skyline removed for performance
 
     if (!this.modelsReady) return;
 
