@@ -16,11 +16,13 @@ GitHub Pages deployment is automatic on push to main via `.github/workflows/depl
 
 A 3D browser-based kart racing mini-game (Three.js v0.183.2 + Vite v8 + @tweenjs/tween.js v25). No React, no backend. Demonstrates piezoelectric energy harvesting: drive over glowing plates on a highway to charge lamp posts progressively.
 
+**Game title:** AL-QADI TEAM RACING — Energy Harvesting Edition
+
 **Game flow:** `menu` → `driverSelect` → `mapSelect` → `playing` ↔ `paused` → `completing` → `complete` → `reward`
 
 **Drivers:** Ethan (black, Sports GT), Kate (pink, Compact), Destiny (blue, AMG GT), Luke (green, Lamborghini SUV). Each has a unique vehicle type, color, and FBX model. Character WebP in `public/characters/`.
 
-**Maps:** Peru (mountain pass), USA (sunset city), Brazil (coastal highway). Each has a custom gradient sky (no Preetham shader), distinct lighting, decorations, and fog.
+**Maps:** Peru (mountain pass), USA (sunset city), Brazil (coastal highway). Each has a custom gradient sky, distinct lighting, and fog. Scenes are lightweight for performance — minimal procedural objects, sparse GLTF model placement.
 
 ## Critical Patterns
 
@@ -38,10 +40,11 @@ On each tier-up (every 10 plates collected), a 3-second turbo boost activates:
 - Audio: `playTurboBoost()` — whoosh + turbo whistle + bass thump + flutter
 - FOV widens +5 degrees during turbo
 - "TURBO BOOST!" toast with fire-themed styling
+- Vehicles with `skipExhaust` (Destiny) skip exhaust particle emission
 
 ### Per-Driver Vehicle Physics
 
-Each driver has unique physics derived from stats (SPD/ACC/EFF). `DRIVER_PHYSICS` in constants.js defines per-driver: `topSpeed`, `gearAccel` (scaled by ACC stars), `gearThresholds` (proportional to top speed), `decelRate`, `coastFloor`, `laneSwitchMs`, `chargeMultiplier`. `getDriverPhysics(driverIndex)` returns active config.
+Each driver has unique physics derived from stats (SPD/ACC/EFF). `DRIVER_PHYSICS` in constants.js defines per-driver: `topSpeed`, `gearAccel` (scaled by ACC stars), `gearThresholds` (proportional to top speed), `decelRate`, `coastFloor`, `chargeMultiplier`. `getDriverPhysics(driverIndex)` returns active config.
 
 | Driver  | Top Speed | Accel | Decel | Coast | Description     |
 |---------|-----------|-------|-------|-------|-----------------|
@@ -62,28 +65,27 @@ Players steer by holding arrow keys/buttons — the kart slides continuously at 
 
 Vehicles use FBX models in `public/models/vehicles/fbx/`. Each model has different mesh structure discovered via FBX inspection:
 
-| Driver  | FBX File   | Body Mesh              | Wheels | Texture |
-|---------|------------|------------------------|--------|---------|
-| Ethan   | ethan.FBX  | sonata_pantera_grey    | None (baked) | Embedded |
-| Kate    | kate.fbx   | Body (5 materials)     | Front_Wheels001, Back_Wheels001 | None (solid colors) |
-| Destiny | destiny.fbx| amg_Gt_body (3 mats)   | 4 individual | Embedded palette |
-| Luke    | luke.fbx   | kuzov + named parts    | 4 individual (Koleso*) | Embedded palette |
+| Driver  | FBX File   | Body Mesh              | Wheels | Notes |
+|---------|------------|------------------------|--------|-------|
+| Ethan   | ethan.FBX  | sonata_pantera_grey    | None (baked) | Dark vehicle, sportsLights: true |
+| Kate    | kate.fbx   | Body (5 materials)     | 2 combined | compactLights: true |
+| Destiny | destiny.fbx| amg_Gt_body (3 mats)   | 4 individual | skipExhaust, no rotation |
+| Luke    | luke.fbx   | kuzov + named parts    | 4 individual | rallyLights, emissiveOnlyTint |
 
-`VEHICLE_MESH_CONFIG` per vehicleType defines: `bodyNames`, `wheelNames`, `hiddenNames`, `rotationY`, `hasTexture`, `glassTint`, `materialProfile`, and light/detail flags.
+`VEHICLE_MESH_CONFIG` per vehicleType defines: `bodyNames`, `wheelNames`, `hiddenNames`, `rotationY`, `hasTexture`, `materialProfile`, and light/detail flags.
 
-Destiny and Luke use `emissiveOnlyTint: true` — preserves texture palette colors (windows stay dark), adds driver color via emissive only. Body uses `MeshPhysicalMaterial` with clearcoat for automotive paint finish.
+**Shared materials:** 10 module-level cached materials (`_sharedChrome`, `_sharedDarkChrome`, `_sharedHlLens`, `_sharedHlBulb`, `_sharedDRL`, `_sharedHalo`, `_sharedLedRed`, `_sharedAmber`, `_sharedRedMarker`, `_sharedWheel`) reused across ALL vehicles and light methods. Eliminates per-build material allocations.
 
-Ethan (dark vehicle) also uses `MeshPhysicalMaterial` with clearcoat, boosted emissive (0.55), and fill light multiplier (2.0x) for road contrast.
-
-`FBX_TEXTURES` map in assetLoader.js registers sidecar PNG textures for Destiny and Luke.
+**colorSpace:** Set on FBX textures at preload time in `assetLoader.js` to avoid GPU re-upload during builds. Never set during `_buildCar`.
 
 ### Per-Vehicle Light Systems
 
 Three light system styles, implemented as static methods shared between `Kart.js` and `DriverSelect.js`:
 
-- **Sports lights** (Ethan, Destiny): `_addSportsHeadlights()` — projector lens + chrome bezel + DRL strip. `_addSportsTaillights()` — full-width LED bar with 6 segments + chrome frame.
+- **Sports lights** (Ethan): `_addSportsHeadlights()` — projector lens + halo + DRL. `_addSportsTaillights()` — full-width LED bar with segments + chrome frame.
 - **Compact lights** (Kate): `_addCompactHeadlights()` — round housings + chrome ring. `_addCompactTaillights()` — round LED clusters + connecting strip.
 - **SUV lights** (Luke): Model headlights (`front_fari` mesh). `_addSUVTaillights()` — vertical LED bars with chrome bezels.
+- **Destiny**: Standard headlights (2 bulbs) + standard taillights (2 clusters). Exhaust skipped.
 
 ### Material Profiles
 
@@ -92,72 +94,82 @@ Three light system styles, implemented as static methods shared between `Kart.js
 - `raceMetal` (Destiny): metalness 0.55, roughness 0.15, emissive 0.22 — deep metallic
 - `rallySatin` (Luke): metalness 0.35, roughness 0.22, emissive 0.20 — satin finish
 
-### Vehicle Detail Packages
+Dark vehicles (Ethan) use a separate paint path with high metalness (0.75), low roughness (0.06), and strong emissive (0.55) for road contrast.
 
-Per-vehicle detail methods add chrome trim, DRLs, side markers, and structural elements:
-- `_addGTDetails()` (Ethan): chrome beltline, rear strip, side markers, underglow boost
-- `_addSportsDetails()` (Destiny): grille, splitter, air intakes, diffuser, spoiler, shoulder lines
-- `_addRallyDetails()` (Luke): roof rails, bull bar, skid plate, side steps, wheel arch flares, bumper guard
+Luke uses `emissiveOnlyTint: true` — preserves texture palette colors (windows stay dark), adds driver color via emissive only.
 
 ### Model Scale Normalization
 
 FBX/GLTF models have wildly different internal scales. **Never hand-tune scales.**
 
-`assetLoader.js` has `normalizeToHeight(object3D, targetHeight)` using `Box3.setFromObject()`. The `MODEL_HEIGHTS` registry maps every model URL to its target height. `getModel(url)` auto-normalizes on every clone.
+`assetLoader.js` has `normalizeToHeight(object3D, targetHeight)` using `Box3.setFromObject()`. The `MODEL_HEIGHTS` registry maps every model URL to its target height. `getModel(url)` auto-normalizes on every clone and deep-clones all materials.
 
-`preloadAll()` auto-detects `.fbx` extension via `isFBX()` and uses `FBXLoader`. FBX results wrapped in `{ scene: group }` to match GLTF cache shape.
+`preloadAll()` auto-detects `.fbx` extension via `isFBX()` and uses `FBXLoader`. FBX results wrapped in `{ scene: group }` to match GLTF cache shape. colorSpace set on all embedded textures at preload time.
 
 ### Asset Path Resolution
 
 All public assets must use `asset('path/to/file')` from `src/utils/base.js`. This prepends `import.meta.env.BASE_URL` so paths work both in dev (`/`) and on GitHub Pages (`/Harvest-Kart/`).
 
+### Piezoelectric Energy Plates
+
+`Plate.js` — Pool of 10 plates. Spawn interval 0.6s with 25-unit minimum gap between active plates. Each plate always spawns in a different lane from the previous one. X-proximity collision detection.
+
 ### Road Surface & Contrast
 
-`ROAD_SURFACE_COLORS` in constants.js — lightened per-theme road colors (brazil `0xababb5`, usa `0x9a9a92`, peru `0xa3a3ab`). Road.js procedural asphalt texture uses `#808080` base. Material color multiplies with texture.
+`ROAD_SURFACE_COLORS` in constants.js — lightened per-theme road colors (brazil `0xababb5`, usa `0x9a9a92`, peru `0xa3a3ab`). Dark vehicles get additional contrast: boosted fill light (2x), body highlight PointLight, consolidated underglow.
 
-Dark vehicles get additional contrast: boosted fill light (2x), body highlight PointLight, consolidated underglow (intensity 6.0), side sill edge strips.
+### HUD System
 
-### HUD System (AAA Racing Style)
-
-`HUD.js` — All DOM-based overlays. SVG speedometer + tachometer + energy gauge + minimap + score/combo + timer + pause button. All use Orbitron font, glassmorphism panels.
+`HUD.js` — All DOM-based overlays. SVG speedometer + tachometer + energy gauge + minimap + score/combo + timer + pause button. Orbitron font, glassmorphism panels.
 
 Per-frame updates debounced: `updateSpeed` skips when rounded MPH unchanged, `updateTacho` quantizes RPM to 50-step increments, `updateTime` skips when centisecond unchanged.
 
-**Tier 3 urgency**: Persistent vibrating "HURRY UP!" overlay (`showHurry()`), timer turns red with vibration animation.
+**Tier 3 urgency**: Persistent vibrating "HURRY UP!" overlay, timer turns red with vibration.
 
-**Turbo toast**: Separate `showTurboToast()` at different screen position with fire-themed styling.
+### Start Screen
+
+Neon title "AL-QADI TEAM RACING / ENERGY HARVESTING EDITION" with animated entrance, glow pulse, decorative frame with corner brackets, ICT logo overlay. Universal input (keyboard, touch, gamepad). Cover art in `public/Start_Screen.webp`.
 
 ### Completion & Reward Flow
 
 `CompletionSequence.js` → `WinScreen.js` ("CONTINUE" button) → `RewardScreen.js` (town map + character) → home.
 
-`RewardScreen.js`: SVG town map divided into 4 clickable sectors (toggle lit state with glow animation). Character panel with Al-Qadi.webp portrait, speech bubble, name/title. Floating particle background.
+`RewardScreen.js`: SVG town map divided into 4 clickable sectors. Character panel with Al-Qadi.webp portrait, speech bubble, name/title.
 
-### Race Start Sequence
+### Loading & Transitions
 
-`RaceStartSequence.js` — Reuses loading overlay from map select (no overlay swap). Black overlay fades out (1.5s) → traffic light countdown (3-2-1-GO) → controls unlock. Music starts during loading screen (before scene is built).
+Loading screen with animated progress bar and stage hints. Track music starts during loading. Loading overlay reused by RaceStartSequence (no overlay swap). Overlay fade 0.6s with `will-change: opacity`.
+
+Pre-gameplay warm-up pipeline:
+1. Build kart, environment, road color, env map
+2. Pre-build gameplay objects (kart lights, start line, lamp posts)
+3. Create particles + turbo glow light (warmUp)
+4. `renderer.compile()` from gameplay camera position
+5. Multiple compositor renders from gameplay + pre-race cameras
+6. Game loop dry runs to warm V8 JIT
+7. 300ms settle delay for async GPU/GC
 
 ### Engine Sound (Web Audio API)
 
 V8 engine: 4 layered oscillators (45Hz fundamental, harmonics at 2x/3x/4x), lowpass filter, idle-lope LFO. `updateEngine(rpm)` debounced (skips when RPM change < 25).
 
-`playTurboBoost()`: whoosh (bandpass noise sweep) + turbo whistle (rising sine) + power thump (bass hit) + flutter (sawtooth LFO).
+`playTurboBoost()`: whoosh + turbo whistle + power thump + flutter.
 
 ### Controls
 
-`controls.js` — Glassmorphism arrow buttons + radial-gradient gas pedal. Continuous lateral movement via `isLeftHeld()`/`isRightHeld()`. Pointer Events API + keyboard + swipe + gamepad support on start screen. `lock()`/`unlock()` gate all inputs.
+`controls.js` — Glassmorphism arrow buttons + radial-gradient gas pedal. Continuous lateral movement via `isLeftHeld()`/`isRightHeld()`. Pointer Events API + keyboard + swipe + gamepad. `lock()`/`unlock()` gate all inputs.
 
 ## Architecture
 
-`src/main.js` — Orchestrator: renderer, scene, camera, game objects, UI screens, event wiring, game loop. Turbo boost state, loading overlay with music, per-theme kart lights.
+`src/main.js` — Orchestrator: renderer, scene, camera, game objects, UI screens, event wiring, game loop. Turbo boost state, loading overlay with progress bar, per-theme kart lights.
 
-`Environment.js` — Sky, lighting, ground, barriers, per-theme scenery. Parallax 3-layer system (background updates every other frame for performance).
+`Environment.js` — Sky, lighting, ground, barriers, per-theme scenery. Parallax 3-layer system (background updates every other frame). Lightweight scenes: Brazil (palms + boats), USA (procedural buildings + trees), Peru (mountains + hills + terraces).
 
 `GameState.js` — Observer pattern state machine. `speed` property is MPH.
 
-`Kart.js` — FBX vehicle loader with per-vehicle `VEHICLE_MESH_CONFIG`. MeshPhysicalMaterial clearcoat paint. Static headlight/taillight methods shared with DriverSelect. Turbo flame particle system. Continuous lateral movement (`slideLateral`, `recoverTilt`).
+`Kart.js` — FBX vehicle loader with per-vehicle `VEHICLE_MESH_CONFIG`. Shared module-level materials. Static headlight/taillight methods shared with DriverSelect. Turbo flame particle system. Continuous lateral movement (`slideLateral`, `recoverTilt`).
 
-`Plate.js` — Pooled electric-blue road panels. X-proximity collision. Idle pulse animation (every other frame).
+`Plate.js` — Pooled electric-blue road panels (10 plates). X-proximity collision. 25-unit minimum gap. Different-lane enforcement. Idle pulse every other frame.
 
 `Road.js` — 3 recycling segments with merged lane markings. Per-theme color via `setThemeColor()`.
 
@@ -166,6 +178,8 @@ V8 engine: 4 layered oscillators (45Hz fundamental, harmonics at 2x/3x/4x), lowp
 `RewardScreen.js` — Post-game reward screen with SVG town map + character panel.
 
 `WinScreen.js` — "HIGHWAY POWERED" screen with "CONTINUE" button.
+
+`StartScreen.js` — Neon title with animated entrance, decorative frame, ICT logo.
 
 `LampPost.js` — 20 recycling posts, 5-tier system, proximity-based light culling (no per-frame sort).
 
@@ -179,14 +193,20 @@ All in `public/models/`. KayKit City Builder (CC0, GLTF+texture atlas), FBX play
 
 - **Mobile**: Antialias off, pixelRatio 1, post-processing skipped, shadow maps 512x512, 4 active lamp lights
 - **Desktop**: Antialias on, pixelRatio 2, vignette + color grading post-processing, shadow maps 1024x1024, 6 active lamp lights
-- **Vehicle PointLights**: Consolidated to 4 per vehicle (fill + underglow + taillight + body highlight)
+- **Shared materials**: 10 module-level cached materials reused across all vehicles (chrome, wheel, LED, markers, headlight lens/bulb, DRL, halo)
+- **No MeshPhysicalMaterial**: All vehicles use MeshStandardMaterial (faster shader compilation)
+- **colorSpace at preload**: FBX textures tagged at load time, never during builds (avoids GPU re-upload)
 - **Camera**: `updateProjectionMatrix()` only when FOV delta > 0.01
 - **HUD**: DOM writes debounced — speed/tacho/time skip when values unchanged
 - **Engine audio**: `updateEngine()` debounced by 25 RPM threshold
-- **Plates**: Idle pulse animation every other frame
+- **Plates**: Idle pulse every other frame, pool of 10
 - **Background parallax**: Every-other-frame updates with 2x move compensation
 - **LampPost culling**: Single-pass proximity check (no array alloc/sort)
 - **Particle scale**: Direct `x*=, y*=, z*=` instead of `multiplyScalar()`
 - **Road**: Merged lane markings via `mergeGeometries`
-- **Loading**: Kart.setDriver() deferred to map select (behind loading screen)
+- **Loading**: Kart.setDriver() + gameplay objects built during loading screen
 - **Music**: Starts during loading screen (perceived faster load)
+- **Overlay**: `will-change: opacity` + `contain: strict`, 0.6s fast fade
+- **Warm-up**: renderer.compile + compositor renders + JIT dry runs + 300ms settle
+- **Scene reduction**: Brazil (palms + boats only), Peru (mountains + hills + 1 terrace, no buildings/trees/houses), USA (procedural buildings + trees)
+- **Destiny optimization**: skipExhaust, no wheel rotation, all body materials same paint path, no sidecar texture
