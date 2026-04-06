@@ -651,7 +651,7 @@ export class Environment {
     const favelaColors = [0xcc4444, 0xe88833, 0xddcc33, 0x44aa66, 0x4488cc, 0xcc5599, 0xeeeecc, 0x66ccaa];
 
     // Front row (closest to road) → midground
-    for (let i = 0; i < 6; i++) {
+    for (let i = 0; i < 4; i++) {
       const url = brazilBldgs[Math.floor(Math.random() * brazilBldgs.length)];
       const x = -(RH + 5 + Math.random() * 6);
       const model = this._placeModel(url, x, 0, -i * 22 - Math.random() * 8, Math.random() * Math.PI, 0.7 + Math.random() * 0.4, 'mg');
@@ -661,7 +661,7 @@ export class Environment {
     }
 
     // Back row (further from road) → midground
-    for (let i = 0; i < 4; i++) {
+    for (let i = 0; i < 3; i++) {
       const url = brazilBldgs[Math.floor(Math.random() * brazilBldgs.length)];
       const x = -(RH + 14 + Math.random() * 10);
       const model = this._placeModel(url, x, 0, -i * 28 - Math.random() * 12, Math.random() * Math.PI, 0.6 + Math.random() * 0.3, 'mg');
@@ -1195,45 +1195,7 @@ export class Environment {
       this.midground.push(terrGroup);
     }
 
-    // ══════════════════════════════════════════
-    //  PROCEDURAL ANDEAN HOUSES (midground, clustered)
-    // ══════════════════════════════════════════
-    const wallColors = [0xD4B896, 0xC8A87A, 0xBB9966, 0xE8D5B8, 0xAA8866, 0xCC9955];
-    const roofColors = [0x8B4513, 0x7A3B10, 0x6B3A1A, 0x994422];
-    // Pre-create material pools (reuse instead of creating per house)
-    const wallMats = wallColors.map(c => new THREE.MeshStandardMaterial({ color: c, roughness: 0.9 }));
-    const roofMats = roofColors.map(c => new THREE.MeshStandardMaterial({ color: c, roughness: 0.85 }));
-    const doorMat = new THREE.MeshBasicMaterial({ color: 0x2a1a0a });
-
-    const clusters = [
-      { z: -120, side: -1, count: 3 },
-    ];
-    for (const cl of clusters) {
-      for (let j = 0; j < cl.count; j++) {
-        const hg = new THREE.Group();
-        const w = 2 + Math.random() * 2, h = 1.5 + Math.random() * 1.5, d = 2 + Math.random() * 2;
-        hg.add((() => {
-          const body = new THREE.Mesh(new THREE.BoxGeometry(w, h, d),
-            wallMats[(Math.random() * wallMats.length) | 0]);
-          body.position.y = h / 2; return body;
-        })());
-        hg.add((() => {
-          const roof = new THREE.Mesh(new THREE.ConeGeometry(Math.max(w, d) * 0.75, h * 0.5, 4),
-            roofMats[(Math.random() * roofMats.length) | 0]);
-          roof.position.y = h + h * 0.25; roof.rotation.y = Math.PI / 4; return roof;
-        })());
-        // Door mesh removed for performance (invisible from chase cam)
-        hg.position.set(
-          cl.side * (RH + 14 + Math.random() * 14),
-          0, cl.z + (Math.random() - 0.5) * 18,
-        );
-        hg.rotation.y = Math.random() * Math.PI * 2;
-        hg.scale.setScalar(0.8 + Math.random() * 0.4);
-        this.scene.add(hg);
-        this.themeObjects.push(hg);
-        this.midground.push(hg);
-      }
-    }
+    // Houses removed for performance — GLTF building models provide structures
 
     // ══════════════════════════════════════════
     //  TREES — dense, 3 types (foreground + midground)
