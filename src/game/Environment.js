@@ -632,7 +632,7 @@ export class Environment {
     // ══════════════════════════════════════════
     const brazilBldgs = [
       MODEL_URLS.brazilE, MODEL_URLS.brazilF, MODEL_URLS.brazilG, MODEL_URLS.brazilI,
-      MODEL_URLS.brazilJ, MODEL_URLS.brazilL, MODEL_URLS.brazilM, MODEL_URLS.brazilN,
+      MODEL_URLS.brazilL, MODEL_URLS.brazilM, MODEL_URLS.brazilN,
     ];
     const favelaColors = [0xcc4444, 0xe88833, 0xddcc33, 0x44aa66, 0x4488cc, 0xcc5599, 0xeeeecc, 0x66ccaa];
 
@@ -646,23 +646,7 @@ export class Environment {
       this._tintModel(model, tintColor);
     }
 
-    // Back row (further from road) → midground
-    for (let i = 0; i < 3; i++) {
-      const url = brazilBldgs[Math.floor(Math.random() * brazilBldgs.length)];
-      const x = -(RH + 14 + Math.random() * 10);
-      const model = this._placeModel(url, x, 0, -i * 28 - Math.random() * 12, Math.random() * Math.PI, 0.6 + Math.random() * 0.3, 'mg');
-      const tintColor = favelaColors[Math.floor(Math.random() * favelaColors.length)];
-      this._tintModel(model, tintColor);
-    }
-
-    // Third row (far back) → background
-    for (let i = 0; i < 6; i++) {
-      const url = brazilBldgs[Math.floor(Math.random() * brazilBldgs.length)];
-      const x = -(RH + 25 + Math.random() * 12);
-      const model = this._placeModel(url, x, 0, -i * 40 - Math.random() * 15, Math.random() * Math.PI, 0.5 + Math.random() * 0.3, 'bg');
-      const tintColor = favelaColors[Math.floor(Math.random() * favelaColors.length)];
-      this._tintModel(model, tintColor);
-    }
+    // Back rows removed for performance (only roadside buildings kept)
 
     // ── Palms between buildings → midground ──
     for (let i = 0; i < 6; i++) {
