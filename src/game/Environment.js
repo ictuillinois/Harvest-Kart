@@ -651,7 +651,7 @@ export class Environment {
     const favelaColors = [0xcc4444, 0xe88833, 0xddcc33, 0x44aa66, 0x4488cc, 0xcc5599, 0xeeeecc, 0x66ccaa];
 
     // Front row (closest to road) → midground
-    for (let i = 0; i < 8; i++) {
+    for (let i = 0; i < 6; i++) {
       const url = brazilBldgs[Math.floor(Math.random() * brazilBldgs.length)];
       const x = -(RH + 5 + Math.random() * 6);
       const model = this._placeModel(url, x, 0, -i * 22 - Math.random() * 8, Math.random() * Math.PI, 0.7 + Math.random() * 0.4, 'mg');
@@ -661,7 +661,7 @@ export class Environment {
     }
 
     // Back row (further from road) → midground
-    for (let i = 0; i < 6; i++) {
+    for (let i = 0; i < 4; i++) {
       const url = brazilBldgs[Math.floor(Math.random() * brazilBldgs.length)];
       const x = -(RH + 14 + Math.random() * 10);
       const model = this._placeModel(url, x, 0, -i * 28 - Math.random() * 12, Math.random() * Math.PI, 0.6 + Math.random() * 0.3, 'mg');
@@ -1250,47 +1250,7 @@ export class Environment {
     );
     const pickCanopy = () => canopyMats[(Math.random() * canopyMats.length) | 0];
 
-    // Foreground vegetation — very sparse
-    for (const side of [-1, 1]) {
-      for (let z = 15; z > -320; z -= 30 + Math.random() * 25) {
-        if (Math.random() > 0.3) continue;
-        const geo = Math.random() > 0.5 ? pineGeo : bushGeo;
-        const tree = new THREE.Mesh(geo, pickCanopy());
-        const s = 0.5 + Math.random() * 0.6;
-        tree.scale.setScalar(s);
-        tree.position.set(side * (RH + 3 + Math.random() * 5), s * 1.5, z);
-        this.scene.add(tree);
-        this.themeObjects.push(tree);
-        this.foreground.push(tree);
-      }
-    }
-
-    // Midground vegetation — very sparse
-    for (const side of [-1, 1]) {
-      for (let z = 15; z > -320; z -= 35 + Math.random() * 25) {
-        if (Math.random() > 0.25) continue;
-        const geo = Math.random() > 0.5 ? pineGeo : roundGeo;
-        const tree = new THREE.Mesh(geo, pickCanopy());
-        const s = 0.5 + Math.random() * 0.7;
-        tree.scale.setScalar(s);
-        tree.position.set(side * (RH + 16 + Math.random() * 22), s * 1.5, z);
-        this.scene.add(tree);
-        this.themeObjects.push(tree);
-        this.midground.push(tree);
-      }
-    }
-
-    // Hillside canopies (background)
-    for (let i = 0; i < 3; i++) {
-      const canopy = new THREE.Mesh(pineGeo, pickCanopy());
-      canopy.position.set(
-        (Math.random() > 0.5 ? 1 : -1) * (30 + Math.random() * 45),
-        Math.random() * 6, -80 - Math.random() * 200);
-      canopy.scale.setScalar(0.3 + Math.random() * 0.5);
-      this.scene.add(canopy);
-      this.themeObjects.push(canopy);
-      this.midground.push(canopy);
-    }
+    // Procedural trees removed for performance — GLTF tree models provide vegetation
 
     // Rocks removed for performance
 
