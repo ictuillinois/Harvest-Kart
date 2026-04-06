@@ -20,9 +20,13 @@ A 3D browser-based kart racing mini-game (Three.js v0.183.2 + Vite v8 + @tweenjs
 
 **Game flow:** `menu` → `driverSelect` → `mapSelect` → `playing` ↔ `paused` → `completing` → `complete` → `reward`
 
+**Intro sequence:** IntroScreen (EOH logo → ICT logo, ~12s) runs as an overlay (z-index 500) on top of the start screen. IntroScreen must be created BEFORE `startScreen.show()` to prevent flash.
+
 **Drivers:** Ethan (black, Sports GT), Kate (pink, Compact), Destiny (blue, AMG GT), Luke (green, Lamborghini SUV). Each has a unique vehicle type, color, and FBX model. Character WebP in `public/characters/`.
 
-**Maps:** Peru (mountain pass), USA (sunset city), Brazil (coastal highway). Each has a custom gradient sky, distinct lighting, and fog. Scenes are lightweight for performance — minimal procedural objects, sparse GLTF model placement.
+**Maps:** Peru (mountain pass), USA (sunset city — default), Brazil (coastal highway). Each has a custom gradient sky, distinct lighting, and fog. Scenes are aggressively optimized for browser performance.
+
+**Game config:** `TOTAL_LAMP_POSTS = 3`, `PLATES_TO_FILL_BAR = 10` → 30 plates to complete. "HURRY UP!" triggers at `TOTAL_LAMP_POSTS - 1` (last batch before completion).
 
 ## Critical Patterns
 
@@ -74,6 +78,8 @@ Vehicles use FBX models in `public/models/vehicles/fbx/`. Each model has differe
 
 `VEHICLE_MESH_CONFIG` per vehicleType defines: `bodyNames`, `wheelNames`, `hiddenNames`, `rotationY`, `hasTexture`, `materialProfile`, and light/detail flags.
 
+**Shadow casting:** Only body + wheel meshes have `castShadow = true` (via `_enableBodyShadows()`). All other kart meshes (lights, chrome, particles, glass) do NOT cast shadows to reduce shadow pass cost.
+
 **Shared materials:** 10 module-level cached materials (`_sharedChrome`, `_sharedDarkChrome`, `_sharedHlLens`, `_sharedHlBulb`, `_sharedDRL`, `_sharedHalo`, `_sharedLedRed`, `_sharedAmber`, `_sharedRedMarker`, `_sharedWheel`) reused across ALL vehicles and light methods. Eliminates per-build material allocations.
 
 **colorSpace:** Set on FBX textures at preload time in `assetLoader.js` to avoid GPU re-upload during builds. Never set during `_buildCar`.
@@ -112,7 +118,7 @@ All public assets must use `asset('path/to/file')` from `src/utils/base.js`. Thi
 
 ### Piezoelectric Energy Plates
 
-`Plate.js` — Pool of 10 plates. Spawn interval 0.6s with 25-unit minimum gap between active plates. Each plate always spawns in a different lane from the previous one. X-proximity collision detection.
+`Plate.js` — Pool of 7 plates. Spawn interval 0.6s with 25-unit minimum gap between active plates. Each plate always spawns in a different lane from the previous one. X-proximity collision detection.
 
 ### Road Surface & Contrast
 
@@ -124,7 +130,7 @@ All public assets must use `asset('path/to/file')` from `src/utils/base.js`. Thi
 
 Per-frame updates debounced: `updateSpeed` skips when rounded MPH unchanged, `updateTacho` quantizes RPM to 50-step increments, `updateTime` skips when centisecond unchanged.
 
-**Tier 3 urgency**: Persistent vibrating "HURRY UP!" overlay, timer turns red with vibration.
+**Last-tier urgency**: Persistent vibrating "HURRY UP!" overlay triggers at `TOTAL_LAMP_POSTS - 1`, timer turns red with vibration.
 
 ### Start Screen
 
@@ -161,15 +167,15 @@ V8 engine: 4 layered oscillators (45Hz fundamental, harmonics at 2x/3x/4x), lowp
 
 ## Architecture
 
-`src/main.js` — Orchestrator: renderer, scene, camera, game objects, UI screens, event wiring, game loop. Turbo boost state, loading overlay with progress bar, per-theme kart lights.
+`src/main.js` — Orchestrator: renderer, scene, camera, game objects, UI screens, event wiring, game loop. Turbo boost state, loading overlay with progress bar, per-theme kart lights. Single combined post-processing pass (vignette + color grade).
 
-`Environment.js` — Sky, lighting, ground, barriers, per-theme scenery. Parallax 3-layer system (background updates every other frame). Lightweight scenes: Brazil (palms + boats), USA (procedural buildings + trees), Peru (mountains + hills + terraces).
+`Environment.js` — Sky, lighting, ground, barriers, per-theme scenery. Parallax 3-layer system (background updates every other frame). GPU resource disposal (`geometry.dispose()`, `material.dispose()`, `texture.dispose()`) on map switch. Lightweight scenes: Brazil (palms + boats), USA (procedural buildings, no trees), Peru (mountains + hills + terraces).
 
 `GameState.js` — Observer pattern state machine. `speed` property is MPH.
 
-`Kart.js` — FBX vehicle loader with per-vehicle `VEHICLE_MESH_CONFIG`. Shared module-level materials. Static headlight/taillight methods shared with DriverSelect. Turbo flame particle system. Continuous lateral movement (`slideLateral`, `recoverTilt`).
+`Kart.js` — FBX vehicle loader with per-vehicle `VEHICLE_MESH_CONFIG`. Shared module-level materials. Static headlight/taillight methods shared with DriverSelect. Turbo flame particle system. Continuous lateral movement (`slideLateral`, `recoverTilt`). Shadow casting limited to body+wheel meshes via `_enableBodyShadows()`.
 
-`Plate.js` — Pooled electric-blue road panels (10 plates). X-proximity collision. 25-unit minimum gap. Different-lane enforcement. Idle pulse every other frame.
+`Plate.js` — Pooled electric-blue road panels (7 plates). X-proximity collision. 25-unit minimum gap. Different-lane enforcement. Idle pulse every other frame.
 
 `Road.js` — 3 recycling segments with merged lane markings. Per-theme color via `setThemeColor()`.
 
@@ -181,32 +187,67 @@ V8 engine: 4 layered oscillators (45Hz fundamental, harmonics at 2x/3x/4x), lowp
 
 `StartScreen.js` — Neon title with animated entrance, decorative frame, ICT logo.
 
-`LampPost.js` — 20 recycling posts, 5-tier system, proximity-based light culling (no per-frame sort).
+`LampPost.js` — 12 recycling posts (6 pairs), 5-tier system, proximity-based light culling (max 2 mobile / 3 desktop active PointLights). Posts start hidden, revealed on first plate hit via `setVisible()`. Structure meshes (pole+arm+housing) merged into single geometry per post.
 
 `audio.js` — Procedural Web Audio: V8 engine, gear shifts, plate hit, turbo boost. Background music via HTML Audio.
 
 ## 3D Assets
 
-All in `public/models/`. KayKit City Builder (CC0, GLTF+texture atlas), FBX player vehicles in `public/models/vehicles/fbx/`, Kenney Commercial/Suburban Buildings (CC0, GLB+colormap), Poly Pizza models (CC0/CC-BY, GLB). Character portraits in `public/characters/` (WebP). Map previews in `public/maps/` (WebP). Start screen in `public/Start_Screen.webp`. Al-Qadi portrait in `public/Al-Qadi.webp`.
+All in `public/models/`. Only actively-used models are registered in `MODEL_URLS` (14 total):
+- **Props:** bench, firehydrant, trafficLight, dumpster, trafficCone, mailbox, trashcan (GLTF)
+- **Racing:** tires, raceBarrier (GLB)
+- **Brazil:** palmTree (GLB)
+- **Vehicles:** 4 FBX models in `public/models/vehicles/fbx/`
+
+Character portraits in `public/characters/` (WebP). Map previews in `public/maps/` (WebP). Start screen in `public/Start_Screen.webp`. Al-Qadi portrait in `public/Al-Qadi.webp`.
+
+**Unused assets have been removed.** Do not add model entries to `MODEL_URLS` without using them in game code — all entries are preloaded at startup.
 
 ## Performance Optimizations
 
-- **Mobile**: Antialias off, pixelRatio 1, post-processing skipped, shadow maps 512x512, 4 active lamp lights
-- **Desktop**: Antialias on, pixelRatio 2, vignette + color grading post-processing, shadow maps 1024x1024, 6 active lamp lights
-- **Shared materials**: 10 module-level cached materials reused across all vehicles (chrome, wheel, LED, markers, headlight lens/bulb, DRL, halo)
-- **No MeshPhysicalMaterial**: All vehicles use MeshStandardMaterial (faster shader compilation)
-- **colorSpace at preload**: FBX textures tagged at load time, never during builds (avoids GPU re-upload)
-- **Camera**: `updateProjectionMatrix()` only when FOV delta > 0.01
+### Rendering Pipeline
+- **Mobile**: Antialias off, pixelRatio 1, post-processing skipped entirely, shadow maps 512x512
+- **Desktop**: Antialias on, pixelRatio 2, single combined shader pass (vignette + color grade), shadow maps 1024x1024
+- **Camera**: `updateProjectionMatrix()` only when FOV delta > 0.5 degrees
+
+### Materials & Shaders
+- **Shared materials**: 10 module-level cached materials reused across all vehicles
+- **No MeshPhysicalMaterial**: All vehicles use MeshStandardMaterial
+- **MeshBasicMaterial**: Used for environment objects that don't need lighting (buildings, barriers, lake, grass, bean, boats, signs)
+- **colorSpace at preload**: FBX textures tagged at load time, never during builds
+
+### Scene Complexity
+- **USA**: ~20 procedural buildings (single MeshBasicMaterial each, shared texture pool of 3), no trees, 8 merged street lamps, 3 merged signs, ~11 scattered props, 3 clouds
+- **Brazil**: 11 palm trees (GLTF), 2 boats (MeshBasicMaterial), 3 clouds
+- **Peru**: Procedural mountains + hills + terraces only, no GLTF models, 3 clouds
+- **All maps**: Merged barrier geometry (2 meshes per map), 7-plate pool
+
+### Lamp Posts
+- **Deferred visibility**: All 12 posts start hidden, revealed on first plate hit (zero cost at game start)
+- **Light culling**: Max 2 (mobile) / 3 (desktop) active PointLights via proximity check
+- **Merged structure**: Pole + arm + housing merged into single BufferGeometry per post
+- **6 pairs** (was 10) — fewer recycling posts for lower mesh count
+
+### Shadow Optimization
+- **Kart body-only shadows**: Only body + wheel meshes cast shadows (`_enableBodyShadows()`), not lights/chrome/particles/glass
+- **Environment**: No environment objects cast shadows — only ground/road receive
+
+### Per-Frame Optimizations
 - **HUD**: DOM writes debounced — speed/tacho/time skip when values unchanged
 - **Engine audio**: `updateEngine()` debounced by 25 RPM threshold
-- **Plates**: Idle pulse every other frame, pool of 10
+- **Plates**: Idle pulse every other frame
 - **Background parallax**: Every-other-frame updates with 2x move compensation
-- **LampPost culling**: Single-pass proximity check (no array alloc/sort)
 - **Particle scale**: Direct `x*=, y*=, z*=` instead of `multiplyScalar()`
+
+### Asset Loading
+- **14 models preloaded** (was 55) — only actively-used models registered
+- **GPU dispose on map switch**: `build()` traverses all themeObjects and calls `geometry.dispose()`, `material.dispose()`, `texture.dispose()`
 - **Road**: Merged lane markings via `mergeGeometries`
 - **Loading**: Kart.setDriver() + gameplay objects built during loading screen
 - **Music**: Starts during loading screen (perceived faster load)
-- **Overlay**: `will-change: opacity` + `contain: strict`, 0.6s fast fade
+
+### Build Optimizations
+- **USA buildings**: Shared window texture pool (3 base CanvasTextures with RepeatWrapping) instead of per-building unique textures
 - **Warm-up**: renderer.compile + compositor renders + JIT dry runs + 300ms settle
-- **Scene reduction**: Brazil (palms + boats only), Peru (mountains + hills + 1 terrace, no buildings/trees/houses), USA (procedural buildings + trees)
-- **Destiny optimization**: skipExhaust, no wheel rotation, all body materials same paint path, no sidecar texture
+- **Overlay**: `will-change: opacity` + `contain: strict`, 0.6s fast fade
+- **Destiny optimization**: skipExhaust, no wheel rotation, all body materials same paint path
