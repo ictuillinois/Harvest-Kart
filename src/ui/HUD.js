@@ -1129,10 +1129,9 @@ export class HUD {
     }
     const el = this._floatEl;
     el.textContent = `+${points}`;
-    // Restart animation by removing and re-adding the class
-    el.style.animation = 'none';
-    void el.offsetWidth; // force reflow (single element, cheap)
-    el.style.animation = '';
+    // Restart animation without forced reflow — split across frames
+    el.classList.remove('hud-float-score');
+    requestAnimationFrame(() => el.classList.add('hud-float-score'));
   }
 
   showToast(text) {

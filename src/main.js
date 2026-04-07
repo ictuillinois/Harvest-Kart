@@ -26,7 +26,7 @@ import { CompletionSequence } from './game/CompletionSequence.js';
 import { AMBIENT_MULTIPLIERS } from './game/LampPost.js';
 
 import { setupControls } from './utils/controls.js';
-import { playPlateHit, playLampLit, playComboBreak, playWinFanfare, playLaneSwitch, haptic, playMusic, stopMusic, startEngineIdle, stopEngine, updateEngine, playGearShift, playCountdownTone, playCountdownRev, playFinalPowerOn, playStartPress, playDriverSelect, playMapSelect, playTurboBoost, preWarmEngine, preWarmPlateAudio } from './utils/audio.js';
+import { playPlateHit, playLampLit, playComboBreak, playWinFanfare, playLaneSwitch, haptic, playMusic, stopMusic, startEngineIdle, stopEngine, updateEngine, playGearShift, playCountdownTone, playCountdownRev, playFinalPowerOn, playStartPress, playDriverSelect, playMapSelect, playTurboBoost, preWarmEngine, preWarmPlateAudio, setVolume } from './utils/audio.js';
 import { gameRoot } from './utils/base.js';
 import {
   MIN_SPEED_MPH, MAX_SPEED_MPH, STARTING_SPEED_MPH, SCROLL_FACTOR,
@@ -246,6 +246,7 @@ const loadingOverlay = document.createElement('div');
 loadingOverlay.id = 'loading-overlay';
 loadingOverlay.innerHTML = `
   <div class="lo-content">
+    <div class="lo-start-prompt" id="lo-start-prompt">PRESS ANY BUTTON TO START</div>
     <div class="lo-title">PREPARING TRACK</div>
     <div class="lo-bar-wrap">
       <div class="lo-bar-track">
@@ -292,7 +293,6 @@ loadingOverlay.innerHTML = `
       </div>
     </div>
     <div class="lo-instr-sub">&#8592; &#8594; Steer over the glowing plates to charge lamp posts</div>
-    <div class="lo-start-prompt" id="lo-start-prompt">PRESS ANY BUTTON TO START</div>
   </div>
 `;
 Object.assign(loadingOverlay.style, {
@@ -339,7 +339,7 @@ loStyle.textContent = `
     width: 0%;
     background: linear-gradient(90deg, #00cc66, #22ffaa, #00ff88);
     border-radius: 10px;
-    transition: width 0.3s ease;
+    transition: width 0.8s linear;
     box-shadow: 0 0 6px rgba(34,255,170,0.4);
   }
   .lo-bar-glow {
@@ -376,8 +376,12 @@ loStyle.textContent = `
     letter-spacing: clamp(2px, 0.4vw, 6px);
     text-shadow: 0 0 12px rgba(34,255,170,0.5);
     animation: loFlash 1.8s ease-in-out infinite;
-    margin-top: clamp(6px, 1vh, 14px);
-    display: none;
+    margin-bottom: clamp(6px, 1vh, 12px);
+    visibility: hidden;
+    white-space: nowrap;
+  }
+  .lo-start-prompt.visible {
+    visibility: visible;
   }
   @keyframes loFlash {
     0%,100% { opacity: 1; } 50% { opacity: 0.3; }
@@ -694,6 +698,35 @@ const mapSelect = new MapSelect(
     // Hide lamp posts again — they were visible for shader compilation in stages 7-8
     lampPosts.setVisible(false);
 
+    // ── Stage 8b: JIT warm-up — exercise first-hit code paths so V8 compiles them ──
+    // Without this, the first plate hit runs in interpreted mode (10-100x slower).
+    setVolume(0);
+    // Warm HUD update paths
+    hud.updateCharge(1); hud.updateCharge(0);
+    hud.updateCombo(2); hud.updateCombo(0);
+    hud.updateScore(100); hud.updateScore(0);
+    hud.showFloatingScore(100);
+    // Warm lamp post tween paths
+    lampPosts.setVisible(true);
+    lampPosts.microProgress(1);
+    lampPosts.setTier(0, false);
+    lampPosts.setVisible(false);
+    // Warm plate collection animation
+    if (plates.plates[0]) {
+      plates.plates[0].visible = true;
+      plates.plates[0].userData.active = true;
+      plates.plates[0].userData.hit = false;
+      plates._animateCollection(plates.plates[0]);
+      plates.plates[0].visible = false;
+      plates.plates[0].userData.active = false;
+    }
+    // Warm audio (silenced)
+    playPlateHit();
+    // Warm tween group update
+    tweenGroup.update();
+    setVolume(0.7);
+    await new Promise(r => requestAnimationFrame(r));
+
     // ── Stage 9: Settle — give browser time to finish async GPU uploads + GC ──
     setLoadProgress(100, 'Ready!');
     await new Promise(r => setTimeout(r, 300));
@@ -701,7 +734,7 @@ const mapSelect = new MapSelect(
     // ── Stage 10: Wait for user to read instructions and press any button ──
     clearLoadingOverlay();
     const startPrompt = loadingOverlay.querySelector('#lo-start-prompt');
-    if (startPrompt) startPrompt.style.display = 'block';
+    if (startPrompt) startPrompt.classList.add('visible');
     await new Promise(resolve => {
       const go = () => {
         window.removeEventListener('keydown', go);
@@ -711,7 +744,7 @@ const mapSelect = new MapSelect(
       window.addEventListener('keydown', go, { once: false });
       window.addEventListener('pointerdown', go, { once: false });
     });
-    if (startPrompt) startPrompt.style.display = 'none';
+    if (startPrompt) startPrompt.classList.remove('visible');
 
     // Transition to playing — RaceStartSequence reuses loadingOverlay
     gameState.transition('playing');
