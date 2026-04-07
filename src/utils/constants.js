@@ -137,8 +137,8 @@ export const DRIVER_TYPES = [
   {
     name: 'Ivan',
     avatar: asset('characters/Ivan.webp'),
-    accentColor: '#2266cc',
-    carBody: 0x2266cc, carAccent: 0x4488ee,
+    accentColor: '#0077aa',
+    carBody: 0x0077aa, carAccent: 0x2299cc,
     vehicleType: 'compact',
     stats: { topSpeed: 3, acceleration: 4, efficiency: 3 },
   },
@@ -153,8 +153,8 @@ export const DRIVER_TYPES = [
   {
     name: 'Nazmus',
     avatar: asset('characters/Nazmus.webp'),
-    accentColor: '#cc2222',
-    carBody: 0xcc2222, carAccent: 0xee4444,
+    accentColor: '#ee2222',
+    carBody: 0xee2222, carAccent: 0xff4444,
     vehicleType: 'compact',
     stats: { topSpeed: 3, acceleration: 5, efficiency: 3 },
   },

@@ -267,22 +267,17 @@ loadingOverlay.innerHTML = `
           <div class="lo-curb lo-curb-r"></div>
           <div class="lo-lane-dash lo-ld-l"></div>
           <div class="lo-lane-dash lo-ld-r"></div>
-          <div class="lo-lamp lo-lamp-l1"><div class="lo-lamp-head"></div><div class="lo-lamp-cone"></div></div>
-          <div class="lo-lamp lo-lamp-r1"><div class="lo-lamp-head"></div><div class="lo-lamp-cone"></div></div>
-          <div class="lo-lamp lo-lamp-l2"><div class="lo-lamp-head"></div><div class="lo-lamp-cone"></div></div>
-          <div class="lo-lamp lo-lamp-r2"><div class="lo-lamp-head"></div><div class="lo-lamp-cone"></div></div>
           <!-- Single plate on center lane -->
-          <div class="lo-plate"><div class="lo-plate-grid"></div><div class="lo-plate-bolt">&#9889;</div></div>
+          <div class="lo-plate"><div class="lo-plate-bolt">&#9889;</div></div>
           <!-- Kart on center lane -->
           <div class="lo-kart">
-            <div class="lo-kart-glow"></div>
             <svg class="lo-kart-svg" viewBox="0 0 30 50">
               <rect x="4" y="7" width="22" height="34" rx="5" fill="#445" stroke="rgba(255,255,255,0.15)" stroke-width="0.8"/>
               <rect x="7" y="10" width="16" height="9" rx="2.5" fill="rgba(80,180,255,0.25)" stroke="rgba(80,180,255,0.15)" stroke-width="0.5"/>
-              <rect x="1" y="9" width="5" height="9" rx="2" fill="#222" stroke="rgba(255,255,255,0.08)" stroke-width="0.5"/>
-              <rect x="24" y="9" width="5" height="9" rx="2" fill="#222" stroke="rgba(255,255,255,0.08)" stroke-width="0.5"/>
-              <rect x="1" y="31" width="5" height="9" rx="2" fill="#222" stroke="rgba(255,255,255,0.08)" stroke-width="0.5"/>
-              <rect x="24" y="31" width="5" height="9" rx="2" fill="#222" stroke="rgba(255,255,255,0.08)" stroke-width="0.5"/>
+              <rect x="1" y="9" width="5" height="9" rx="2" fill="#222"/>
+              <rect x="24" y="9" width="5" height="9" rx="2" fill="#222"/>
+              <rect x="1" y="31" width="5" height="9" rx="2" fill="#222"/>
+              <rect x="24" y="31" width="5" height="9" rx="2" fill="#222"/>
               <rect x="9" y="7" width="4" height="2.5" rx="1" fill="#ffee88" opacity="0.8"/>
               <rect x="17" y="7" width="4" height="2.5" rx="1" fill="#ffee88" opacity="0.8"/>
               <rect x="9" y="38.5" width="4" height="2.5" rx="1" fill="#ff4444" opacity="0.7"/>
@@ -339,7 +334,7 @@ loStyle.textContent = `
     width: 0%;
     background: linear-gradient(90deg, #00cc66, #22ffaa, #00ff88);
     border-radius: 10px;
-    transition: width 0.8s linear;
+    transition: width 0.4s linear;
     box-shadow: 0 0 6px rgba(34,255,170,0.4);
   }
   .lo-bar-glow {
@@ -454,37 +449,6 @@ loStyle.textContent = `
     to   { background-position-y: 18px; }
   }
 
-  /* ── Lamp posts ── */
-  .lo-lamp {
-    position: absolute; z-index: 3;
-    display: flex; flex-direction: column; align-items: center;
-  }
-  .lo-lamp-head {
-    width: clamp(6px, 0.8vw, 12px); height: clamp(6px, 0.8vw, 12px);
-    border-radius: 50%;
-    background: #664400;
-    border: 1px solid rgba(255,200,0,0.3);
-    transition: background 0.3s, box-shadow 0.3s;
-  }
-  .lo-lamp-cone {
-    width: 0; height: 0;
-    border-left: clamp(4px, 0.5vw, 8px) solid transparent;
-    border-right: clamp(4px, 0.5vw, 8px) solid transparent;
-    border-top: clamp(10px, 1.5vh, 20px) solid rgba(255,200,50,0.0);
-    transition: border-top-color 0.3s;
-  }
-  .lo-lamp.lit .lo-lamp-head {
-    background: #ffcc00;
-    box-shadow: 0 0 6px 2px rgba(255,200,0,0.5);
-  }
-  .lo-lamp.lit .lo-lamp-cone {
-    border-top-color: rgba(255,200,50,0.06);
-  }
-  .lo-lamp-l1 { left: 3%; top: 15%; }
-  .lo-lamp-r1 { right: 3%; top: 15%; }
-  .lo-lamp-l2 { left: 3%; top: 55%; }
-  .lo-lamp-r2 { right: 3%; top: 55%; }
-
   /* ── Single plate — center lane, square, scrolls down ── */
   .lo-plate {
     position: absolute;
@@ -500,14 +464,6 @@ loStyle.textContent = `
     opacity: 0;
     will-change: top, opacity;
     contain: layout style;
-  }
-  .lo-plate-grid {
-    position: absolute; inset: 3px;
-    background:
-      linear-gradient(90deg, rgba(34,170,255,0.14) 1px, transparent 1px),
-      linear-gradient(0deg, rgba(34,170,255,0.14) 1px, transparent 1px);
-    background-size: 25% 25%;
-    border-radius: 2px;
   }
   .lo-plate-bolt {
     position: relative; z-index: 1;
@@ -531,11 +487,6 @@ loStyle.textContent = `
     width: clamp(56px, 7vw, 100px);
     transform: translateX(-50%);
   }
-  .lo-kart-glow {
-    position: absolute; left: -30%; right: -30%; bottom: -15%; height: 50%;
-    background: radial-gradient(ellipse, rgba(34,255,170,0.12) 0%, transparent 65%);
-    pointer-events: none;
-  }
   .lo-kart-svg {
     width: 100%; height: auto;
     display: block;
@@ -545,15 +496,6 @@ loStyle.textContent = `
 `;
 document.head.appendChild(loStyle);
 document.body.appendChild(loadingOverlay);
-
-// Animate lamp posts lighting up — simple toggle, low frequency
-const loLamps = loadingOverlay.querySelectorAll('.lo-lamp');
-let _loLampIdx = 0;
-setInterval(() => {
-  for (const l of loLamps) l.classList.remove('lit');
-  loLamps[_loLampIdx].classList.add('lit');
-  _loLampIdx = (_loLampIdx + 1) % loLamps.length;
-}, 2000);
 
 const loBarFill = loadingOverlay.querySelector('#lo-bar-fill');
 const loHint = loadingOverlay.querySelector('#lo-hint');
@@ -723,6 +665,47 @@ const mapSelect = new MapSelect(
     // Warm tween group update
     tweenGroup.update();
     setVolume(0.7);
+    await new Promise(r => requestAnimationFrame(r));
+
+    // ── Stage 8c: Pre-warm first-gameplay-frame code paths ──
+    // During the countdown, animate()'s physics block (!raceStart) is always skipped.
+    // V8 never compiles that path, causing a JIT cold-start stall on the first real
+    // gameplay frame. Exercise every computation that fires at GO! time.
+    {
+      const _ws = STARTING_SPEED_MPH;
+      const _wss = _ws * SCROLL_FACTOR;
+      const { gear: _wg, rpm: _wr } = computeGearAndRPM(_ws);
+
+      // HUD speedometer + tachometer with gameplay values (SVG attribute writes)
+      hud.updateSpeed(_ws);
+      hud.updateTacho(_wr, _wg + 1);
+
+      // Collision detection paths (no plates near kart, safe no-ops)
+      plates.checkCollision(0);
+      plates.checkMisses();
+
+      // Start line scroll
+      updateStartLine(fakeDelta, _wss);
+
+      // Camera FOV at gameplay speed — forces updateProjectionMatrix
+      const _wfrac = (_ws - activePhysics.coastFloor)
+        / (activePhysics.topSpeed - activePhysics.coastFloor);
+      const _wfov = CAMERA_FOV_MIN
+        + Math.max(0, Math.min(1, _wfrac)) * (CAMERA_FOV_MAX - CAMERA_FOV_MIN);
+      const _savedFov = camera.fov;
+      camera.fov = _wfov;
+      camera.updateProjectionMatrix();
+
+      // Render one frame at gameplay FOV so GPU caches this projection
+      if (isMobile) renderer.render(scene, camera);
+      else composer.render();
+
+      // Reset to pre-game state
+      camera.fov = _savedFov;
+      camera.updateProjectionMatrix();
+      hud.updateSpeed(0);
+      hud.updateTacho(1000, 1);
+    }
     await new Promise(r => requestAnimationFrame(r));
 
     // ── Stage 9: Settle — give browser time to finish async GPU uploads + GC ──
@@ -935,17 +918,22 @@ gameState.on('stateChange', ({ from, to }) => {
           playCountdownRev,
           startEngine: startEngineIdle,
           onComplete: () => {
-            // Player gains control — starts at 40 MPH in gear 2
-            gameState.speed = STARTING_SPEED_MPH;
-            hud.updateSpeed(STARTING_SPEED_MPH);
-            currentGear = 1; // gear 2 (0-indexed)
-            shiftCooldown = 0;
-            turboActive = false;
-            turboTimer = 0;
-            const { rpm } = computeGearAndRPM(STARTING_SPEED_MPH);
-            currentRPM = rpm;
-            hud.updateTacho(rpm, 2);
-            raceStart = null;
+            // Defer state changes to next animation frame. The GO! callback already
+            // does DOM work (traffic light, GO text, HUD opacity transition) + audio;
+            // deferring the gameplay state change prevents all work from landing on
+            // one overloaded frame and gives the browser a clean compositing boundary.
+            requestAnimationFrame(() => {
+              gameState.speed = STARTING_SPEED_MPH;
+              currentGear = 1; // gear 2 (0-indexed)
+              shiftCooldown = 0;
+              turboActive = false;
+              turboTimer = 0;
+              const { rpm } = computeGearAndRPM(STARTING_SPEED_MPH);
+              currentRPM = rpm;
+              hud.updateSpeed(STARTING_SPEED_MPH);
+              hud.updateTacho(rpm, 2);
+              raceStart = null;
+            });
           },
         });
         raceStart.start();
@@ -1122,6 +1110,7 @@ function animate() {
 
     road.update(delta, scrollSpeed);
     kart.update(delta, scrollSpeed, true);
+    kart.recoverTilt(delta);
     plates.update(delta, scrollSpeed);
     lampPosts.update(delta, scrollSpeed);
   }

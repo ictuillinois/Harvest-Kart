@@ -342,6 +342,7 @@ export class DriverSelect {
     this._cardEls = [...this.el.querySelectorAll('.ds-card')];
     this._focusIdx = 0;
     this._selected = false;
+    this._inputGate = true; // Block input until first keyup (prevents held-key bleed from previous screen)
 
     const selectCard = (card, idx) => {
       if (this._selected) return;
@@ -362,9 +363,13 @@ export class DriverSelect {
       });
     });
 
+    // Gate: require keyup before accepting new keypresses (prevents held-key bleed)
+    this._keyUpHandler = () => { this._inputGate = false; };
+    window.addEventListener('keyup', this._keyUpHandler);
+
     // Keyboard navigation
     this._keyHandler = (e) => {
-      if (this.el.style.display === 'none' || this._selected) return;
+      if (this.el.style.display === 'none' || this._selected || this._inputGate) return;
       const cols = 4;
       let idx = this._focusIdx;
       if (e.key === 'ArrowRight') idx = Math.min(idx + 1, this._cardEls.length - 1);
@@ -424,6 +429,7 @@ export class DriverSelect {
 
   show() {
     this._selected = false;
+    this._inputGate = true; // Block until keyup
     this._cardEls.forEach(c => c.classList.remove('active', 'dimmed', 'focused'));
     this._setFocus(0);
     fadeIn(this.el);

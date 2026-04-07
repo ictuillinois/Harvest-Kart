@@ -361,6 +361,7 @@ export class MapSelect {
     this._cardEls = [...this.el.querySelectorAll('.ms-card')];
     this._focusIdx = 0;
     this._selected = false;
+    this._inputGate = true;
 
     const selectCard = (card, idx) => {
       if (this._selected) return;
@@ -381,9 +382,13 @@ export class MapSelect {
       });
     });
 
+    // Gate: require keyup before accepting new keypresses
+    this._keyUpHandler = () => { this._inputGate = false; };
+    window.addEventListener('keyup', this._keyUpHandler);
+
     // Keyboard navigation
     this._keyHandler = (e) => {
-      if (this.el.style.display === 'none' || this._selected) return;
+      if (this.el.style.display === 'none' || this._selected || this._inputGate) return;
       let idx = this._focusIdx;
       if (e.key === 'ArrowRight') idx = Math.min(idx + 1, this._cardEls.length - 1);
       else if (e.key === 'ArrowLeft') idx = Math.max(idx - 1, 0);
@@ -438,6 +443,7 @@ export class MapSelect {
 
   show() {
     this._selected = false;
+    this._inputGate = true;
     this._cardEls.forEach(c => c.classList.remove('active', 'dimmed', 'focused'));
     this._setFocus(0);
     fadeIn(this.el);
