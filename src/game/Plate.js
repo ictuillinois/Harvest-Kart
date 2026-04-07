@@ -262,9 +262,12 @@ export class Plate {
       const spawnZ = -(ROAD_SEGMENT_LENGTH * 0.9 + Math.random() * 30);
       if (spawnZ < -20) {
         // Enforce minimum gap — no plate within 25 units of any active plate
-        const tooClose = this.plates.some(p =>
-          p.userData.active && Math.abs(p.position.z - spawnZ) < 25
-        );
+        let tooClose = false;
+        for (let i = 0; i < this.plates.length; i++) {
+          if (this.plates[i].userData.active && Math.abs(this.plates[i].position.z - spawnZ) < 25) {
+            tooClose = true; break;
+          }
+        }
         if (!tooClose) this.spawnPlate(spawnZ);
       }
     }

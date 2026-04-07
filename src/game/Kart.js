@@ -1309,33 +1309,35 @@ export class Kart {
     const kartX = this.group.position.x;
     const kartZ = this.group.position.z;
 
-    // Spawn 3-4 new flame particles per frame from each exhaust pipe
-    let spawned = 0;
-    for (const p of this._flameParticles) {
-      if (spawned >= 4) break;
-      if (p.visible) continue;
+    this._flameFrame = (this._flameFrame || 0) + 1;
 
-      p.visible = true;
-      const side = spawned % 2 === 0 ? 0.22 : -0.22;
-      p.position.set(
-        kartX + side + (Math.random() - 0.5) * 0.12,
-        0.22 + Math.random() * 0.12,
-        kartZ + exhaustZ + Math.random() * 0.08,
-      );
-      // Vary size — mix of small sparks and larger flame bursts
-      const isSpark = Math.random() > 0.6;
-      p.scale.setScalar(isSpark ? 0.05 + Math.random() * 0.05 : 0.12 + Math.random() * 0.12);
-      p.material.opacity = isSpark ? 1.0 : 0.85 + Math.random() * 0.15;
+    // Spawn particles every other frame (halves allocation/random-call overhead)
+    if ((this._flameFrame & 1) === 0) {
+      let spawned = 0;
+      for (const p of this._flameParticles) {
+        if (spawned >= 4) break;
+        if (p.visible) continue;
 
-      // Velocity: backward (+Z), upward, slight horizontal spread
-      p.userData.vx = (Math.random() - 0.5) * 1.8;
-      p.userData.vy = 0.6 + Math.random() * 2.0;
-      p.userData.vz = 1.5 + Math.random() * 4.0;
-      p.userData.life = isSpark ? 0.08 + Math.random() * 0.10 : 0.15 + Math.random() * 0.20;
-      spawned++;
+        p.visible = true;
+        const side = spawned % 2 === 0 ? 0.22 : -0.22;
+        p.position.set(
+          kartX + side + (Math.random() - 0.5) * 0.12,
+          0.22 + Math.random() * 0.12,
+          kartZ + exhaustZ + Math.random() * 0.08,
+        );
+        const isSpark = Math.random() > 0.6;
+        p.scale.setScalar(isSpark ? 0.05 + Math.random() * 0.05 : 0.12 + Math.random() * 0.12);
+        p.material.opacity = isSpark ? 1.0 : 0.85 + Math.random() * 0.15;
+
+        p.userData.vx = (Math.random() - 0.5) * 1.8;
+        p.userData.vy = 0.6 + Math.random() * 2.0;
+        p.userData.vz = 1.5 + Math.random() * 4.0;
+        p.userData.life = isSpark ? 0.08 + Math.random() * 0.10 : 0.15 + Math.random() * 0.20;
+        spawned++;
+      }
     }
 
-    // Update active flame particles
+    // Update active flame particles (every frame for smooth motion)
     for (const p of this._flameParticles) {
       if (!p.visible) continue;
       p.userData.life -= delta;
@@ -1347,8 +1349,8 @@ export class Kart {
       const fs = 1 + delta * 7.0; p.scale.x *= fs; p.scale.y *= fs; p.scale.z *= fs;
     }
 
-    // Flicker the rear flame glow light
-    if (this._flameGlow) {
+    // Flicker flame glow every other frame
+    if (this._flameGlow && (this._flameFrame & 1) === 0) {
       this._flameGlow.intensity = 4.0 + Math.random() * 4.0;
       this._flameGlow.color.set(Math.random() > 0.3 ? 0xff5500 : 0xffaa00);
     }

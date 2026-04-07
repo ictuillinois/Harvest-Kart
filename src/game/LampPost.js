@@ -29,6 +29,20 @@ const TIER_COLORS = TIER.map(t => new THREE.Color(t.color));
 // Base cone radius at tier 0 (used for scale math)
 const BASE_CONE_R = TIER[0].coneR;
 
+// Pre-computed tier target states (avoids object allocation on lookup)
+const TIER_STATES = TIER.map((cfg, i) => ({
+  intensity: cfg.intensity,
+  distance: cfg.distance,
+  emissive: cfg.emissive,
+  coneOp: cfg.coneOp,
+  coneScale: cfg.coneR / BASE_CONE_R,
+  color: TIER_COLORS[i],
+}));
+
+// Reusable objects for micro-progression (avoids per-hit allocations)
+const _tempColor = new THREE.Color();
+const _targetState = { intensity: 0, distance: 0, emissive: 0, coneOp: 0, coneScale: 0, color: _tempColor };
+
 // Ambient intensity multipliers per tier (applied to base theme value)
 // 5 entries: tier 0 (start), tier 1, tier 2, tier 3, tier 4 (fully powered)
 export const AMBIENT_MULTIPLIERS = [0.4, 0.55, 0.7, 0.85, 1.0];
@@ -54,7 +68,7 @@ export class LampPost {
     this.posts = [];
     this.currentTier = 0;
 
-    // Shared current interpolated state (for recycling)
+    // Shared current interpolated state (for recycling + single-tween updates)
     this._state = {
       intensity: TIER[0].intensity,
       distance: TIER[0].distance,
@@ -62,7 +76,11 @@ export class LampPost {
       coneOp: TIER[0].coneOp,
       coneScale: 1.0,
       color: TIER_COLORS[0].clone(),
+      cr: TIER_COLORS[0].r,
+      cg: TIER_COLORS[0].g,
+      cb: TIER_COLORS[0].b,
     };
+    this._stateTween = null;
 
     const poleMat = new THREE.MeshStandardMaterial({
       color: 0x666666, metalness: 0.6, roughness: 0.4,
@@ -169,77 +187,38 @@ export class LampPost {
 
   /**
    * Smoothly interpolate all lamp posts to a target state.
-   * @param {object} target  { intensity, distance, emissive, coneOp, coneScale, color }
-   * @param {number} duration ms
+   * Uses a SINGLE tween on the shared _state object instead of 11×12=132 individual
+   * tweens. Eliminates massive GC pressure from short-lived Tween allocations.
    */
   _tweenToState(target, duration = 1500) {
-    // Update shared state for recycling
-    Object.assign(this._state, {
-      intensity: target.intensity,
-      distance: target.distance,
-      emissive: target.emissive,
-      coneOp: target.coneOp,
-      coneScale: target.coneScale,
-      color: target.color.clone(),
-    });
+    if (this._stateTween) this._stateTween.stop();
 
-    for (const p of this.posts) {
-      new Tween(p.light, tweenGroup)
-        .to({ intensity: target.intensity, distance: target.distance }, duration)
-        .easing(Easing.Quadratic.Out).start();
-
-      // Color tween (light)
-      new Tween(p.light.color, tweenGroup)
-        .to({ r: target.color.r, g: target.color.g, b: target.color.b }, duration)
-        .easing(Easing.Quadratic.Out).start();
-
-      new Tween(p.headMat, tweenGroup)
-        .to({ emissiveIntensity: target.emissive }, duration)
-        .easing(Easing.Quadratic.Out).start();
-      new Tween(p.headMat.emissive, tweenGroup)
-        .to({ r: target.color.r, g: target.color.g, b: target.color.b }, duration)
-        .easing(Easing.Quadratic.Out).start();
-      new Tween(p.headMat.color, tweenGroup)
-        .to({ r: target.color.r, g: target.color.g, b: target.color.b }, duration)
-        .easing(Easing.Quadratic.Out).start();
-
-      // Cone opacity + color
-      new Tween(p.coneMat, tweenGroup)
-        .to({ opacity: target.coneOp }, duration)
-        .easing(Easing.Quadratic.Out).start();
-      new Tween(p.coneMat.color, tweenGroup)
-        .to({ r: target.color.r, g: target.color.g, b: target.color.b }, duration)
-        .easing(Easing.Quadratic.Out).start();
-
-      // Cone scale (width grows)
-      new Tween(p.cone.scale, tweenGroup)
-        .to({ x: target.coneScale, z: target.coneScale }, duration)
-        .easing(Easing.Quadratic.Out).start();
-
-      // Pool
-      new Tween(p.poolMat, tweenGroup)
-        .to({ opacity: target.coneOp * 1.0 }, duration)
-        .easing(Easing.Quadratic.Out).start();
-      new Tween(p.poolMat.color, tweenGroup)
-        .to({ r: target.color.r, g: target.color.g, b: target.color.b }, duration)
-        .easing(Easing.Quadratic.Out).start();
-      new Tween(p.pool.scale, tweenGroup)
-        .to({ x: target.coneScale, y: target.coneScale, z: target.coneScale }, duration)
-        .easing(Easing.Quadratic.Out).start();
-    }
+    this._stateTween = new Tween(this._state, tweenGroup)
+      .to({
+        intensity: target.intensity,
+        distance: target.distance,
+        emissive: target.emissive,
+        coneOp: target.coneOp,
+        coneScale: target.coneScale,
+        cr: target.color.r,
+        cg: target.color.g,
+        cb: target.color.b,
+      }, duration)
+      .easing(Easing.Quadratic.Out)
+      .onUpdate(() => {
+        this._state.color.setRGB(this._state.cr, this._state.cg, this._state.cb);
+        for (const p of this.posts) this._snapPost(p, this._state);
+      })
+      .onComplete(() => {
+        this._state.color.setRGB(this._state.cr, this._state.cg, this._state.cb);
+        this._stateTween = null;
+      })
+      .start();
   }
 
-  /** Build a target state from tier config. */
+  /** Return pre-computed target state for tier (no allocation). */
   _tierState(tier) {
-    const cfg = TIER[Math.min(tier, TIER.length - 1)];
-    return {
-      intensity: cfg.intensity,
-      distance: cfg.distance,
-      emissive: cfg.emissive,
-      coneOp: cfg.coneOp,
-      coneScale: cfg.coneR / BASE_CONE_R,
-      color: TIER_COLORS[Math.min(tier, TIER_COLORS.length - 1)].clone(),
-    };
+    return TIER_STATES[Math.min(tier, TIER_STATES.length - 1)];
   }
 
   /**
@@ -252,8 +231,16 @@ export class LampPost {
     const st = this._tierState(this.currentTier);
 
     if (!animate) {
-      Object.assign(this._state, { ...st, color: st.color.clone() });
-      for (const p of this.posts) this._snapPost(p, st);
+      this._state.intensity = st.intensity;
+      this._state.distance = st.distance;
+      this._state.emissive = st.emissive;
+      this._state.coneOp = st.coneOp;
+      this._state.coneScale = st.coneScale;
+      this._state.cr = st.color.r;
+      this._state.cg = st.color.g;
+      this._state.cb = st.color.b;
+      this._state.color.copy(st.color);
+      for (const p of this.posts) this._snapPost(p, this._state);
       return;
     }
 
@@ -262,6 +249,7 @@ export class LampPost {
 
   /**
    * Per-coin micro-progression: interpolate between current tier and next.
+   * Includes micro-flash (spike before tween) — previously separate method.
    * @param {number} chargeInBar  0 to PLATES_TO_FILL_BAR-1
    */
   microProgress(chargeInBar) {
@@ -270,83 +258,43 @@ export class LampPost {
     const nextTier = Math.min(curTier + 1, TIER.length - 1);
     const cur = TIER[curTier];
     const nxt = TIER[nextTier];
-    const curColor = TIER_COLORS[curTier];
-    const nxtColor = TIER_COLORS[nextTier];
 
-    const st = {
-      intensity: THREE.MathUtils.lerp(cur.intensity, nxt.intensity, t),
-      distance: THREE.MathUtils.lerp(cur.distance, nxt.distance, t),
-      emissive: THREE.MathUtils.lerp(cur.emissive, nxt.emissive, t),
-      coneOp: THREE.MathUtils.lerp(cur.coneOp, nxt.coneOp, t),
-      coneScale: THREE.MathUtils.lerp(cur.coneR, nxt.coneR, t) / BASE_CONE_R,
-      color: curColor.clone().lerp(nxtColor, t),
-    };
+    _tempColor.copy(TIER_COLORS[curTier]).lerp(TIER_COLORS[nextTier], t);
+    _targetState.intensity = THREE.MathUtils.lerp(cur.intensity, nxt.intensity, t);
+    _targetState.distance = THREE.MathUtils.lerp(cur.distance, nxt.distance, t);
+    _targetState.emissive = THREE.MathUtils.lerp(cur.emissive, nxt.emissive, t);
+    _targetState.coneOp = THREE.MathUtils.lerp(cur.coneOp, nxt.coneOp, t);
+    _targetState.coneScale = THREE.MathUtils.lerp(cur.coneR, nxt.coneR, t) / BASE_CONE_R;
 
-    this._tweenToState(st, 300);
+    // Micro-flash: spike current state before tweening (flash decays into progression)
+    this._state.coneOp += 0.02;
+    this._state.intensity += 0.08;
+    for (const p of this.posts) this._snapPost(p, this._state);
+
+    this._tweenToState(_targetState, 300);
   }
 
-  /** Per-coin micro-flash (brief pulse on every plate hit). */
-  microFlash() {
-    for (const p of this.posts) {
-      const origOp = p.coneMat.opacity;
-      const origInt = p.light.intensity;
-      p.coneMat.opacity = origOp + 0.02;
-      p.light.intensity = origInt + 0.08;
-
-      new Tween(p.coneMat, tweenGroup)
-        .to({ opacity: origOp }, 250)
-        .easing(Easing.Quadratic.In).start();
-      new Tween(p.light, tweenGroup)
-        .to({ intensity: origInt }, 250)
-        .easing(Easing.Quadratic.In).start();
-    }
-  }
+  /** @deprecated Folded into microProgress. Kept as no-op for compat. */
+  microFlash() {}
 
   /** Milestone flash (dramatic surge on tier change). */
   flash() {
     const cfg = TIER[this.currentTier];
-    const spikeScale = cfg.coneR * 1.3 / BASE_CONE_R;
-    const white = new THREE.Color('#ffffff');
+    const target = this._tierState(this.currentTier);
 
-    for (const p of this.posts) {
-      // Spike intensity + emissive
-      p.light.intensity = cfg.intensity * 2;
-      p.headMat.emissiveIntensity = Math.min(cfg.emissive * 2, 1.0);
-      p.coneMat.opacity = cfg.coneOp * 2;
+    // Spike shared state to white / boosted values
+    this._state.intensity = cfg.intensity * 2;
+    this._state.emissive = Math.min(cfg.emissive * 2, 1.0);
+    this._state.coneOp = cfg.coneOp * 2;
+    this._state.coneScale = cfg.coneR * 1.3 / BASE_CONE_R;
+    this._state.cr = 1; this._state.cg = 1; this._state.cb = 1;
+    this._state.color.setRGB(1, 1, 1);
 
-      // Flash to white then settle to tier color
-      p.coneMat.color.copy(white);
-      p.headMat.emissive.copy(white);
+    // Apply spike to all posts
+    for (const p of this.posts) this._snapPost(p, this._state);
 
-      // Scale spike
-      p.cone.scale.set(spikeScale, 1, spikeScale);
-      p.pool.scale.setScalar(spikeScale);
-
-      const target = this._tierState(this.currentTier);
-
-      // Settle over 1.3s
-      new Tween(p.light, tweenGroup)
-        .to({ intensity: cfg.intensity }, 1300)
-        .easing(Easing.Quadratic.Out).start();
-      new Tween(p.headMat, tweenGroup)
-        .to({ emissiveIntensity: cfg.emissive }, 1300)
-        .easing(Easing.Quadratic.Out).start();
-      new Tween(p.coneMat, tweenGroup)
-        .to({ opacity: cfg.coneOp }, 1300)
-        .easing(Easing.Quadratic.Out).start();
-      new Tween(p.coneMat.color, tweenGroup)
-        .to({ r: target.color.r, g: target.color.g, b: target.color.b }, 1000)
-        .easing(Easing.Quadratic.Out).start();
-      new Tween(p.headMat.emissive, tweenGroup)
-        .to({ r: target.color.r, g: target.color.g, b: target.color.b }, 1000)
-        .easing(Easing.Quadratic.Out).start();
-      new Tween(p.cone.scale, tweenGroup)
-        .to({ x: target.coneScale, z: target.coneScale }, 1300)
-        .easing(Easing.Quadratic.Out).start();
-      new Tween(p.pool.scale, tweenGroup)
-        .to({ x: target.coneScale, y: target.coneScale, z: target.coneScale }, 1300)
-        .easing(Easing.Quadratic.Out).start();
-    }
+    // Settle from spike to tier target
+    this._tweenToState(target, 1300);
   }
 
   // ── Update / recycle ──
@@ -379,8 +327,18 @@ export class LampPost {
 
   resetAll() {
     this.currentTier = 0;
+    if (this._stateTween) { this._stateTween.stop(); this._stateTween = null; }
+
     const st = this._tierState(0);
-    Object.assign(this._state, { ...st, color: st.color.clone() });
+    this._state.intensity = st.intensity;
+    this._state.distance = st.distance;
+    this._state.emissive = st.emissive;
+    this._state.coneOp = st.coneOp;
+    this._state.coneScale = st.coneScale;
+    this._state.cr = st.color.r;
+    this._state.cg = st.color.g;
+    this._state.cb = st.color.b;
+    this._state.color.copy(st.color);
 
     let pair = 0;
     for (let i = 0; i < this.posts.length; i += 2) {
@@ -390,8 +348,8 @@ export class LampPost {
       pair++;
     }
     for (const p of this.posts) {
-      this._snapPost(p, st);
-      p.group.visible = false; // hidden until first plate hit
+      this._snapPost(p, this._state);
+      p.group.visible = false;
     }
   }
 

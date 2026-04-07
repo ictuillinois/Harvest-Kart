@@ -116,7 +116,7 @@ export class Road {
 
   update(delta, speed) {
     const move = speed * delta;
-    this.roadTexture.offset.y += speed * delta * 0.03;
+    this.roadTexture.offset.y = (this.roadTexture.offset.y + speed * delta * 0.03) % 1000;
 
     for (let i = 0; i < this.segments.length; i++) {
       this.segments[i].position.z += move;

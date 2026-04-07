@@ -736,9 +736,8 @@ gameState.on('plateHit', ({ currentCharge, combo, score }) => {
   // Reveal lamp posts on first plate hit (deferred for smoother start)
   if (!lampPosts.posts[0].group.visible) lampPosts.setVisible(true);
 
-  // Per-coin lamp post micro-progression + flash
+  // Per-coin lamp post micro-progression (includes micro-flash)
   lampPosts.microProgress(currentCharge);
-  lampPosts.microFlash();
 });
 
 gameState.on('comboBreak', () => {

@@ -7,10 +7,18 @@ const ARC_CX = 100, ARC_CY = 100, ARC_R = 78;
 const ARC_START_DEG = 160, ARC_SWEEP_DEG = 220;
 const ARC_LENGTH = (ARC_SWEEP_DEG / 360) * 2 * Math.PI * ARC_R; // ≈ 299.4
 
+// Reusable result object — eliminates per-call allocation in hot path
+const _xy = { x: 0, y: 0 };
 function polarToXY(cx, cy, r, deg) {
   const rad = (deg - 90) * Math.PI / 180;
-  return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
+  _xy.x = cx + r * Math.cos(rad);
+  _xy.y = cy + r * Math.sin(rad);
+  return _xy;
 }
+
+// Pre-cached 0-padded digit strings — avoids String()+padStart() allocations
+const _pad2 = [];
+for (let i = 0; i < 100; i++) _pad2[i] = String(i).padStart(2, '0');
 
 function describeArc(cx, cy, r, startDeg, sweepDeg) {
   const s = polarToXY(cx, cy, r, startDeg);
@@ -870,10 +878,7 @@ export class HUD {
 
     const m = Math.floor(elapsed / 60);
     const s = Math.floor(elapsed % 60);
-    this.spTime.textContent =
-      String(m).padStart(2, '0') + "'" +
-      String(s).padStart(2, '0') + '"' +
-      String(cs).padStart(2, '0');
+    this.spTime.textContent = _pad2[m] + "'" + _pad2[s] + '"' + _pad2[cs];
   }
 
   updateCharge(charge) {
