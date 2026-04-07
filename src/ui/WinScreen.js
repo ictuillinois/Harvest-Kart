@@ -1,4 +1,4 @@
-import { gameRoot } from '../utils/base.js';
+import { asset, gameRoot } from '../utils/base.js';
 
 export class WinScreen {
   constructor(onPlayAgain) {
@@ -8,31 +8,57 @@ export class WinScreen {
       <div class="win-bg"></div>
       <div class="win-particles" id="win-particles"></div>
       <div class="win-content">
-        <div class="win-badge">
-          <div class="win-badge-ring"></div>
-          <div class="win-badge-icon">&#9889;</div>
+
+        <!-- EOH branding — top of screen, prominent -->
+        <div class="win-eoh-block">
+          <img class="win-eoh-logo" src="${asset('eoh.svg')}" alt="Engineering Open House" draggable="false"/>
+          <div class="win-eoh-text">
+            <div class="win-eoh-tagline">FORGING THE FUTURE</div>
+            <div class="win-eoh-dates">April 10th &amp; April 11th, 2026</div>
+          </div>
         </div>
-        <h1 class="win-heading" id="win-heading">HIGHWAY POWERED</h1>
-        <p class="win-sub">All sectors energized. The highway is alive.</p>
+
         <div class="win-divider"></div>
-        <div class="win-stats">
-          <div class="win-stat">
-            <div class="win-stat-val" id="win-plates">0</div>
-            <div class="win-stat-lbl">PLATES HIT</div>
+
+        <h1 class="win-heading" id="win-heading">HIGHWAY POWERED</h1>
+
+        <!-- Driver portrait (left) + Stats grid (right) -->
+        <div class="win-main-row">
+          <div class="win-driver-side">
+            <div class="win-driver-frame">
+              <img class="win-driver-img" id="win-driver-img" src="" alt="" draggable="false"/>
+            </div>
           </div>
-          <div class="win-stat win-stat-main">
-            <div class="win-stat-val" id="win-score">0</div>
-            <div class="win-stat-lbl">TOTAL SCORE</div>
-          </div>
-          <div class="win-stat">
-            <div class="win-stat-val" id="win-combo">x0</div>
-            <div class="win-stat-lbl">BEST COMBO</div>
+
+          <div class="win-stats-side">
+            <div class="win-stats-grid">
+              <div class="win-metric win-metric-highlight">
+                <div class="win-metric-icon">&#9733;</div>
+                <div class="win-metric-val" id="win-score">0</div>
+                <div class="win-metric-lbl">TOTAL SCORE</div>
+              </div>
+              <div class="win-metric">
+                <div class="win-metric-icon">&#9889;</div>
+                <div class="win-metric-val" id="win-plates">0</div>
+                <div class="win-metric-lbl">PLATES HIT</div>
+              </div>
+              <div class="win-metric">
+                <div class="win-metric-icon">&#215;</div>
+                <div class="win-metric-val" id="win-combo">x0</div>
+                <div class="win-metric-lbl">BEST COMBO</div>
+              </div>
+              <div class="win-metric">
+                <div class="win-metric-icon">&#9201;</div>
+                <div class="win-metric-val" id="win-time">0:00</div>
+                <div class="win-metric-lbl">FINISH TIME</div>
+              </div>
+            </div>
+            <button class="win-btn" id="win-btn">
+              <span class="win-btn-text">CONTINUE</span>
+              <span class="win-btn-arrow">&#8594;</span>
+            </button>
           </div>
         </div>
-        <button class="win-btn" id="win-btn">
-          <span class="win-btn-text">CONTINUE</span>
-          <span class="win-btn-arrow">&#8594;</span>
-        </button>
       </div>
     `;
 
@@ -47,19 +73,14 @@ export class WinScreen {
 
       .win-bg {
         position: absolute; inset: 0;
-        background: radial-gradient(ellipse at 50% 40%, #0a2a1a 0%, #040e08 60%, #000000 100%);
+        background: radial-gradient(ellipse at 50% 20%, #0a2a1a 0%, #040e08 55%, #000000 100%);
       }
-
-      /* Floating particles */
       .win-particles {
         position: absolute; inset: 0; overflow: hidden; pointer-events: none;
       }
       .win-particle {
-        position: absolute;
-        width: 3px; height: 3px;
-        background: #22ffaa;
-        border-radius: 50%;
-        opacity: 0;
+        position: absolute; width: 3px; height: 3px;
+        background: #22ffaa; border-radius: 50%; opacity: 0;
         animation: winFloat 4s ease-in-out infinite;
       }
       @keyframes winFloat {
@@ -71,169 +92,257 @@ export class WinScreen {
 
       .win-content {
         position: relative; z-index: 1;
-        display: flex; flex-direction: column;
-        align-items: center;
-        padding: clamp(24px, 4vh, 60px) clamp(20px, 4vw, 80px);
-        max-width: clamp(320px, 50vw, 800px);
+        display: flex; flex-direction: column; align-items: center;
+        padding: clamp(10px, 1.5vh, 24px) clamp(16px, 3vw, 60px);
+        max-width: clamp(500px, 75vw, 1100px);
+        width: 100%;
         animation: winReveal 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
       }
       @keyframes winReveal {
         0%   { transform: translateY(40px) scale(0.95); opacity: 0; }
         100% { transform: translateY(0) scale(1); opacity: 1; }
       }
-
-      /* Badge */
-      .win-badge {
-        position: relative;
-        width: clamp(70px, 10vw, 130px);
-        height: clamp(70px, 10vw, 130px);
-        margin-bottom: clamp(12px, 2vh, 28px);
-      }
-      .win-badge-ring {
-        position: absolute; inset: 0;
-        border: 3px solid #22ffaa;
-        border-radius: 50%;
-        animation: winPulseRing 2s ease-in-out infinite;
-        box-shadow: 0 0 20px rgba(34,255,170,0.3), inset 0 0 20px rgba(34,255,170,0.1);
-      }
-      @keyframes winPulseRing {
-        0%, 100% { transform: scale(1); opacity: 1; }
-        50%      { transform: scale(1.08); opacity: 0.7; }
-      }
-      .win-badge-icon {
-        position: absolute; inset: 0;
-        display: flex; align-items: center; justify-content: center;
-        font-size: clamp(32px, 5vw, 60px);
-        filter: drop-shadow(0 0 12px rgba(34,255,170,0.8));
-        animation: winBadgePop 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) 0.3s both;
-      }
-      @keyframes winBadgePop {
-        0%   { transform: scale(0); opacity: 0; }
-        100% { transform: scale(1); opacity: 1; }
+      @keyframes winFadeUp {
+        0%   { transform: translateY(16px); opacity: 0; }
+        100% { transform: translateY(0); opacity: 1; }
       }
 
-      /* Heading */
+      /* ── EOH branding — large, top of screen ── */
+      .win-eoh-block {
+        display: flex; align-items: center;
+        gap: clamp(14px, 2.5vw, 40px);
+        animation: winFadeUp 0.6s ease-out 0.1s both;
+        margin-bottom: clamp(6px, 1vh, 14px);
+      }
+      .win-eoh-logo {
+        width: clamp(120px, 18vw, 300px);
+        height: auto;
+        filter: drop-shadow(0 0 16px rgba(123,47,242,0.35));
+      }
+      .win-eoh-text {
+        display: flex; flex-direction: column;
+        gap: clamp(2px, 0.4vh, 6px);
+      }
+      .win-eoh-tagline {
+        font-family: 'Press Start 2P', 'Impact', sans-serif;
+        font-size: clamp(12px, 2vw, 32px);
+        white-space: nowrap;
+        font-weight: 900;
+        letter-spacing: clamp(3px, 0.5vw, 10px);
+        text-transform: uppercase;
+        color: #7b2ff2;
+        -webkit-text-stroke: 1px rgba(255,255,255,0.75);
+        text-shadow:
+          0 0 12px rgba(123,47,242,0.6),
+          0 0 30px rgba(123,47,242,0.25);
+      }
+      .win-eoh-dates {
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        font-size: clamp(9px, 1.2vw, 20px);
+        font-weight: 300;
+        letter-spacing: clamp(2px, 0.3vw, 6px);
+        color: rgba(255,255,255,0.55);
+      }
+
+      .win-divider {
+        width: clamp(80px, 18vw, 300px);
+        height: 2px;
+        background: linear-gradient(90deg, transparent, rgba(34,255,170,0.4), transparent);
+        margin-bottom: clamp(6px, 1vh, 14px);
+        animation: winFadeUp 0.6s ease-out 0.2s both;
+      }
+
+      /* ── Heading ── */
       .win-heading {
         font-family: 'Orbitron', sans-serif;
-        font-size: clamp(24px, 4.5vw, 72px);
+        font-size: clamp(24px, 5vw, 76px);
         font-weight: 900;
         color: #fff;
-        letter-spacing: clamp(3px, 0.5vw, 10px);
+        letter-spacing: clamp(4px, 0.8vw, 14px);
         text-align: center;
-        margin: 0 0 clamp(4px, 0.8vh, 12px);
+        margin: 0 0 clamp(10px, 1.5vh, 22px);
+        white-space: nowrap;
         background: linear-gradient(180deg, #ffffff 20%, #22ffaa 100%);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         background-clip: text;
-        animation: winHeadingIn 0.7s ease-out 0.2s both;
-      }
-      @keyframes winHeadingIn {
-        0%   { transform: translateY(20px); opacity: 0; }
-        100% { transform: translateY(0); opacity: 1; }
+        animation: winFadeUp 0.6s ease-out 0.25s both;
       }
       .win-heading.new-best {
         background: linear-gradient(180deg, #ffffff 20%, #ffaa00 100%);
-        -webkit-background-clip: text;
-        background-clip: text;
+        -webkit-background-clip: text; background-clip: text;
       }
 
-      .win-sub {
-        font-family: 'Segoe UI', sans-serif;
-        font-size: clamp(11px, 1.3vw, 20px);
-        color: rgba(255,255,255,0.45);
-        margin: 0 0 clamp(12px, 2vh, 28px);
-        letter-spacing: 1px;
-        animation: winHeadingIn 0.7s ease-out 0.35s both;
+      /* ── Main row: driver left, stats right ── */
+      .win-main-row {
+        display: flex;
+        align-items: stretch;
+        gap: clamp(14px, 2.5vw, 40px);
+        width: 100%;
+        animation: winFadeUp 0.7s ease-out 0.35s both;
       }
 
-      .win-divider {
-        width: clamp(60px, 12vw, 200px);
-        height: 2px;
-        background: linear-gradient(90deg, transparent, #22ffaa, transparent);
-        margin-bottom: clamp(16px, 2.5vh, 36px);
-        animation: winHeadingIn 0.7s ease-out 0.4s both;
+      /* Driver side */
+      .win-driver-side {
+        flex: 0 0 auto;
+        display: flex; align-items: center;
       }
-
-      /* Stats */
-      .win-stats {
-        display: flex; gap: clamp(8px, 1.5vw, 28px);
-        margin-bottom: clamp(20px, 3vh, 44px);
-        animation: winHeadingIn 0.7s ease-out 0.5s both;
-      }
-      .win-stat {
-        display: flex; flex-direction: column; align-items: center;
-        padding: clamp(10px, 1.5vh, 20px) clamp(14px, 2vw, 32px);
-        background: rgba(34,255,170,0.04);
-        border: 1px solid rgba(34,255,170,0.12);
+      .win-driver-frame {
+        width: clamp(130px, 18vw, 280px);
         border-radius: clamp(8px, 1vw, 16px);
+        overflow: hidden;
+        border: 2.5px solid rgba(34,255,170,0.3);
+        box-shadow:
+          0 4px 24px rgba(0,0,0,0.6),
+          0 0 24px rgba(34,255,170,0.1),
+          inset 0 0 20px rgba(0,0,0,0.3);
       }
-      .win-stat-main {
-        border-color: rgba(34,255,170,0.3);
-        background: rgba(34,255,170,0.08);
+      .win-driver-img {
+        display: block; width: 100%; height: auto;
+        object-fit: contain; pointer-events: none;
       }
-      .win-stat-val {
+
+      /* Stats side */
+      .win-stats-side {
+        flex: 1;
+        display: flex; flex-direction: column;
+        justify-content: center;
+        gap: clamp(10px, 1.5vh, 22px);
+      }
+
+      /* 2×2 stats grid */
+      .win-stats-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: clamp(6px, 1vw, 16px);
+      }
+      .win-metric {
+        display: flex; flex-direction: column; align-items: center;
+        gap: clamp(2px, 0.3vh, 5px);
+        padding: clamp(10px, 1.4vh, 22px) clamp(10px, 1.2vw, 24px);
+        background: rgba(255,255,255,0.025);
+        border: 1px solid rgba(255,255,255,0.06);
+        border-radius: clamp(8px, 1vw, 16px);
+        position: relative;
+        overflow: hidden;
+      }
+      .win-metric::before {
+        content: '';
+        position: absolute; inset: 0;
+        background: radial-gradient(ellipse at 50% 0%, rgba(34,255,170,0.04) 0%, transparent 70%);
+        pointer-events: none;
+      }
+      .win-metric-highlight {
+        background: rgba(34,255,170,0.05);
+        border-color: rgba(34,255,170,0.18);
+      }
+      .win-metric-highlight::before {
+        background: radial-gradient(ellipse at 50% 0%, rgba(34,255,170,0.1) 0%, transparent 70%);
+      }
+      .win-metric-icon {
+        font-size: clamp(18px, 2.5vw, 34px);
+        filter: drop-shadow(0 0 4px rgba(34,255,170,0.3));
+      }
+      .win-metric-highlight .win-metric-icon { color: #22ffaa; }
+      .win-metric-val {
         font-family: 'Orbitron', monospace;
-        font-size: clamp(18px, 3vw, 48px);
-        font-weight: 900;
-        color: #fff;
-        line-height: 1;
+        font-size: clamp(20px, 3.2vw, 50px);
+        font-weight: 900; color: #fff; line-height: 1;
       }
-      .win-stat-main .win-stat-val {
+      .win-metric-highlight .win-metric-val {
         color: #22ffaa;
         text-shadow: 0 0 12px rgba(34,255,170,0.5);
       }
-      .win-stat-lbl {
+      .win-metric-lbl {
         font-family: 'Orbitron', monospace;
-        font-size: clamp(7px, 0.7vw, 12px);
+        font-size: clamp(5px, 0.6vw, 10px);
         font-weight: 500;
-        color: rgba(255,255,255,0.35);
+        color: rgba(255,255,255,0.3);
         letter-spacing: 2px;
-        margin-top: clamp(4px, 0.5vh, 8px);
       }
 
       /* Button */
       .win-btn {
-        display: flex; align-items: center; gap: clamp(8px, 1vw, 16px);
+        display: flex; align-items: center; justify-content: center;
+        gap: clamp(8px, 1vw, 16px);
         font-family: 'Orbitron', sans-serif;
         font-size: clamp(12px, 1.4vw, 22px);
         font-weight: 700;
-        padding: clamp(12px, 1.8vh, 22px) clamp(28px, 4vw, 56px);
+        padding: clamp(10px, 1.4vh, 20px) clamp(24px, 3vw, 48px);
         background: transparent;
-        color: #22ffaa;
-        border: 2px solid #22ffaa;
-        border-radius: 60px;
-        cursor: pointer;
-        letter-spacing: clamp(2px, 0.3vw, 5px);
+        color: #22ffaa; border: 2px solid #22ffaa;
+        border-radius: 60px; cursor: pointer;
+        letter-spacing: clamp(2px, 0.4vw, 6px);
         transition: all 0.3s ease;
-        animation: winHeadingIn 0.7s ease-out 0.65s both;
       }
       .win-btn:hover {
-        background: #22ffaa;
-        color: #0a1a10;
+        background: #22ffaa; color: #0a1a10;
         box-shadow: 0 0 30px rgba(34,255,170,0.4);
         transform: translateY(-2px);
       }
       .win-btn:active { transform: scale(0.97); }
-      .win-btn-arrow {
-        font-size: 1.2em;
-        transition: transform 0.3s;
-      }
+      .win-btn-arrow { font-size: 1.2em; transition: transform 0.3s; }
       .win-btn:hover .win-btn-arrow { transform: translateX(4px); }
+
+      /* Responsive */
+      @media (max-width: 640px) {
+        .win-main-row { flex-direction: column; align-items: center; }
+        .win-driver-frame { width: clamp(100px, 30vw, 160px); }
+        .win-stats-grid { width: 100%; }
+        .win-eoh-block { flex-direction: column; text-align: center; }
+        .win-heading { white-space: normal; font-size: clamp(18px, 6vw, 36px); }
+      }
     `;
     document.head.appendChild(style);
     gameRoot().appendChild(this.el);
 
-    this.el.querySelector('#win-btn').addEventListener('click', () => onPlayAgain());
+    this._onContinue = onPlayAgain;
+    this._continued = false;
+    this.el.querySelector('#win-btn').addEventListener('click', () => this._triggerContinue());
   }
 
-  show(platesHit, score = 0, maxCombo = 0) {
+  _triggerContinue() {
+    if (this._continued) return;
+    this._continued = true;
+    this._removeInputListeners();
+    this._onContinue();
+  }
+
+  _addInputListeners() {
+    this._keyH = (e) => {
+      if (this.el.style.display === 'none' || this._continued) return;
+      this._triggerContinue();
+    };
+    this._ptrH = () => {
+      if (this.el.style.display === 'none' || this._continued) return;
+      this._triggerContinue();
+    };
+    window.addEventListener('keydown', this._keyH);
+    // Use pointerup (not pointerdown) so a tap doesn't accidentally fire during the reveal animation
+    window.addEventListener('pointerup', this._ptrH);
+  }
+
+  _removeInputListeners() {
+    if (this._keyH) { window.removeEventListener('keydown', this._keyH); this._keyH = null; }
+    if (this._ptrH) { window.removeEventListener('pointerup', this._ptrH); this._ptrH = null; }
+  }
+
+  show(platesHit, score = 0, maxCombo = 0, elapsed = 0, driver = null) {
     this.el.querySelector('#win-plates').textContent = platesHit;
     this.el.querySelector('#win-score').textContent = score.toLocaleString();
     this.el.querySelector('#win-combo').textContent = 'x' + maxCombo;
 
-    const heading = this.el.querySelector('#win-heading');
+    const m = Math.floor(elapsed / 60);
+    const s = Math.floor(elapsed % 60);
+    this.el.querySelector('#win-time').textContent = m + ':' + String(s).padStart(2, '0');
 
-    // High score check
+    if (driver) {
+      this.el.querySelector('#win-driver-img').src = driver.avatar;
+      this.el.querySelector('#win-driver-img').alt = driver.name;
+      this.el.querySelector('.win-driver-frame').style.borderColor = driver.accentColor;
+    }
+
+    const heading = this.el.querySelector('#win-heading');
     const prevBest = parseInt(localStorage.getItem('harvestKart_highScore') || '0');
     if (score > prevBest) {
       localStorage.setItem('harvestKart_highScore', score.toString());
@@ -248,7 +357,6 @@ export class WinScreen {
       heading.classList.remove('new-best');
     }
 
-    // Spawn floating particles
     const particlesEl = this.el.querySelector('#win-particles');
     particlesEl.innerHTML = '';
     for (let i = 0; i < 30; i++) {
@@ -263,11 +371,14 @@ export class WinScreen {
     }
 
     this.el.style.display = 'flex';
+    this._continued = false;
+    // Delay input listeners so the reveal animation doesn't get skipped by a stray input
+    setTimeout(() => this._addInputListeners(), 1200);
   }
 
   hide() {
+    this._removeInputListeners();
     this.el.style.display = 'none';
-    // Reset timer color
     const timerEl = document.getElementById('hud-time');
     if (timerEl) timerEl.style.color = '';
   }

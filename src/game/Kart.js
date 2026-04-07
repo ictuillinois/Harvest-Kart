@@ -90,13 +90,16 @@ const VEHICLE_MESH_CONFIG = {
     taillightXFrac: 0.38,
   },
   formula: {
-    // Destiny: AMG GT — all materials use same paint path for GPU efficiency
+    // Destiny: AMG GT — body paint + glass on material indices
     bodyNames: ['amg_gt_body'],
     wheelNames: ['lfwheel001', 'rrwheel', 'rfwheel001', 'lrwheel002'],
     wheelRotation: false,
     hiddenNames: [],
     rotationY: -Math.PI / 2,
     hasTexture: true,
+    glassIndices: [1],
+    glassTint: 0x000000,
+    glassOpacity: 1.0,
     materialProfile: 'raceMetal',
     skipExhaust: true,
     taillightYFrac: 0.25,
@@ -447,12 +450,13 @@ export class Kart {
     };
 
     // Reusable material factories
+    const glassOp = meshConfig.glassOpacity ?? 0.70;
     const makeGlass = (tint) => new THREE.MeshStandardMaterial({
       color: tint || meshConfig.glassTint || 0x112233,
       metalness: 0.85,
       roughness: 0.08,
-      transparent: true,
-      opacity: 0.70,
+      transparent: glassOp < 1,
+      opacity: glassOp,
       envMapIntensity: 2.0,
     });
 

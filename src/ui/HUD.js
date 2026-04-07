@@ -117,19 +117,44 @@ export class HUD {
     this.el = document.createElement('div');
     this.el.id = 'hud';
     this.el.innerHTML = `
-      <!-- Top-left: HOME + minimap -->
+      <!-- Top-left: HOME + minimap + driver avatar -->
       <div class="hud-tl">
         <button class="hud-btn hud-glass" id="hud-home" aria-label="Home">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg>
           HOME
         </button>
         <div class="hud-glass mm-panel">
-          <div class="mm-label">MAP</div>
-          <div class="mm-road">
-            <div class="mm-stripe"></div>
-            ${lampHTML}
-            <div class="mm-player" id="mm-player"></div>
+          <div class="mm-header">
+            <div class="mm-dot"></div>
+            <div class="mm-label">ROUTE</div>
+            <div class="mm-dot"></div>
           </div>
+          <div class="mm-track">
+            <div class="mm-terrain mm-terrain-l"></div>
+            <div class="mm-road">
+              <div class="mm-edge mm-edge-l"></div>
+              <div class="mm-edge mm-edge-r"></div>
+              <div class="mm-stripe mm-stripe-l"></div>
+              <div class="mm-stripe mm-stripe-r"></div>
+              <div class="mm-finish"></div>
+              <div class="mm-start"></div>
+              ${lampHTML}
+              <div class="mm-player" id="mm-player">
+                <svg class="mm-kart-icon" viewBox="0 0 10 14" fill="none">
+                  <path d="M5 0L9 5V12C9 13 8 14 7 14H3C2 14 1 13 1 12V5L5 0Z" fill="currentColor"/>
+                  <rect x="0" y="4" width="2" height="4" rx="0.5" fill="currentColor" opacity="0.5"/>
+                  <rect x="8" y="4" width="2" height="4" rx="0.5" fill="currentColor" opacity="0.5"/>
+                </svg>
+              </div>
+            </div>
+            <div class="mm-terrain mm-terrain-r"></div>
+          </div>
+          <div class="mm-footer">
+            <div class="mm-dist-bar"><div class="mm-dist-fill" id="mm-dist-fill"></div></div>
+          </div>
+        </div>
+        <div class="hud-avatar-frame">
+          <img class="hud-avatar" id="hud-avatar" src="" alt="" draggable="false"/>
         </div>
       </div>
 
@@ -368,57 +393,171 @@ export class HUD {
       }
 
       .mm-panel {
-        padding: clamp(8px, 1vh, 18px) clamp(8px, 0.9vw, 18px);
-        width: clamp(90px, 10vw, 210px);
+        padding: clamp(8px, 1.2vh, 20px) clamp(8px, 1vw, 20px);
+        width: clamp(135px, 15vw, 315px);
+      }
+
+      /* Header bar */
+      .mm-header {
+        display: flex; align-items: center; justify-content: center;
+        gap: clamp(4px, 0.4vw, 8px);
+        margin-bottom: clamp(4px, 0.5vh, 8px);
       }
       .mm-label {
-        font-size: clamp(6px, 0.7vw, 13px);
+        font-size: clamp(7px, 0.9vw, 16px);
         font-weight: 700;
         color: var(--hud-text-muted);
         letter-spacing: 3px;
-        text-align: center;
-        margin-bottom: clamp(4px, 0.5vh, 8px);
       }
+      .mm-dot {
+        width: 4px; height: 4px; border-radius: 50%;
+        background: var(--hud-accent);
+        box-shadow: 0 0 4px var(--hud-accent-glow);
+      }
+
+      /* Track container: terrain + road */
+      .mm-track {
+        display: flex;
+        gap: 0;
+        height: clamp(150px, 30vh, 360px);
+      }
+      .mm-terrain {
+        flex: 0 0 clamp(9px, 1vw, 21px);
+        border-radius: 2px;
+      }
+      .mm-terrain-l {
+        background: linear-gradient(180deg,
+          rgba(40,80,40,0.25) 0%, rgba(60,100,50,0.15) 30%,
+          rgba(40,70,40,0.2) 60%, rgba(30,60,30,0.25) 100%);
+        border-right: 1px solid rgba(255,255,255,0.04);
+      }
+      .mm-terrain-r {
+        background: linear-gradient(180deg,
+          rgba(40,80,40,0.25) 0%, rgba(50,90,45,0.15) 40%,
+          rgba(40,70,40,0.2) 70%, rgba(30,60,30,0.25) 100%);
+        border-left: 1px solid rgba(255,255,255,0.04);
+      }
+
+      /* Road surface */
       .mm-road {
         position: relative;
-        width: clamp(28px, 3.5vw, 54px);
-        height: clamp(100px, 20vh, 240px);
-        margin: 0 auto;
-        background: rgba(255,255,255,0.05);
-        border: 1px solid rgba(255,255,255,0.08);
-        border-radius: 4px;
+        flex: 1;
+        background: linear-gradient(180deg, rgba(45,45,55,0.9) 0%, rgba(35,35,42,0.9) 100%);
         overflow: hidden;
       }
-      .mm-stripe {
-        position: absolute; left: 50%; top: 0; bottom: 0; width: 1px;
-        background: repeating-linear-gradient(to bottom, rgba(255,255,255,0.2) 0, rgba(255,255,255,0.2) 4px, transparent 4px, transparent 8px);
-        transform: translateX(-50%);
+
+      /* Road edges (curb lines) */
+      .mm-edge {
+        position: absolute; top: 0; bottom: 0; width: 1.5px;
+        background: rgba(255,255,255,0.12);
       }
+      .mm-edge-l { left: 0; }
+      .mm-edge-r { right: 0; }
+
+      /* Dashed lane stripes (two lanes) */
+      .mm-stripe {
+        position: absolute; top: 0; bottom: 0; width: 1px;
+        background: repeating-linear-gradient(
+          to bottom,
+          rgba(255,255,255,0.18) 0, rgba(255,255,255,0.18) 4px,
+          transparent 4px, transparent 10px
+        );
+      }
+      .mm-stripe-l { left: 33%; }
+      .mm-stripe-r { left: 66%; }
+
+      /* Finish line at top */
+      .mm-finish {
+        position: absolute; top: 2%; left: 8%; right: 8%; height: 3px;
+        background: repeating-linear-gradient(
+          90deg, #fff 0, #fff 3px, #222 3px, #222 6px
+        );
+        opacity: 0.4;
+        border-radius: 1px;
+      }
+      /* Start line at bottom */
+      .mm-start {
+        position: absolute; bottom: 2%; left: 8%; right: 8%; height: 2px;
+        background: rgba(34,255,170,0.3);
+        border-radius: 1px;
+      }
+
+      /* Lamp markers */
       .mm-lamp {
         position: absolute; left: 50%;
-        width: clamp(7px, 0.7vw, 14px); height: clamp(7px, 0.7vw, 14px); border-radius: 50%;
+        width: clamp(10px, 1vw, 20px); height: clamp(10px, 1vw, 20px);
+        border-radius: 50%;
         background: var(--hud-segment-empty);
-        border: 1.5px solid rgba(255,190,0,0.3);
+        border: 1.5px solid rgba(255,190,0,0.25);
         transform: translate(-50%, 50%);
         transition: background 0.4s, border-color 0.4s, box-shadow 0.4s;
+      }
+      .mm-lamp::after {
+        content: '';
+        position: absolute; inset: -3px;
+        border-radius: 50%;
+        border: 1px solid rgba(255,190,0,0.08);
       }
       .mm-lamp.lit {
         background: var(--hud-warning);
         border-color: var(--hud-warning);
-        box-shadow: 0 0 6px 2px rgba(255,220,0,0.7);
+        box-shadow: 0 0 6px 2px rgba(255,220,0,0.6);
+      }
+      .mm-lamp.lit::after {
+        border-color: rgba(255,220,0,0.2);
+      }
+
+      /* Progress bar at bottom */
+      .mm-footer {
+        margin-top: clamp(4px, 0.4vh, 6px);
+      }
+      .mm-dist-bar {
+        height: clamp(2px, 0.3vh, 4px);
+        background: rgba(255,255,255,0.06);
+        border-radius: 2px;
+        overflow: hidden;
+      }
+      .mm-dist-fill {
+        height: 100%; width: 0%;
+        background: linear-gradient(90deg, var(--hud-accent), #44ffcc);
+        border-radius: 2px;
+        transition: width 0.3s ease;
+        box-shadow: 0 0 4px var(--hud-accent-glow);
+      }
+
+      /* ── Driver avatar ── */
+      .hud-avatar-frame {
+        width: clamp(135px, 15vw, 315px);
+        border-radius: clamp(4px, 0.5vw, 8px);
+        border: 2px solid rgba(255,255,255,0.15);
+        overflow: hidden;
+        background: rgba(0,0,0,0.4);
+        box-shadow: 0 2px 8px rgba(0,0,0,0.5), inset 0 0 12px rgba(0,0,0,0.3);
+      }
+      .hud-avatar {
+        display: block;
+        width: 100%; height: auto;
+        object-fit: contain;
+        pointer-events: none;
+        user-select: none;
+        filter: drop-shadow(0 1px 2px rgba(0,0,0,0.4));
       }
       .mm-player {
         position: absolute; left: 50%; bottom: 4%;
-        width: clamp(8px, 0.9vw, 18px); height: clamp(8px, 0.9vw, 18px); border-radius: 50%;
-        background: var(--hud-accent);
-        box-shadow: 0 0 6px 3px var(--hud-accent-glow);
+        width: clamp(14px, 1.6vw, 28px); height: clamp(20px, 2.2vw, 40px);
+        color: var(--hud-accent);
+        filter: drop-shadow(0 0 4px var(--hud-accent-glow));
         transform: translate(-50%, 50%);
         transition: bottom 0.28s ease-out;
-        animation: dotPulse 1.5s ease-in-out infinite;
+        animation: kartPulse 1.5s ease-in-out infinite;
       }
-      @keyframes dotPulse {
-        0%, 100% { transform: translate(-50%, 50%) scale(1); box-shadow: 0 0 6px 3px var(--hud-accent-glow); }
-        50% { transform: translate(-50%, 50%) scale(1.25); box-shadow: 0 0 10px 5px var(--hud-accent-glow); }
+      .mm-kart-icon {
+        width: 100%; height: 100%;
+        display: block;
+      }
+      @keyframes kartPulse {
+        0%, 100% { filter: drop-shadow(0 0 4px var(--hud-accent-glow)); }
+        50%      { filter: drop-shadow(0 0 8px var(--hud-accent-glow)) brightness(1.3); }
       }
 
       /* ══════════════════════════════════════════
@@ -431,14 +570,14 @@ export class HUD {
         pointer-events: none;
       }
       .hud-score {
-        font-size: clamp(16px, 2vw, 40px);
+        font-size: clamp(24px, 3vw, 60px);
         font-weight: 700;
         color: var(--hud-text);
         text-shadow: 0 0 12px var(--hud-accent-glow);
         letter-spacing: 3px;
       }
       .hud-combo {
-        font-size: clamp(14px, 1.6vw, 32px);
+        font-size: clamp(21px, 2.4vw, 48px);
         font-weight: 900;
         color: var(--hud-accent);
         text-shadow:
@@ -446,7 +585,7 @@ export class HUD {
           0 0 28px rgba(0,255,136,0.2);
         letter-spacing: 2px;
         transition: transform 0.12s;
-        min-height: clamp(16px, 2vh, 36px);
+        min-height: clamp(24px, 3vh, 54px);
       }
       .hud-combo.pop { transform: scale(1.5); }
 
@@ -454,7 +593,7 @@ export class HUD {
       .hud-float-score {
         position: fixed; z-index: 55;
         font-family: var(--hud-font);
-        font-size: clamp(14px, 1.6vw, 30px);
+        font-size: clamp(21px, 2.4vw, 45px);
         font-weight: 900;
         color: var(--hud-accent);
         text-shadow: 0 0 10px var(--hud-accent-glow), 0 0 24px rgba(0,255,136,0.2);
@@ -475,19 +614,19 @@ export class HUD {
         display: flex; align-items: center; gap: clamp(6px, 0.6vw, 12px);
       }
       .hud-timer-panel {
-        display: flex; align-items: center; gap: clamp(5px, 0.5vw, 10px);
-        padding: clamp(5px, 0.6vh, 10px) clamp(8px, 0.8vw, 16px);
+        display: flex; align-items: center; gap: clamp(7px, 0.75vw, 15px);
+        padding: clamp(7px, 0.9vh, 15px) clamp(12px, 1.2vw, 24px);
         border-color: rgba(255,221,0,0.2);
       }
       .timer-icon {
-        width: clamp(14px, 1.3vw, 24px); height: clamp(14px, 1.3vw, 24px);
+        width: clamp(21px, 2vw, 36px); height: clamp(21px, 2vw, 36px);
         opacity: 0.7;
         filter: drop-shadow(0 0 3px rgba(255,221,0,0.4));
       }
       .hud-timer {
         font-family: var(--hud-font);
         font-variant-numeric: tabular-nums;
-        font-size: clamp(14px, 1.5vw, 30px);
+        font-size: clamp(21px, 2.25vw, 45px);
         font-weight: 700;
         color: var(--hud-warning);
         text-shadow:
@@ -506,13 +645,13 @@ export class HUD {
       .en-panel {
         display: flex; flex-direction: column;
         align-items: center; gap: clamp(4px, 0.6vh, 9px);
-        padding: clamp(8px, 1vh, 18px) clamp(7px, 0.7vw, 15px);
-        width: clamp(48px, 5vw, 84px);
+        padding: clamp(10px, 1.4vh, 24px) clamp(9px, 1vw, 20px);
+        width: clamp(66px, 7vw, 120px);
       }
       .en-bolt {
         opacity: 0.4;
         transition: opacity 0.3s, filter 0.3s;
-        width: clamp(16px, 1.8vw, 30px); height: clamp(16px, 1.8vw, 30px);
+        width: clamp(22px, 2.5vw, 42px); height: clamp(22px, 2.5vw, 42px);
       }
       .en-bolt.charged {
         opacity: 1;
@@ -522,7 +661,7 @@ export class HUD {
         display: flex; flex-direction: column-reverse; gap: clamp(2px, 0.25vh, 3px);
       }
       .en-seg {
-        width: clamp(26px, 3vw, 48px); height: clamp(8px, 1.3vh, 18px);
+        width: clamp(39px, 4.5vw, 72px); height: clamp(12px, 2vh, 27px);
         border-radius: 3px;
         background: var(--hud-segment-empty);
         border: 1px solid rgba(255,255,255,0.05);
@@ -780,6 +919,7 @@ export class HUD {
          ══════════════════════════════════════════ */
       @media (max-height: 380px) {
         .mm-panel { display: none; }
+        .hud-avatar-frame { display: none; }
         .hud-bl { display: none; }
         .en-panel { padding: 4px; }
         .hud-tl, .hud-tr { gap: 4px; }
@@ -800,11 +940,13 @@ export class HUD {
     this.enSegs      = [...this.el.querySelectorAll('.en-seg')];
     this.mmLamps     = [...this.el.querySelectorAll('.mm-lamp')];
     this.mmPlayer    = this.el.querySelector('#mm-player');
+    this._distFill   = this.el.querySelector('#mm-dist-fill');
     this.spTime      = this.el.querySelector('#sp-time');
     this.enLampCount = this.el.querySelector('#en-lamp-count');
     this.scoreEl     = this.el.querySelector('#hud-score');
     this.comboEl     = this.el.querySelector('#hud-combo');
     this.enBolt      = this.el.querySelector('.en-bolt');
+    this._avatarImg  = this.el.querySelector('#hud-avatar');
 
     // Speedometer refs
     this._arcFill   = this.el.querySelector('#speedo-fill');
@@ -836,9 +978,18 @@ export class HUD {
     const progress = (this._lamps * PLATES_TO_FILL_BAR + this._charge) / totalPlates;
     const pct = 4 + Math.min(92, progress * 92);
     this.mmPlayer.style.bottom = pct.toFixed(1) + '%';
+    if (this._distFill) this._distFill.style.width = (progress * 100).toFixed(1) + '%';
   }
 
   // ── Public API ──
+
+  setDriver(driver) {
+    if (this._avatarImg && driver && driver.avatar) {
+      this._avatarImg.src = driver.avatar;
+      this._avatarImg.alt = driver.name;
+      this._avatarImg.parentElement.style.borderColor = driver.accentColor || 'rgba(255,255,255,0.15)';
+    }
+  }
 
   updateSpeed(mph) {
     const rounded = Math.round(mph);

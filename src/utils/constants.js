@@ -38,52 +38,52 @@ function calcGearAccel(accStars) {
 }
 
 export const DRIVER_PHYSICS = {
-  // Ethan — The Balanced Pro (SPD 4, ACC 3, EFF 5)
-  ethan: {
-    topSpeed: 92,
-    gearAccel: calcGearAccel(3),          // [12, 9.6, 7.2, 4.8, 3]
+  yihan: {
+    topSpeed: 92, gearAccel: calcGearAccel(3),
     gearThresholds: calcGearThresholds(92),
-    decelRate: 4,                          // excellent coast
-    coastFloor: 32,
-    laneSwitchMs: 200,
-    chargeMultiplier: 1.2,                // 5★ EFF → 20% bonus
+    decelRate: 5, coastFloor: 30, laneSwitchMs: 180, chargeMultiplier: 1.15,
   },
-  // Kate — The Quick Starter (SPD 3, ACC 5, EFF 3)
-  kate: {
-    topSpeed: 84,
-    gearAccel: calcGearAccel(5),          // [16, 12.8, 9.6, 6.4, 4]
+  ivan: {
+    topSpeed: 88, gearAccel: calcGearAccel(4),
+    gearThresholds: calcGearThresholds(88),
+    decelRate: 8, coastFloor: 26, laneSwitchMs: 160, chargeMultiplier: 1.0,
+  },
+  murryam: {
+    topSpeed: 96, gearAccel: calcGearAccel(3),
+    gearThresholds: calcGearThresholds(96),
+    decelRate: 6, coastFloor: 28, laneSwitchMs: 200, chargeMultiplier: 1.1,
+  },
+  nazmus: {
+    topSpeed: 84, gearAccel: calcGearAccel(5),
     gearThresholds: calcGearThresholds(84),
-    decelRate: 10,                         // loses speed fast
-    coastFloor: 24,
-    laneSwitchMs: 150,                     // snappy handling
-    chargeMultiplier: 1.0,
+    decelRate: 10, coastFloor: 24, laneSwitchMs: 150, chargeMultiplier: 1.0,
   },
-  // Destiny — The Speed Demon (SPD 5, ACC 3, EFF 4)
-  destiny: {
-    topSpeed: 100,
-    gearAccel: calcGearAccel(3),          // [12, 9.6, 7.2, 4.8, 3]
+  alex: {
+    topSpeed: 100, gearAccel: calcGearAccel(3),
     gearThresholds: calcGearThresholds(100),
-    decelRate: 7,
-    coastFloor: 28,
-    laneSwitchMs: 250,                     // heavier at high speed
-    chargeMultiplier: 1.1,
+    decelRate: 7, coastFloor: 28, laneSwitchMs: 220, chargeMultiplier: 1.05,
   },
-  // Luke — The Raging Bull (SPD 5, ACC 4, EFF 2)
-  luke: {
-    topSpeed: 100,
-    gearAccel: calcGearAccel(4),          // [14, 11.2, 8.4, 5.6, 3.5]
-    gearThresholds: calcGearThresholds(100),
-    decelRate: 12,                         // heavy SUV, loses speed fast
-    coastFloor: 20,
-    laneSwitchMs: 230,                     // heavy but capable AWD
-    chargeMultiplier: 0.9,                // 2★ EFF — raw power over efficiency
+  william: {
+    topSpeed: 90, gearAccel: calcGearAccel(4),
+    gearThresholds: calcGearThresholds(90),
+    decelRate: 4, coastFloor: 32, laneSwitchMs: 190, chargeMultiplier: 1.2,
+  },
+  jiarui: {
+    topSpeed: 94, gearAccel: calcGearAccel(4),
+    gearThresholds: calcGearThresholds(94),
+    decelRate: 6, coastFloor: 27, laneSwitchMs: 170, chargeMultiplier: 1.1,
+  },
+  asad: {
+    topSpeed: 98, gearAccel: calcGearAccel(3),
+    gearThresholds: calcGearThresholds(98),
+    decelRate: 9, coastFloor: 22, laneSwitchMs: 240, chargeMultiplier: 0.95,
   },
 };
 
 // Driver ID lookup by index (matches DRIVER_TYPES order)
-const DRIVER_IDS = ['ethan', 'kate', 'destiny', 'luke'];
+const DRIVER_IDS = ['yihan', 'ivan', 'murryam', 'nazmus', 'alex', 'william', 'jiarui', 'asad'];
 export function getDriverPhysics(driverIndex) {
-  return DRIVER_PHYSICS[DRIVER_IDS[driverIndex]] || DRIVER_PHYSICS.ethan;
+  return DRIVER_PHYSICS[DRIVER_IDS[driverIndex]] || DRIVER_PHYSICS.yihan;
 }
 
 // Legacy exports (defaults — used before driver is selected)
@@ -123,47 +123,73 @@ export const COLORS = {
   barrier: 0x888888,
 };
 
-// Driver definitions
+// Driver definitions — all use compact vehicle in different color variations
 export const DRIVER_TYPES = [
+  // Row 1
   {
-    name: 'Ethan',
-    description: 'The Balanced Pro',
-    avatar: asset('characters/ethan.webp'),
-    accentColor: '#2a2a2a',
-    carBody: 0x1a1a1a,
-    carAccent: 0x444444,
-    vehicleType: 'sportsGT',
-    stats: { topSpeed: 4, acceleration: 3, efficiency: 5 },
+    name: 'Yihan',
+    avatar: asset('characters/Yihan.webp'),
+    accentColor: '#e0e0e0',
+    carBody: 0xe8e8e8, carAccent: 0xffffff,
+    vehicleType: 'compact',
+    stats: { topSpeed: 4, acceleration: 3, efficiency: 4 },
   },
   {
-    name: 'Kate',
-    description: 'The Quick Starter',
-    avatar: asset('characters/kate.webp'),
-    accentColor: '#d44a7a',
-    carBody: 0xd44a7a,
-    carAccent: 0xff6b9d,
+    name: 'Ivan',
+    avatar: asset('characters/Ivan.webp'),
+    accentColor: '#2266cc',
+    carBody: 0x2266cc, carAccent: 0x4488ee,
+    vehicleType: 'compact',
+    stats: { topSpeed: 3, acceleration: 4, efficiency: 3 },
+  },
+  {
+    name: 'Murryam',
+    avatar: asset('characters/Murryam.webp'),
+    accentColor: '#22aa44',
+    carBody: 0x22aa44, carAccent: 0x44cc66,
+    vehicleType: 'compact',
+    stats: { topSpeed: 4, acceleration: 3, efficiency: 4 },
+  },
+  {
+    name: 'Nazmus',
+    avatar: asset('characters/Nazmus.webp'),
+    accentColor: '#cc2222',
+    carBody: 0xcc2222, carAccent: 0xee4444,
     vehicleType: 'compact',
     stats: { topSpeed: 3, acceleration: 5, efficiency: 3 },
   },
+  // Row 2
   {
-    name: 'Destiny',
-    description: 'The Speed Demon',
-    avatar: asset('characters/destiny.webp'),
-    accentColor: '#3a6adf',
-    carBody: 0x3a6adf,
-    carAccent: 0x5a8aff,
-    vehicleType: 'formula',
+    name: 'Alex',
+    avatar: asset('characters/Alex.webp'),
+    accentColor: '#dd6600',
+    carBody: 0xdd6600, carAccent: 0xff8822,
+    vehicleType: 'compact',
     stats: { topSpeed: 5, acceleration: 3, efficiency: 4 },
   },
   {
-    name: 'Luke',
-    description: 'The Raging Bull',
-    avatar: asset('characters/luke.webp'),
-    accentColor: '#2aaa4a',
-    carBody: 0x2aaa4a,
-    carAccent: 0x4acc6a,
-    vehicleType: 'rally',
-    stats: { topSpeed: 5, acceleration: 4, efficiency: 2 },
+    name: 'William',
+    avatar: asset('characters/William.webp'),
+    accentColor: '#2a2a2a',
+    carBody: 0x1a1a1a, carAccent: 0x333333,
+    vehicleType: 'compact',
+    stats: { topSpeed: 4, acceleration: 4, efficiency: 5 },
+  },
+  {
+    name: 'Jiarui',
+    avatar: asset('characters/Jiarui.webp'),
+    accentColor: '#dd5599',
+    carBody: 0xdd5599, carAccent: 0xff77bb,
+    vehicleType: 'compact',
+    stats: { topSpeed: 4, acceleration: 4, efficiency: 4 },
+  },
+  {
+    name: 'Asad',
+    avatar: asset('characters/Asad.webp'),
+    accentColor: '#44aa66',
+    carBody: 0xe0e8e0, carAccent: 0x44aa66,
+    vehicleType: 'compact',
+    stats: { topSpeed: 5, acceleration: 3, efficiency: 3 },
   },
 ];
 
@@ -173,7 +199,8 @@ export const MAP_THEMES = [
     id: 'brazil',
     name: 'Brazil',
     description: 'Sun, beaches & tropical vibes',
-    subtitle: 'Rio de Janeiro Highway',
+    subtitle: 'Rio de Janeiro\nHighway',
+    city: 'Rio de Janeiro',
     flag: asset('flags/brazil.png'),
     features: ['Palm-lined coast road', 'Golden hour sunset', 'Colorful buildings'],
     // Sky shader (Preetham model)
@@ -209,7 +236,8 @@ export const MAP_THEMES = [
     id: 'usa',
     name: 'USA',
     description: 'Golden hour skyline & skyscrapers',
-    subtitle: 'Downtown Sunset Drive',
+    subtitle: 'Chicago\nDowntown',
+    city: 'Chicago',
     flag: asset('flags/usa.png'),
     features: ['Sunset skyline', 'Golden hour glow', 'Urban highway'],
     sky: {
@@ -243,7 +271,8 @@ export const MAP_THEMES = [
     id: 'peru',
     name: 'Peru',
     description: 'Majestic mountains & green valleys',
-    subtitle: 'Andean Mountain Pass',
+    subtitle: 'Cuzco\nHighlands',
+    city: 'Cuzco',
     flag: asset('flags/peru.png'),
     features: ['Snow-capped peaks', 'Lush green valleys', 'Inca terraces'],
     sky: {

@@ -26,7 +26,7 @@ import { CompletionSequence } from './game/CompletionSequence.js';
 import { AMBIENT_MULTIPLIERS } from './game/LampPost.js';
 
 import { setupControls } from './utils/controls.js';
-import { playPlateHit, playLampLit, playComboBreak, playWinFanfare, playLaneSwitch, haptic, playMusic, stopMusic, startEngineIdle, stopEngine, updateEngine, playGearShift, playCountdownTone, playCountdownRev, playFinalPowerOn, playStartPress, playDriverSelect, playMapSelect, playTurboBoost } from './utils/audio.js';
+import { playPlateHit, playLampLit, playComboBreak, playWinFanfare, playLaneSwitch, haptic, playMusic, stopMusic, startEngineIdle, stopEngine, updateEngine, playGearShift, playCountdownTone, playCountdownRev, playFinalPowerOn, playStartPress, playDriverSelect, playMapSelect, playTurboBoost, preWarmEngine } from './utils/audio.js';
 import { gameRoot } from './utils/base.js';
 import {
   MIN_SPEED_MPH, MAX_SPEED_MPH, STARTING_SPEED_MPH, SCROLL_FACTOR,
@@ -35,7 +35,7 @@ import {
   MAP_THEMES, PLATE_SPAWN_INTERVAL, TOTAL_LAMP_POSTS,
   CAMERA_OFFSET, CAMERA_LOOK_AHEAD,
   CAMERA_FOV_MIN, CAMERA_FOV_MAX, CAMERA_SHAKE_THRESHOLD,
-  getDriverPhysics,
+  getDriverPhysics, DRIVER_TYPES,
 } from './utils/constants.js';
 
 // --- Renderer ---
@@ -48,6 +48,7 @@ renderer.toneMapping = THREE.AgXToneMapping;
 renderer.toneMappingExposure = 1.3;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFShadowMap; // cheaper shadow type for all
+renderer.domElement.style.opacity = '0'; // hidden until IntroScreen overlay is in place
 gameRoot().appendChild(renderer.domElement);
 
 // --- Scene & Camera ---
@@ -254,6 +255,56 @@ loadingOverlay.innerHTML = `
     </div>
     <div class="lo-hint" id="lo-hint">Loading environment...</div>
   </div>
+  <div class="lo-instructions">
+    <div class="lo-instr-text">Harvest energy by driving over the plates on the road</div>
+    <div class="lo-road-diagram">
+      <div class="lo-scene">
+        <!-- Terrain -->
+        <div class="lo-terrain lo-terrain-l"></div>
+        <div class="lo-terrain lo-terrain-r"></div>
+        <!-- Road -->
+        <div class="lo-road-surface">
+          <div class="lo-curb lo-curb-l"></div>
+          <div class="lo-curb lo-curb-r"></div>
+          <div class="lo-lane-dash lo-ld-l"></div>
+          <div class="lo-lane-dash lo-ld-r"></div>
+          <!-- Lamp posts -->
+          <div class="lo-lamp lo-lamp-l1"><div class="lo-lamp-head"></div><div class="lo-lamp-cone"></div></div>
+          <div class="lo-lamp lo-lamp-r1"><div class="lo-lamp-head"></div><div class="lo-lamp-cone"></div></div>
+          <div class="lo-lamp lo-lamp-l2"><div class="lo-lamp-head"></div><div class="lo-lamp-cone"></div></div>
+          <div class="lo-lamp lo-lamp-r2"><div class="lo-lamp-head"></div><div class="lo-lamp-cone"></div></div>
+          <!-- Scrolling plates -->
+          <div class="lo-plate lo-plate-1"><div class="lo-plate-grid"></div><div class="lo-plate-bolt">&#9889;</div><div class="lo-plate-ring"></div></div>
+          <div class="lo-plate lo-plate-2"><div class="lo-plate-grid"></div><div class="lo-plate-bolt">&#9889;</div><div class="lo-plate-ring"></div></div>
+          <div class="lo-plate lo-plate-3"><div class="lo-plate-grid"></div><div class="lo-plate-bolt">&#9889;</div><div class="lo-plate-ring"></div></div>
+          <!-- Kart -->
+          <div class="lo-kart">
+            <div class="lo-kart-glow"></div>
+            <svg class="lo-kart-svg" viewBox="0 0 30 50">
+              <rect x="4" y="7" width="22" height="34" rx="5" fill="#445" stroke="rgba(255,255,255,0.15)" stroke-width="0.8"/>
+              <rect x="7" y="10" width="16" height="9" rx="2.5" fill="rgba(80,180,255,0.25)" stroke="rgba(80,180,255,0.15)" stroke-width="0.5"/>
+              <rect x="1" y="9" width="5" height="9" rx="2" fill="#222" stroke="rgba(255,255,255,0.08)" stroke-width="0.5"/>
+              <rect x="24" y="9" width="5" height="9" rx="2" fill="#222" stroke="rgba(255,255,255,0.08)" stroke-width="0.5"/>
+              <rect x="1" y="31" width="5" height="9" rx="2" fill="#222" stroke="rgba(255,255,255,0.08)" stroke-width="0.5"/>
+              <rect x="24" y="31" width="5" height="9" rx="2" fill="#222" stroke="rgba(255,255,255,0.08)" stroke-width="0.5"/>
+              <rect x="9" y="7" width="4" height="2.5" rx="1" fill="#ffee88" opacity="0.8"/>
+              <rect x="17" y="7" width="4" height="2.5" rx="1" fill="#ffee88" opacity="0.8"/>
+              <rect x="9" y="38.5" width="4" height="2.5" rx="1" fill="#ff4444" opacity="0.7"/>
+              <rect x="17" y="38.5" width="4" height="2.5" rx="1" fill="#ff4444" opacity="0.7"/>
+            </svg>
+          </div>
+        </div>
+      </div>
+      <!-- Labels -->
+      <div class="lo-labels">
+        <div class="lo-label lo-label-plate"><span class="lo-label-dot lo-dot-blue"></span> Energy Plate</div>
+        <div class="lo-label lo-label-lamp"><span class="lo-label-dot lo-dot-amber"></span> Lamp Post</div>
+        <div class="lo-label lo-label-kart"><span class="lo-label-dot lo-dot-green"></span> Your Kart</div>
+      </div>
+    </div>
+    <div class="lo-instr-sub">&#8592; &#8594; Steer over the glowing plates to charge lamp posts</div>
+    <div class="lo-start-prompt" id="lo-start-prompt">PRESS ANY BUTTON TO START</div>
+  </div>
 `;
 Object.assign(loadingOverlay.style, {
   position: 'fixed', inset: '0', zIndex: '200',
@@ -318,9 +369,253 @@ loStyle.textContent = `
   @keyframes loPulse {
     0%,100% { opacity: 0.7; } 50% { opacity: 1; }
   }
+
+  /* ── Instructions panel ── */
+  .lo-instructions {
+    position: absolute; left: 50%; top: 36%;
+    transform: translate(-50%, -50%);
+    display: flex; flex-direction: column; align-items: center;
+    gap: clamp(14px, 2vh, 28px);
+    opacity: 0;
+    animation: loInstrFade 0.5s ease 0.3s forwards;
+  }
+  @keyframes loInstrFade {
+    to { opacity: 1; }
+  }
+  .lo-start-prompt {
+    font-family: 'Orbitron', sans-serif;
+    font-size: clamp(12px, 1.6vw, 24px);
+    font-weight: 700;
+    color: #22ffaa;
+    letter-spacing: clamp(2px, 0.4vw, 6px);
+    text-shadow: 0 0 12px rgba(34,255,170,0.5);
+    animation: loFlash 1.8s ease-in-out infinite;
+    margin-top: clamp(6px, 1vh, 14px);
+    display: none;
+  }
+  @keyframes loFlash {
+    0%,100% { opacity: 1; } 50% { opacity: 0.3; }
+  }
+  .lo-instr-text {
+    font-family: 'Orbitron', sans-serif;
+    font-size: clamp(14px, 2vw, 32px);
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: clamp(1px, 0.3vw, 5px);
+    text-align: center;
+    text-shadow: 0 0 16px rgba(34,255,170,0.3);
+  }
+  .lo-instr-sub {
+    font-family: 'Orbitron', sans-serif;
+    font-size: clamp(10px, 1.2vw, 20px);
+    font-weight: 500;
+    color: rgba(255,255,255,0.35);
+    letter-spacing: 1.5px;
+    text-align: center;
+  }
+
+  /* ── Road diagram ── */
+  .lo-road-diagram {
+    width: clamp(300px, 46vw, 650px);
+    padding: clamp(8px, 1.5vh, 18px) 0;
+  }
+  .lo-scene {
+    position: relative;
+    display: flex;
+    height: clamp(140px, 24vh, 300px);
+    perspective: 600px;
+    transform-style: preserve-3d;
+  }
+
+  /* Terrain strips */
+  .lo-terrain {
+    flex: 0 0 clamp(14px, 2vw, 30px);
+    border-radius: 4px;
+  }
+  .lo-terrain-l {
+    background: linear-gradient(180deg, rgba(30,70,30,0.4) 0%, rgba(45,90,40,0.25) 40%, rgba(30,65,30,0.35) 100%);
+    border-right: 2px solid rgba(180,180,160,0.15);
+  }
+  .lo-terrain-r {
+    background: linear-gradient(180deg, rgba(30,70,30,0.4) 0%, rgba(40,85,38,0.25) 50%, rgba(30,65,30,0.35) 100%);
+    border-left: 2px solid rgba(180,180,160,0.15);
+  }
+
+  /* Road surface with subtle perspective */
+  .lo-road-surface {
+    position: relative;
+    flex: 1;
+    background:
+      linear-gradient(180deg, rgba(38,38,48,0.95) 0%, rgba(30,30,38,0.95) 100%);
+    overflow: hidden;
+    transform: rotateX(2deg);
+    transform-origin: bottom center;
+  }
+
+  /* Curbs */
+  .lo-curb { position: absolute; top: 0; bottom: 0; width: 3px; }
+  .lo-curb-l { left: 0; background: repeating-linear-gradient(to bottom, #cc3333 0, #cc3333 6px, #eee 6px, #eee 12px); opacity: 0.3; }
+  .lo-curb-r { right: 0; background: repeating-linear-gradient(to bottom, #eee 0, #eee 6px, #cc3333 6px, #cc3333 12px); opacity: 0.3; }
+
+  /* Scrolling lane dashes */
+  .lo-lane-dash {
+    position: absolute; top: 0; bottom: 0; width: 2px;
+    background: repeating-linear-gradient(to bottom, rgba(255,255,255,0.25) 0, rgba(255,255,255,0.25) 8px, transparent 8px, transparent 18px);
+    animation: loRoadScroll 0.8s linear infinite;
+  }
+  .lo-ld-l { left: 33.3%; }
+  .lo-ld-r { left: 66.6%; }
+  @keyframes loRoadScroll {
+    from { background-position-y: 0; }
+    to   { background-position-y: 18px; }
+  }
+
+  /* ── Lamp posts ── */
+  .lo-lamp {
+    position: absolute; z-index: 3;
+    display: flex; flex-direction: column; align-items: center;
+  }
+  .lo-lamp-head {
+    width: clamp(6px, 0.8vw, 12px); height: clamp(6px, 0.8vw, 12px);
+    border-radius: 50%;
+    background: #664400;
+    border: 1px solid rgba(255,200,0,0.3);
+    transition: background 0.3s, box-shadow 0.3s;
+  }
+  .lo-lamp-cone {
+    width: 0; height: 0;
+    border-left: clamp(4px, 0.5vw, 8px) solid transparent;
+    border-right: clamp(4px, 0.5vw, 8px) solid transparent;
+    border-top: clamp(10px, 1.5vh, 20px) solid rgba(255,200,50,0.0);
+    transition: border-top-color 0.3s;
+  }
+  .lo-lamp.lit .lo-lamp-head {
+    background: #ffcc00;
+    box-shadow: 0 0 8px 3px rgba(255,200,0,0.6);
+    animation: loLampPulse 1.5s ease-in-out infinite;
+  }
+  .lo-lamp.lit .lo-lamp-cone {
+    border-top-color: rgba(255,200,50,0.08);
+  }
+  @keyframes loLampPulse {
+    0%,100% { box-shadow: 0 0 6px 2px rgba(255,200,0,0.5); }
+    50%     { box-shadow: 0 0 12px 4px rgba(255,200,0,0.8); }
+  }
+  .lo-lamp-l1 { left: 3%; top: 15%; }
+  .lo-lamp-r1 { right: 3%; top: 15%; }
+  .lo-lamp-l2 { left: 3%; top: 55%; }
+  .lo-lamp-r2 { right: 3%; top: 55%; }
+
+  /* ── Plates — scroll down and flash on collection ── */
+  .lo-plate {
+    position: absolute;
+    width: 24%; height: 13%;
+    border-radius: 3px;
+    background: rgba(10,10,20,0.9);
+    border: 1.5px solid rgba(34,170,255,0.5);
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 0 10px rgba(34,170,255,0.3), inset 0 0 6px rgba(34,170,255,0.1);
+    animation: loPlateFlow 5s ease-in-out infinite;
+    opacity: 0;
+  }
+  .lo-plate-grid {
+    position: absolute; inset: 2px;
+    background:
+      linear-gradient(90deg, rgba(34,170,255,0.12) 1px, transparent 1px),
+      linear-gradient(0deg, rgba(34,170,255,0.12) 1px, transparent 1px);
+    background-size: 25% 33%;
+    border-radius: 2px;
+  }
+  .lo-plate-bolt {
+    position: relative; z-index: 1;
+    font-size: clamp(12px, 1.6vw, 22px);
+    color: #22aaff;
+    filter: drop-shadow(0 0 4px rgba(34,170,255,0.7));
+  }
+  /* Collection ring burst */
+  .lo-plate-ring {
+    position: absolute; inset: -8px;
+    border: 2px solid rgba(34,255,170,0.0);
+    border-radius: 6px;
+    pointer-events: none;
+  }
+
+  /* Plate 1 — left lane, staggers through */
+  .lo-plate-1 { left: 4%; animation-delay: 0s; }
+  .lo-plate-2 { left: 38%; animation-delay: 1.7s; }
+  .lo-plate-3 { left: 72%; animation-delay: 3.4s; }
+
+  @keyframes loPlateFlow {
+    0%   { top: -15%; opacity: 0; transform: scale(0.9); }
+    8%   { opacity: 1; transform: scale(1); }
+    55%  { opacity: 1; transform: scale(1); }
+    62%  { opacity: 1; transform: scale(1); }
+    65%  { opacity: 0; transform: scale(1.15); }
+    66%  { opacity: 0; }
+    100% { top: 75%; opacity: 0; transform: scale(1); }
+  }
+
+  /* ── Kart ── */
+  .lo-kart {
+    position: absolute; z-index: 5;
+    left: 50%; bottom: 8%;
+    width: clamp(28px, 3.5vw, 50px);
+    transform: translateX(-50%);
+    animation: loKartSway 4s ease-in-out infinite;
+  }
+  @keyframes loKartSway {
+    0%,100% { transform: translateX(-50%) translateX(0); }
+    25%     { transform: translateX(-50%) translateX(clamp(-20px, -3vw, -40px)); }
+    75%     { transform: translateX(-50%) translateX(clamp(20px, 3vw, 40px)); }
+  }
+  .lo-kart-glow {
+    position: absolute; left: -40%; right: -40%; bottom: -20%; height: 60%;
+    background: radial-gradient(ellipse, rgba(34,255,170,0.15) 0%, transparent 70%);
+    pointer-events: none;
+    filter: blur(4px);
+  }
+  .lo-kart-svg {
+    width: 100%; height: auto;
+    display: block;
+    filter: drop-shadow(0 0 6px rgba(255,255,255,0.1));
+  }
+
+  /* ── Legend labels ── */
+  .lo-labels {
+    display: flex; justify-content: center;
+    gap: clamp(14px, 2vw, 32px);
+    margin-top: clamp(6px, 1vh, 14px);
+  }
+  .lo-label {
+    font-family: 'Orbitron', sans-serif;
+    font-size: clamp(7px, 0.8vw, 13px);
+    font-weight: 500;
+    color: rgba(255,255,255,0.35);
+    letter-spacing: 1px;
+    display: flex; align-items: center;
+    gap: clamp(4px, 0.4vw, 8px);
+  }
+  .lo-label-dot {
+    width: clamp(6px, 0.7vw, 10px); height: clamp(6px, 0.7vw, 10px);
+    border-radius: 50%;
+    display: inline-block;
+  }
+  .lo-dot-blue { background: #22aaff; box-shadow: 0 0 4px rgba(34,170,255,0.5); }
+  .lo-dot-amber { background: #ffcc00; box-shadow: 0 0 4px rgba(255,200,0,0.5); }
+  .lo-dot-green { background: #22ffaa; box-shadow: 0 0 4px rgba(34,255,170,0.5); }
 `;
 document.head.appendChild(loStyle);
 document.body.appendChild(loadingOverlay);
+
+// Animate lamp posts lighting up in sync with plate scroll timing
+const loLamps = loadingOverlay.querySelectorAll('.lo-lamp');
+let _loLampIdx = 0;
+setInterval(() => {
+  loLamps.forEach(l => l.classList.remove('lit'));
+  loLamps[_loLampIdx % loLamps.length].classList.add('lit');
+  loLamps[(_loLampIdx + 1) % loLamps.length].classList.add('lit');
+  _loLampIdx = (_loLampIdx + 2) % loLamps.length;
+}, 1700);
 
 const loBarFill = loadingOverlay.querySelector('#lo-bar-fill');
 const loHint = loadingOverlay.querySelector('#lo-hint');
@@ -410,6 +705,8 @@ const mapSelect = new MapSelect(
     kart.warmUp();
     // Pre-spawn a plate to compile plate materials
     plates.spawnPlate(-50);
+    // Pre-create engine audio graph (20 Web Audio nodes) while loading screen is visible
+    preWarmEngine();
 
     // ── Stage 6: Position camera at gameplay view for warm-up ──
     setLoadProgress(78, 'Compiling shaders...');
@@ -456,11 +753,23 @@ const mapSelect = new MapSelect(
     }
 
     // ── Stage 9: Settle — give browser time to finish async GPU uploads + GC ──
-    setLoadProgress(98, 'Ready!');
+    setLoadProgress(100, 'Ready!');
     await new Promise(r => setTimeout(r, 300));
 
-    // ── Done ──
+    // ── Stage 10: Wait for user to read instructions and press any button ──
     clearLoadingOverlay();
+    const startPrompt = loadingOverlay.querySelector('#lo-start-prompt');
+    if (startPrompt) startPrompt.style.display = 'block';
+    await new Promise(resolve => {
+      const go = () => {
+        window.removeEventListener('keydown', go);
+        window.removeEventListener('pointerdown', go);
+        resolve();
+      };
+      window.addEventListener('keydown', go, { once: false });
+      window.addEventListener('pointerdown', go, { once: false });
+    });
+    if (startPrompt) startPrompt.style.display = 'none';
 
     // Transition to playing — RaceStartSequence reuses loadingOverlay
     gameState.transition('playing');
@@ -628,7 +937,13 @@ gameState.on('stateChange', ({ from, to }) => {
         gameState.speed = 0;
         gameState.elapsed = 0;
         hud.reset();
-        hud.show();
+        hud.setDriver(DRIVER_TYPES[gameState.selectedDriver]);
+        // Skip hud.show() fadeIn (triggers 10-15ms forced reflow on 100+ node SVG tree).
+        // RaceStartSequence immediately overrides opacity to 0.5 anyway.
+        clearTimeout(hud._hideTimer);
+        hud.el.style.transition = '';
+        hud.el.style.display = 'block';
+        hud.el.style.opacity = '0';
 
         // Store base ambient and dim it to tier-0 level
         if (environment.ambientLight) {
@@ -694,7 +1009,7 @@ gameState.on('stateChange', ({ from, to }) => {
       controls.hideButtons();
       controls.unlock();
       stopEngine();
-      winScreen.show(gameState.platesHit, gameState.score, gameState.maxCombo);
+      winScreen.show(gameState.platesHit, gameState.score, gameState.maxCombo, gameState.elapsed, DRIVER_TYPES[gameState.selectedDriver]);
       playMusic('qualified');
       break;
   }
@@ -976,9 +1291,10 @@ playMusic('menu');
   renderer.compile(scene, camera);
   renderer.render(scene, camera);
 
-  // Create intro overlay FIRST (z-index 500) so it covers everything,
-  // then show start screen behind it (z-index 100).
+  // IntroScreen is a black overlay (z-index 500) covering everything.
+  // Now safe to reveal the canvas behind it.
   const intro = new IntroScreen();
+  renderer.domElement.style.opacity = '';
   startScreen.show();
   await intro.run();
   // Start screen is already visible — nothing more to do.

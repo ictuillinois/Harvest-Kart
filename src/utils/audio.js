@@ -410,8 +410,34 @@ function _makeDistortionCurve(k) {
   return curve;
 }
 
+/**
+ * Pre-create engine audio nodes during loading (keeps engine muted).
+ * Eliminates the 10-30ms node-creation stall that would otherwise hit
+ * during the countdown overlay fade at T+500ms.
+ */
+export function preWarmEngine() {
+  startEngineIdle();
+  // Immediately mute — override the fade-in ramp
+  if (_eMaster) {
+    const c = getCtx();
+    const t = c.currentTime;
+    _eMaster.gain.cancelScheduledValues(t);
+    _eMaster.gain.setValueAtTime(0, t);
+  }
+}
+
 /** Start the V8 muscle engine at idle. Sustains until stopEngine(). */
 export function startEngineIdle() {
+  // If already pre-warmed, just fade in (skip expensive node creation)
+  if (_eRunning && _eMaster) {
+    const c = getCtx();
+    const t = c.currentTime;
+    _eMaster.gain.cancelScheduledValues(t);
+    _eMaster.gain.setValueAtTime(_eMaster.gain.value, t);
+    _eMaster.gain.linearRampToValueAtTime(ENG_IDLE_VOL, t + 0.5);
+    return;
+  }
+
   const c = getCtx();
   const t = c.currentTime;
   const out = getMaster();

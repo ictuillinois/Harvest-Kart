@@ -58,11 +58,12 @@ export class StartScreen {
         </div>
       </div>
       <img class="ss-ict-logo" src="${asset('ICT-Logo.png')}" alt="ICT" draggable="false"/>
+      <img class="ss-eoh-logo" src="${asset('eoh.svg')}" alt="Engineering Open House" draggable="false"/>
       <div class="ss-bottom">
         <div class="ss-prompt">PRESS ANY BUTTON TO START</div>
         <div class="ss-credits">
           <span class="ss-license">Licensed by the Illinois Center for Transportation</span>
-          <span class="ss-copyright">&copy; 2026 JJC Inc.</span>
+          <span class="ss-copyright">&copy; 2026, Powered by the Computational Mechanics Group</span>
         </div>
       </div>
     `;
@@ -359,12 +360,24 @@ export class StartScreen {
         50%      { opacity: 0.25; }
       }
 
-      /* ═══ ICT LOGO (bottom-right, covers rhomboid) ═══ */
+      /* ═══ ICT LOGO (bottom-right) ═══ */
       .ss-ict-logo {
         position: absolute; z-index: 2;
         right: clamp(12px, 2vw, 36px);
         bottom: clamp(12px, 2vh, 36px);
         width: clamp(50px, 7vw, 110px);
+        height: auto;
+        opacity: 0.85;
+        filter: drop-shadow(0 2px 8px rgba(0,0,0,0.6));
+        pointer-events: none;
+      }
+
+      /* ═══ EOH LOGO (bottom-left) ═══ */
+      .ss-eoh-logo {
+        position: absolute; z-index: 2;
+        left: clamp(12px, 2vw, 36px);
+        bottom: clamp(12px, 2vh, 36px);
+        width: clamp(100px, 14vw, 220px);
         height: auto;
         opacity: 0.85;
         filter: drop-shadow(0 2px 8px rgba(0,0,0,0.6));
