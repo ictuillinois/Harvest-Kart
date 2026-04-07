@@ -68,6 +68,7 @@ export class StartScreen {
     `;
 
     gameRoot().appendChild(this.el);
+    this.el.style.display = 'none'; // hidden until show() — prevents flash before IntroScreen
 
     const style = document.createElement('style');
     style.textContent = `

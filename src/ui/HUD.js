@@ -7,13 +7,9 @@ const ARC_CX = 100, ARC_CY = 100, ARC_R = 78;
 const ARC_START_DEG = 160, ARC_SWEEP_DEG = 220;
 const ARC_LENGTH = (ARC_SWEEP_DEG / 360) * 2 * Math.PI * ARC_R; // ≈ 299.4
 
-// Reusable result object — eliminates per-call allocation in hot path
-const _xy = { x: 0, y: 0 };
 function polarToXY(cx, cy, r, deg) {
   const rad = (deg - 90) * Math.PI / 180;
-  _xy.x = cx + r * Math.cos(rad);
-  _xy.y = cy + r * Math.sin(rad);
-  return _xy;
+  return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
 }
 
 // Pre-cached 0-padded digit strings — avoids String()+padStart() allocations
@@ -856,9 +852,9 @@ export class HUD {
 
     // Needle rotation: 160° (min) → 380° (max, wraps to 20°)
     const angle = ARC_START_DEG + frac * ARC_SWEEP_DEG;
-    const nEnd = polarToXY(ARC_CX, ARC_CY, ARC_R - 18, angle);
-    this._needle.setAttribute('x2', nEnd.x);
-    this._needle.setAttribute('y2', nEnd.y);
+    const nRad = (angle - 90) * Math.PI / 180;
+    this._needle.setAttribute('x2', ARC_CX + (ARC_R - 18) * Math.cos(nRad));
+    this._needle.setAttribute('y2', ARC_CY + (ARC_R - 18) * Math.sin(nRad));
 
     // Speed number
     this._speedText.textContent = rounded;
@@ -940,9 +936,9 @@ export class HUD {
 
     // Needle
     const angle = ARC_START_DEG + frac * ARC_SWEEP_DEG;
-    const nEnd = polarToXY(ARC_CX, ARC_CY, ARC_R - 18, angle);
-    this._tachoNeedle.setAttribute('x2', nEnd.x);
-    this._tachoNeedle.setAttribute('y2', nEnd.y);
+    const nRad = (angle - 90) * Math.PI / 180;
+    this._tachoNeedle.setAttribute('x2', ARC_CX + (ARC_R - 18) * Math.cos(nRad));
+    this._tachoNeedle.setAttribute('y2', ARC_CY + (ARC_R - 18) * Math.sin(nRad));
 
     // Redline visual feedback
     this._tachoSvg.classList.toggle('redline', rpm > 7500);
