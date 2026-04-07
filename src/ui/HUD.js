@@ -1031,18 +1031,23 @@ export class HUD {
   updateCharge(charge) {
     this._charge = charge;
     const lit = Math.round((charge / PLATES_TO_FILL_BAR) * EN_SEGS);
+    if (lit === this._prevLit) return; // skip if no visual change
 
-    this.enSegs.forEach((seg, i) => {
-      seg.classList.remove('on-r', 'on-o', 'on-y', 'on-g', 'seg-flash');
+    for (let i = 0; i < EN_SEGS; i++) {
+      const seg = this.enSegs[i];
       if (i < lit) {
-        seg.classList.add(this._enColor(i));
-        // Flash newly filled segments
+        const target = this._enColor(i);
+        if (!seg.classList.contains(target)) {
+          seg.className = 'en-seg ' + target;
+        }
         if (i >= this._prevLit) {
           seg.classList.add('seg-flash');
           setTimeout(() => seg.classList.remove('seg-flash'), 200);
         }
+      } else if (seg.className !== 'en-seg') {
+        seg.className = 'en-seg';
       }
-    });
+    }
 
     // Bolt glow when > 60%
     this.enBolt.classList.toggle('charged', lit / EN_SEGS > 0.6);

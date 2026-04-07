@@ -695,8 +695,8 @@ const mapSelect = new MapSelect(
       await new Promise(r => requestAnimationFrame(r));
     }
 
-    // Hide lamp posts again — they were visible for shader compilation in stages 7-8
-    lampPosts.setVisible(false);
+    // Keep lamp posts visible — tier 0 is nearly invisible but keeps PointLights
+    // in the render pipeline. Avoids the costly setVisible(true) on first plate hit.
 
     // ── Stage 8b: JIT warm-up — exercise first-hit code paths so V8 compiles them ──
     // Without this, the first plate hit runs in interpreted mode (10-100x slower).
@@ -706,11 +706,9 @@ const mapSelect = new MapSelect(
     hud.updateCombo(2); hud.updateCombo(0);
     hud.updateScore(100); hud.updateScore(0);
     hud.showFloatingScore(100);
-    // Warm lamp post tween paths
-    lampPosts.setVisible(true);
+    // Warm lamp post tween paths (already visible from stage 5)
     lampPosts.microProgress(1);
     lampPosts.setTier(0, false);
-    lampPosts.setVisible(false);
     // Warm plate collection animation
     if (plates.plates[0]) {
       plates.plates[0].visible = true;
@@ -1020,11 +1018,9 @@ gameState.on('plateHit', ({ currentCharge, combo, score }) => {
   const speedMultiplier = 1.0 + speedRatio;
   const points = Math.round(basePoints * speedMultiplier);
   hud.showFloatingScore(points);
-  playPlateHit();
-  haptic(25);
 
-  // Reveal lamp posts on first plate hit (deferred for smoother start)
-  if (!lampPosts.posts[0].group.visible) lampPosts.setVisible(true);
+  // Defer audio + haptic to next frame — keeps visual feedback instant
+  requestAnimationFrame(() => { playPlateHit(); haptic(25); });
 
   // Per-coin lamp post micro-progression (includes micro-flash)
   lampPosts.microProgress(currentCharge);
