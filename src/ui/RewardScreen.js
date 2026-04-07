@@ -195,16 +195,19 @@ export class RewardScreen {
       .rw-content {
         position: relative; z-index: 1;
         display: flex; flex-direction: column; align-items: center;
-        gap: clamp(24px, 3.5vh, 48px);
-        padding: clamp(20px, 3vh, 40px) clamp(20px, 4vw, 60px);
-        max-width: clamp(800px, 92vw, 1500px);
+        gap: clamp(16px, 2.5vh, 36px);
+        padding: clamp(12px, 1.5vh, 24px) clamp(16px, 2.5vw, 40px);
+        max-width: clamp(900px, 96vw, 1800px);
         width: 100%;
+        height: 100%;
+        justify-content: center;
         animation: rwPopIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
       }
       .rw-columns {
         display: flex;
-        gap: clamp(30px, 5vw, 70px);
+        gap: clamp(24px, 4vw, 56px);
         width: 100%;
+        flex: 1;
         align-items: center;
         justify-content: center;
       }
@@ -212,13 +215,13 @@ export class RewardScreen {
       /* ═══ LEFT: TOWN MAP ═══ */
       .rw-map-panel {
         flex: 1.3;
-        max-width: 560px;
+        max-width: 700px;
         display: flex; flex-direction: column; align-items: center;
         animation: rwSlideUp 0.55s ease-out 0.1s both;
       }
       .rw-map-heading {
         font-family: 'Orbitron', sans-serif;
-        font-size: clamp(13px, 1.6vw, 24px);
+        font-size: clamp(16px, 2vw, 30px);
         font-weight: 700;
         color: #22ffaa;
         letter-spacing: clamp(4px, 0.6vw, 9px);
@@ -227,10 +230,10 @@ export class RewardScreen {
       }
       .rw-map-frame {
         width: 100%;
-        border-radius: clamp(12px, 1.5vw, 22px);
-        border: 2px solid rgba(34,255,170,0.25);
+        border-radius: clamp(14px, 1.8vw, 28px);
+        border: 2.5px solid rgba(34,255,170,0.25);
         background: rgba(4,10,6,0.6);
-        padding: clamp(8px, 1vw, 16px);
+        padding: clamp(10px, 1.2vw, 20px);
         animation: rwPulseGlow 3s ease-in-out infinite;
       }
       .rw-town { width: 100%; display: block; }
@@ -298,7 +301,7 @@ export class RewardScreen {
       /* ═══ RIGHT: CHARACTER ═══ */
       .rw-char-panel {
         flex: 0 0 auto;
-        width: clamp(280px, 34vw, 480px);
+        width: clamp(350px, 42vw, 600px);
         display: flex; flex-direction: column; align-items: center;
         animation: rwSlideUp 0.55s ease-out 0.25s both;
       }
@@ -312,16 +315,16 @@ export class RewardScreen {
       .rw-dialog-bubble {
         position: relative;
         background: linear-gradient(145deg, rgba(10,35,22,0.92), rgba(6,20,14,0.95));
-        border: 2px solid rgba(34,255,170,0.35);
-        border-radius: clamp(16px, 2vw, 28px);
-        padding: clamp(18px, 2.5vh, 32px) clamp(20px, 2.5vw, 36px);
+        border: 2.5px solid rgba(34,255,170,0.35);
+        border-radius: clamp(18px, 2.5vw, 34px);
+        padding: clamp(22px, 3vh, 40px) clamp(24px, 3vw, 44px);
         backdrop-filter: blur(10px);
         box-shadow: 0 4px 28px rgba(0,0,0,0.4), 0 0 20px rgba(34,255,170,0.1);
         animation: rwBubblePop 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) 0.5s both;
       }
       .rw-dialog-text {
         font-family: 'Orbitron', sans-serif;
-        font-size: clamp(12px, 1.5vw, 22px);
+        font-size: clamp(14px, 1.8vw, 28px);
         font-weight: 700;
         color: #fff;
         line-height: 1.6;
@@ -337,8 +340,8 @@ export class RewardScreen {
       /* Portrait */
       .rw-portrait {
         position: relative;
-        width: clamp(180px, 24vw, 340px);
-        border-radius: clamp(12px, 1.5vw, 20px);
+        width: clamp(225px, 30vw, 425px);
+        border-radius: clamp(14px, 1.8vw, 24px);
         overflow: hidden;
         margin-bottom: clamp(14px, 2vh, 24px);
         animation: rwSlideUp 0.55s ease-out 0.4s both;
@@ -363,7 +366,7 @@ export class RewardScreen {
       }
       .rw-name {
         font-family: 'Orbitron', sans-serif;
-        font-size: clamp(15px, 1.8vw, 28px);
+        font-size: clamp(18px, 2.2vw, 35px);
         font-weight: 900;
         color: #fff;
         letter-spacing: 2px;
@@ -371,7 +374,7 @@ export class RewardScreen {
       }
       .rw-title {
         font-family: 'Segoe UI', Tahoma, sans-serif;
-        font-size: clamp(10px, 1.2vw, 18px);
+        font-size: clamp(12px, 1.5vw, 22px);
         color: rgba(255,255,255,0.45);
         text-align: center;
         line-height: 1.4;
@@ -381,11 +384,11 @@ export class RewardScreen {
       /* ═══ HOME BUTTON ═══ */
       .rw-home-btn {
         display: flex; align-items: center;
-        gap: clamp(10px, 1.2vw, 20px);
+        gap: clamp(12px, 1.5vw, 24px);
         font-family: 'Orbitron', sans-serif;
-        font-size: clamp(14px, 1.8vw, 28px);
+        font-size: clamp(16px, 2.2vw, 34px);
         font-weight: 700;
-        padding: clamp(14px, 2.2vh, 28px) clamp(36px, 5vw, 72px);
+        padding: clamp(16px, 2.5vh, 32px) clamp(44px, 6vw, 88px);
         background: transparent;
         color: #22ffaa;
         border: 2.5px solid #22ffaa;
@@ -406,11 +409,11 @@ export class RewardScreen {
       .rw-home-btn:hover .rw-btn-arrow { transform: translateX(5px); }
 
       /* ═══ RESPONSIVE ═══ */
-      @media (max-width: 850px) {
+      @media (max-width: 950px) {
         .rw-columns { flex-direction: column-reverse; align-items: center; }
-        .rw-char-panel { width: 90%; max-width: 400px; }
-        .rw-map-panel { max-width: 95%; }
-        .rw-portrait { width: clamp(150px, 40vw, 280px); }
+        .rw-char-panel { width: 95%; max-width: 500px; }
+        .rw-map-panel { max-width: 98%; }
+        .rw-portrait { width: clamp(180px, 45vw, 320px); }
       }
     `;
     document.head.appendChild(style);
