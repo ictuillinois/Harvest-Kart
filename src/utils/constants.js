@@ -176,8 +176,8 @@ export const DRIVER_TYPES = [
     stats: { topSpeed: 4, acceleration: 4, efficiency: 5 },
   },
   {
-    name: 'Jiarui',
-    avatar: asset('characters/Jiarui.webp'),
+    name: 'Sofia',
+    avatar: asset('characters/Sofia.webp'),
     accentColor: '#dd5599',
     carBody: 0xdd5599, carAccent: 0xff77bb,
     vehicleType: 'compact',
