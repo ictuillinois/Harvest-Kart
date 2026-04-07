@@ -288,6 +288,57 @@ export function setupControls(onSwitch, onRelease) {
   container.addEventListener('contextmenu', (e) => e.preventDefault());
 
   // =================================================================
+  //  Gamepad / Racing Wheel — polled each frame
+  //  Supports standard gamepads AND Logitech steering wheels (G29/G920/G923).
+  //  Steering wheel: axes[0] = steering, axes[1..3] = pedals (rest ~1.0, pressed ~-1.0)
+  //  Standard pad:   axes[0] = left stick X, axes[1] = left stick Y (up = -1)
+  // =================================================================
+  const GP_STEER_DEADZONE = 0.15;
+  const GP_GAS_THRESHOLD = -0.3; // axis below this = gas pressed
+  let _gpLeftHeld = false;
+  let _gpRightHeld = false;
+  let _gpPedalDown = false;
+
+  function pollGamepad() {
+    const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
+    let steer = 0;
+    let gas = false;
+
+    for (const gp of gamepads) {
+      if (!gp) continue;
+
+      // ── Steering: axes[0] (universal for wheels + standard pads) ──
+      const ax0 = gp.axes[0] || 0;
+      if (Math.abs(ax0) > Math.abs(steer)) steer = ax0;
+
+      // ── D-pad: buttons 14 (left) / 15 (right) on standard pads ──
+      if (gp.buttons[14]?.pressed) steer = -1;
+      if (gp.buttons[15]?.pressed) steer = 1;
+
+      // ── Gas: check axes 1-3 for pedal input ──
+      // Standard pad: axes[1] < -0.3 = left stick pushed up
+      // Racing wheel: axes[1] rests at ~1.0, pressed = -1.0; same for axes[2]/[3]
+      for (let a = 1; a < Math.min(gp.axes.length, 4); a++) {
+        if (gp.axes[a] < GP_GAS_THRESHOLD) { gas = true; break; }
+      }
+
+      // ── Gas buttons: RT (7), A (0), d-pad up (12) ──
+      if (gp.buttons[7]?.pressed || gp.buttons[0]?.pressed || gp.buttons[12]?.pressed) gas = true;
+    }
+
+    // Update gamepad held state
+    const prevLeft = _gpLeftHeld, prevRight = _gpRightHeld, prevGas = _gpPedalDown;
+    _gpLeftHeld = steer < -GP_STEER_DEADZONE;
+    _gpRightHeld = steer > GP_STEER_DEADZONE;
+    _gpPedalDown = gas;
+
+    // Visual feedback on on-screen buttons
+    if (_gpLeftHeld !== prevLeft) leftBtn.classList.toggle('active', _gpLeftHeld || _leftHeld);
+    if (_gpRightHeld !== prevRight) rightBtn.classList.toggle('active', _gpRightHeld || _rightHeld);
+    if (_gpPedalDown !== prevGas) pedalBtn.classList.toggle('active', _gpPedalDown || _pedalDown);
+  }
+
+  // =================================================================
   //  Public API
   // =================================================================
   return {
@@ -296,9 +347,10 @@ export function setupControls(onSwitch, onRelease) {
       pedalBtn.classList.remove('touched');
     },
     hideButtons() { container.style.display = 'none'; },
-    isPedalDown() { return !_locked && _pedalDown; },
-    isLeftHeld()  { return !_locked && _leftHeld; },
-    isRightHeld() { return !_locked && _rightHeld; },
+    isPedalDown() { return !_locked && (_pedalDown || _gpPedalDown); },
+    isLeftHeld()  { return !_locked && (_leftHeld || _gpLeftHeld); },
+    isRightHeld() { return !_locked && (_rightHeld || _gpRightHeld); },
+    pollGamepad,
     lock()   { _locked = true; },
     unlock() { _locked = false; },
   };

@@ -1097,6 +1097,7 @@ function animate() {
   const delta = Math.min(clock.getDelta(), 0.05);
 
   tweenGroup.update();
+  controls.pollGamepad();
 
   // Always animate sky (clouds, stars) even on menus
   const isActive = gameState.state === 'playing' || gameState.state === 'completing';
