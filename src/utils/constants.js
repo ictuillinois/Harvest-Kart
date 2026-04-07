@@ -74,9 +74,9 @@ export const DRIVER_PHYSICS = {
     decelRate: 6, coastFloor: 27, laneSwitchMs: 170, chargeMultiplier: 1.1,
   },
   asad: {
-    topSpeed: 98, gearAccel: calcGearAccel(3),
-    gearThresholds: calcGearThresholds(98),
-    decelRate: 9, coastFloor: 22, laneSwitchMs: 240, chargeMultiplier: 0.95,
+    topSpeed: 110, gearAccel: calcGearAccel(5),
+    gearThresholds: calcGearThresholds(110),
+    decelRate: 4, coastFloor: 32, laneSwitchMs: 150, chargeMultiplier: 1.2,
   },
 };
 
@@ -189,7 +189,7 @@ export const DRIVER_TYPES = [
     accentColor: '#44aa66',
     carBody: 0xe0e8e0, carAccent: 0x44aa66,
     vehicleType: 'compact',
-    stats: { topSpeed: 5, acceleration: 3, efficiency: 3 },
+    stats: { topSpeed: 5, acceleration: 5, efficiency: 5 },
   },
 ];
 
