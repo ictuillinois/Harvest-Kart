@@ -106,6 +106,24 @@ export function setVolume(v) {
   getMaster().gain.value = Math.max(0, Math.min(1, v));
 }
 
+/**
+ * Pre-warm audio node types used by playPlateHit (oscillator, buffer, filter).
+ * Creates one of each and immediately stops them — warms the audio thread's
+ * internal allocators so the first real playPlateHit doesn't stall.
+ */
+export function preWarmPlateAudio() {
+  const c = getCtx();
+  const t = c.currentTime;
+  const dummy = c.createGain();
+  dummy.gain.value = 0; // silent
+  dummy.connect(c.destination);
+  // Warm oscillator + filter + buffer source (the 3 node types playPlateHit uses)
+  const osc = c.createOscillator(); osc.connect(dummy); osc.start(t); osc.stop(t + 0.01);
+  const filt = c.createBiquadFilter(); filt.connect(dummy);
+  const buf = c.createBufferSource(); buf.buffer = getNoiseBuffer(); buf.connect(dummy); buf.start(t); buf.stop(t + 0.01);
+  setTimeout(() => dummy.disconnect(), 100);
+}
+
 /** Plate hit — piezoelectric spring compression + metallic sproing + electric zaps */
 export function playPlateHit() {
   const c = getCtx();

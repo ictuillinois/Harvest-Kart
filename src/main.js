@@ -26,7 +26,7 @@ import { CompletionSequence } from './game/CompletionSequence.js';
 import { AMBIENT_MULTIPLIERS } from './game/LampPost.js';
 
 import { setupControls } from './utils/controls.js';
-import { playPlateHit, playLampLit, playComboBreak, playWinFanfare, playLaneSwitch, haptic, playMusic, stopMusic, startEngineIdle, stopEngine, updateEngine, playGearShift, playCountdownTone, playCountdownRev, playFinalPowerOn, playStartPress, playDriverSelect, playMapSelect, playTurboBoost, preWarmEngine } from './utils/audio.js';
+import { playPlateHit, playLampLit, playComboBreak, playWinFanfare, playLaneSwitch, haptic, playMusic, stopMusic, startEngineIdle, stopEngine, updateEngine, playGearShift, playCountdownTone, playCountdownRev, playFinalPowerOn, playStartPress, playDriverSelect, playMapSelect, playTurboBoost, preWarmEngine, preWarmPlateAudio } from './utils/audio.js';
 import { gameRoot } from './utils/base.js';
 import {
   MIN_SPEED_MPH, MAX_SPEED_MPH, STARTING_SPEED_MPH, SCROLL_FACTOR,
@@ -707,6 +707,11 @@ const mapSelect = new MapSelect(
     plates.spawnPlate(-50);
     // Pre-create engine audio graph (20 Web Audio nodes) while loading screen is visible
     preWarmEngine();
+    // Pre-warm plate hit audio node types (oscillator, filter, buffer)
+    preWarmPlateAudio();
+    // Briefly reveal lamp posts so GPU compiles their shaders + uploads geometry,
+    // then hide again (they'll be revealed on first plate hit)
+    lampPosts.setVisible(true);
 
     // ── Stage 6: Position camera at gameplay view for warm-up ──
     setLoadProgress(78, 'Compiling shaders...');
@@ -751,6 +756,9 @@ const mapSelect = new MapSelect(
       composer.render();
       await new Promise(r => requestAnimationFrame(r));
     }
+
+    // Hide lamp posts again — they were visible for shader compilation in stages 7-8
+    lampPosts.setVisible(false);
 
     // ── Stage 9: Settle — give browser time to finish async GPU uploads + GC ──
     setLoadProgress(100, 'Ready!');

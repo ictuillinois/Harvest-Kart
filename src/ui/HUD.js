@@ -1119,13 +1119,20 @@ export class HUD {
   }
 
   showFloatingScore(points) {
-    const el = document.createElement('div');
-    el.className = 'hud-float-score';
+    // Reuse a pooled element instead of createElement each hit (avoids DOM append reflow)
+    if (!this._floatEl) {
+      this._floatEl = document.createElement('div');
+      this._floatEl.className = 'hud-float-score';
+      this._floatEl.style.left = '50%';
+      this._floatEl.style.top = '42%';
+      document.body.appendChild(this._floatEl);
+    }
+    const el = this._floatEl;
     el.textContent = `+${points}`;
-    el.style.left = '50%';
-    el.style.top  = '42%';
-    document.body.appendChild(el);
-    setTimeout(() => el.remove(), 900);
+    // Restart animation by removing and re-adding the class
+    el.style.animation = 'none';
+    void el.offsetWidth; // force reflow (single element, cheap)
+    el.style.animation = '';
   }
 
   showToast(text) {
