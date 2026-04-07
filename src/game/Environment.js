@@ -1067,106 +1067,79 @@ export class Environment {
   _buildBillboards(style) {
     const RH = ROAD_WIDTH / 2;
     const COUNT = 4;
-    const SPACING = 100; // units between billboards
+    const SPACING = 100;
 
-    // Load ICT logo texture once
-    if (!Environment._ictTexture) {
-      const tex = new THREE.TextureLoader().load(asset('ICT-Logo.png'));
-      tex.colorSpace = THREE.SRGBColorSpace;
-      Environment._ictTexture = tex;
+    // Load logo textures once (shared across map rebuilds)
+    if (!Environment._bbTextures) {
+      const loader = new THREE.TextureLoader();
+      const load = (path) => { const t = loader.load(asset(path)); t.colorSpace = THREE.SRGBColorSpace; return t; };
+      Environment._bbTextures = [
+        { tex: load('ICT-Logo.png'), bgColor: 0x0a1e3d, large: false },
+        { tex: load('logos/eoh-short.webp'), bgColor: 0xffffff, large: true },
+        { tex: load('logos/asce.webp'), bgColor: 0xffffff, large: true },
+      ];
     }
-    const logoTex = Environment._ictTexture;
+    const variants = Environment._bbTextures;
 
-    // Per-map style configs
+    // Per-map post/frame style
     const styles = {
-      brazil: {
-        postColor: 0x8b6914,  postRoughness: 0.85,  // weathered wood
-        panelColor: 0xf5e6c8, panelBack: 0x6b4e1e,  // warm cream front, dark wood back
-        frameColor: 0xa07828, frameRoughness: 0.7,
-        postWidth: 0.25, postDepth: 0.25,
-      },
-      usa: {
-        postColor: 0x888899,  postRoughness: 0.2,   // polished metal
-        panelColor: 0xe8eaef, panelBack: 0x444455,  // clean white front, dark steel back
-        frameColor: 0x666677, frameRoughness: 0.15,
-        postWidth: 0.15, postDepth: 0.15,
-      },
-      peru: {
-        postColor: 0x7a6b50,  postRoughness: 0.9,   // rough stone/adobe
-        panelColor: 0xd9c9a8, panelBack: 0x5a4a32,  // sandy parchment, dark wood
-        frameColor: 0x5a4a3a, frameRoughness: 0.8,
-        postWidth: 0.30, postDepth: 0.30,
-      },
+      brazil: { postColor: 0x8b6914, postRoughness: 0.85, frameColor: 0xa07828, frameRoughness: 0.7, postWidth: 0.25, postDepth: 0.25, panelBack: 0x6b4e1e, roadOffset: 4 },
+      usa:    { postColor: 0x888899, postRoughness: 0.2,  frameColor: 0x666677, frameRoughness: 0.15, postWidth: 0.15, postDepth: 0.15, panelBack: 0x444455, roadOffset: 1.5 },
+      peru:   { postColor: 0x7a6b50, postRoughness: 0.9,  frameColor: 0x5a4a3a, frameRoughness: 0.8, postWidth: 0.30, postDepth: 0.30, panelBack: 0x5a4a32, roadOffset: 4 },
     };
     const s = styles[style] || styles.usa;
+    const isMetal = style === 'usa';
 
-    // Shared materials
-    const postMat = new THREE.MeshStandardMaterial({
-      color: s.postColor, roughness: s.postRoughness, metalness: style === 'usa' ? 0.7 : 0.1,
-    });
-    const frameMat = new THREE.MeshStandardMaterial({
-      color: s.frameColor, roughness: s.frameRoughness, metalness: style === 'usa' ? 0.6 : 0.1,
-    });
-    const panelBackMat = new THREE.MeshStandardMaterial({
-      color: s.panelBack, roughness: 0.8,
-    });
-    // Bright background for contrast — navy blue makes the orange ICT logo pop
-    const panelFaceMat = new THREE.MeshStandardMaterial({
-      color: 0x0a1e3d, roughness: 0.3, metalness: 0.0,
-      emissive: 0x0a1e3d, emissiveIntensity: 0.15,
-    });
-    // Logo at full brightness on transparent-friendly white base
-    const logoMat = new THREE.MeshBasicMaterial({ map: logoTex, transparent: true });
+    // Shared structural materials
+    const postMat = new THREE.MeshStandardMaterial({ color: s.postColor, roughness: s.postRoughness, metalness: isMetal ? 0.7 : 0.1 });
+    const frameMat = new THREE.MeshStandardMaterial({ color: s.frameColor, roughness: s.frameRoughness, metalness: isMetal ? 0.6 : 0.1 });
 
     // Shared geometries
     const postH = 5.5;
     const panelW = 3.2, panelH = 2.0;
-    const logoScale = 0.6;
-    const logoW = panelW * logoScale, logoH = panelH * logoScale;
+    const logoScaleSmall = 0.6;
+    const logoScaleLarge = 0.75;
     const postGeo = new THREE.BoxGeometry(s.postWidth, postH, s.postDepth);
     postGeo.translate(0, postH / 2, 0);
-    const frameW = panelW + 0.2, frameH = panelH + 0.2;
-    const frameGeo = new THREE.BoxGeometry(frameW, frameH, 0.08);
-    const panelGeo = new THREE.PlaneGeometry(panelW, panelH);
-    const logoGeo = new THREE.PlaneGeometry(logoW, logoH);
-    const backGeo = new THREE.PlaneGeometry(panelW, panelH);
+    const blackFrameGeo = new THREE.BoxGeometry(panelW + 0.4, panelH + 0.4, 0.08);
+    const blackFrameMat = new THREE.MeshBasicMaterial({ color: 0x111111 });
+    const frameGeo = new THREE.BoxGeometry(panelW + 0.1, panelH + 0.1, 0.08);
+    const logoGeoSmall = new THREE.PlaneGeometry(panelW * logoScaleSmall, panelH * logoScaleSmall);
+    const logoGeoLarge = new THREE.PlaneGeometry(panelW * logoScaleLarge, panelH * logoScaleLarge);
 
     for (let i = 0; i < COUNT; i++) {
+      const v = variants[i % variants.length];
       const group = new THREE.Group();
 
       // Post
       group.add(new THREE.Mesh(postGeo, postMat));
 
-      // Frame (behind panel, gives depth)
-      const frame = new THREE.Mesh(frameGeo, frameMat);
-      frame.position.set(0, postH + panelH / 2, 0);
-      group.add(frame);
+      // Black frame (slightly larger box behind the panel)
+      const frameMesh = new THREE.Mesh(blackFrameGeo, blackFrameMat);
+      frameMesh.position.set(0, postH + panelH / 2, 0);
+      group.add(frameMesh);
 
-      // Panel background (navy blue)
-      const face = new THREE.Mesh(panelGeo, panelFaceMat);
-      face.position.set(0, postH + panelH / 2, 0.04);
-      group.add(face);
+      // Billboard panel — colored background
+      const panelMat = new THREE.MeshBasicMaterial({ color: v.bgColor });
+      const panelBox = new THREE.Mesh(frameGeo, panelMat);
+      panelBox.position.set(0, postH + panelH / 2, 0.06);
+      group.add(panelBox);
 
-      // Logo (60% size, centered on panel)
-      const logo = new THREE.Mesh(logoGeo, logoMat);
-      logo.position.set(0, postH + panelH / 2, 0.05);
+      // Logo (60% size, centered, well in front of the panel box)
+      const logoMat = new THREE.MeshBasicMaterial({ map: v.tex, transparent: true });
+      const logo = new THREE.Mesh(v.large ? logoGeoLarge : logoGeoSmall, logoMat);
+      logo.position.set(0, postH + panelH / 2, 0.18);
       group.add(logo);
 
-      // Back panel
-      const back = new THREE.Mesh(backGeo, panelBackMat);
-      back.position.set(0, postH + panelH / 2, -0.05);
-      back.rotation.y = Math.PI;
-      group.add(back);
-
-      // Alternate sides, offset from road
+      // Alternate sides
       const side = i % 2 === 0 ? 1 : -1;
-      const xOffset = RH + 4 + Math.random() * 2;
+      const xOffset = RH + s.roadOffset + Math.random() * 1.5;
       group.position.set(side * xOffset, 0, -i * SPACING - 20 - Math.random() * 20);
-      group.rotation.y = side > 0 ? -0.15 : 0.15; // slight angle toward road
+      group.rotation.y = side > 0 ? -0.15 : 0.15;
 
       this.scene.add(group);
       this.themeObjects.push(group);
-      this.midground.push(group); // 0.6x scroll — one passes every ~5s at highway speed
+      this.midground.push(group);
     }
   }
 

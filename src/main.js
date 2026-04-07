@@ -259,25 +259,20 @@ loadingOverlay.innerHTML = `
     <div class="lo-instr-text">Harvest energy by driving over the plates on the road</div>
     <div class="lo-road-diagram">
       <div class="lo-scene">
-        <!-- Terrain -->
         <div class="lo-terrain lo-terrain-l"></div>
         <div class="lo-terrain lo-terrain-r"></div>
-        <!-- Road -->
         <div class="lo-road-surface">
           <div class="lo-curb lo-curb-l"></div>
           <div class="lo-curb lo-curb-r"></div>
           <div class="lo-lane-dash lo-ld-l"></div>
           <div class="lo-lane-dash lo-ld-r"></div>
-          <!-- Lamp posts -->
           <div class="lo-lamp lo-lamp-l1"><div class="lo-lamp-head"></div><div class="lo-lamp-cone"></div></div>
           <div class="lo-lamp lo-lamp-r1"><div class="lo-lamp-head"></div><div class="lo-lamp-cone"></div></div>
           <div class="lo-lamp lo-lamp-l2"><div class="lo-lamp-head"></div><div class="lo-lamp-cone"></div></div>
           <div class="lo-lamp lo-lamp-r2"><div class="lo-lamp-head"></div><div class="lo-lamp-cone"></div></div>
-          <!-- Scrolling plates -->
-          <div class="lo-plate lo-plate-1"><div class="lo-plate-grid"></div><div class="lo-plate-bolt">&#9889;</div><div class="lo-plate-ring"></div></div>
-          <div class="lo-plate lo-plate-2"><div class="lo-plate-grid"></div><div class="lo-plate-bolt">&#9889;</div><div class="lo-plate-ring"></div></div>
-          <div class="lo-plate lo-plate-3"><div class="lo-plate-grid"></div><div class="lo-plate-bolt">&#9889;</div><div class="lo-plate-ring"></div></div>
-          <!-- Kart -->
+          <!-- Single plate on center lane -->
+          <div class="lo-plate"><div class="lo-plate-grid"></div><div class="lo-plate-bolt">&#9889;</div></div>
+          <!-- Kart on center lane -->
           <div class="lo-kart">
             <div class="lo-kart-glow"></div>
             <svg class="lo-kart-svg" viewBox="0 0 30 50">
@@ -294,12 +289,6 @@ loadingOverlay.innerHTML = `
             </svg>
           </div>
         </div>
-      </div>
-      <!-- Labels -->
-      <div class="lo-labels">
-        <div class="lo-label lo-label-plate"><span class="lo-label-dot lo-dot-blue"></span> Energy Plate</div>
-        <div class="lo-label lo-label-lamp"><span class="lo-label-dot lo-dot-amber"></span> Lamp Post</div>
-        <div class="lo-label lo-label-kart"><span class="lo-label-dot lo-dot-green"></span> Your Kart</div>
       </div>
     </div>
     <div class="lo-instr-sub">&#8592; &#8594; Steer over the glowing plates to charge lamp posts</div>
@@ -351,13 +340,10 @@ loStyle.textContent = `
     background: linear-gradient(90deg, #00cc66, #22ffaa, #00ff88);
     border-radius: 10px;
     transition: width 0.3s ease;
-    box-shadow: 0 0 10px rgba(34,255,170,0.5);
+    box-shadow: 0 0 6px rgba(34,255,170,0.4);
   }
   .lo-bar-glow {
-    position: absolute; inset: -2px;
-    border-radius: 12px;
-    box-shadow: 0 0 12px rgba(34,255,170,0.1);
-    pointer-events: none;
+    display: none;
   }
   .lo-hint {
     font-family: 'Orbitron', sans-serif;
@@ -422,9 +408,7 @@ loStyle.textContent = `
   .lo-scene {
     position: relative;
     display: flex;
-    height: clamp(140px, 24vh, 300px);
-    perspective: 600px;
-    transform-style: preserve-3d;
+    height: clamp(220px, 38vh, 440px);
   }
 
   /* Terrain strips */
@@ -441,21 +425,17 @@ loStyle.textContent = `
     border-left: 2px solid rgba(180,180,160,0.15);
   }
 
-  /* Road surface with subtle perspective */
   .lo-road-surface {
     position: relative;
     flex: 1;
-    background:
-      linear-gradient(180deg, rgba(38,38,48,0.95) 0%, rgba(30,30,38,0.95) 100%);
+    background: rgba(34,34,42,0.95);
     overflow: hidden;
-    transform: rotateX(2deg);
-    transform-origin: bottom center;
   }
 
   /* Curbs */
   .lo-curb { position: absolute; top: 0; bottom: 0; width: 3px; }
-  .lo-curb-l { left: 0; background: repeating-linear-gradient(to bottom, #cc3333 0, #cc3333 6px, #eee 6px, #eee 12px); opacity: 0.3; }
-  .lo-curb-r { right: 0; background: repeating-linear-gradient(to bottom, #eee 0, #eee 6px, #cc3333 6px, #cc3333 12px); opacity: 0.3; }
+  .lo-curb-l { left: 0; background: rgba(200,200,200,0.15); }
+  .lo-curb-r { right: 0; background: rgba(200,200,200,0.15); }
 
   /* Scrolling lane dashes */
   .lo-lane-dash {
@@ -491,131 +471,85 @@ loStyle.textContent = `
   }
   .lo-lamp.lit .lo-lamp-head {
     background: #ffcc00;
-    box-shadow: 0 0 8px 3px rgba(255,200,0,0.6);
-    animation: loLampPulse 1.5s ease-in-out infinite;
+    box-shadow: 0 0 6px 2px rgba(255,200,0,0.5);
   }
   .lo-lamp.lit .lo-lamp-cone {
-    border-top-color: rgba(255,200,50,0.08);
-  }
-  @keyframes loLampPulse {
-    0%,100% { box-shadow: 0 0 6px 2px rgba(255,200,0,0.5); }
-    50%     { box-shadow: 0 0 12px 4px rgba(255,200,0,0.8); }
+    border-top-color: rgba(255,200,50,0.06);
   }
   .lo-lamp-l1 { left: 3%; top: 15%; }
   .lo-lamp-r1 { right: 3%; top: 15%; }
   .lo-lamp-l2 { left: 3%; top: 55%; }
   .lo-lamp-r2 { right: 3%; top: 55%; }
 
-  /* ── Plates — scroll down and flash on collection ── */
+  /* ── Single plate — center lane, square, scrolls down ── */
   .lo-plate {
     position: absolute;
-    width: 24%; height: 13%;
+    width: 22%;
+    aspect-ratio: 1;
+    left: 50%; transform: translateX(-50%);
     border-radius: 3px;
     background: rgba(10,10,20,0.9);
-    border: 1.5px solid rgba(34,170,255,0.5);
+    border: 2px solid rgba(34,170,255,0.5);
     display: flex; align-items: center; justify-content: center;
-    box-shadow: 0 0 10px rgba(34,170,255,0.3), inset 0 0 6px rgba(34,170,255,0.1);
-    animation: loPlateFlow 5s ease-in-out infinite;
+    box-shadow: 0 0 8px rgba(34,170,255,0.3);
+    animation: loPlateFlow 4s ease-in-out infinite;
     opacity: 0;
+    will-change: top, opacity;
+    contain: layout style;
   }
   .lo-plate-grid {
-    position: absolute; inset: 2px;
+    position: absolute; inset: 3px;
     background:
-      linear-gradient(90deg, rgba(34,170,255,0.12) 1px, transparent 1px),
-      linear-gradient(0deg, rgba(34,170,255,0.12) 1px, transparent 1px);
-    background-size: 25% 33%;
+      linear-gradient(90deg, rgba(34,170,255,0.14) 1px, transparent 1px),
+      linear-gradient(0deg, rgba(34,170,255,0.14) 1px, transparent 1px);
+    background-size: 25% 25%;
     border-radius: 2px;
   }
   .lo-plate-bolt {
     position: relative; z-index: 1;
-    font-size: clamp(12px, 1.6vw, 22px);
+    font-size: clamp(16px, 2.2vw, 30px);
     color: #22aaff;
-    filter: drop-shadow(0 0 4px rgba(34,170,255,0.7));
+    text-shadow: 0 0 5px rgba(34,170,255,0.7);
   }
-  /* Collection ring burst */
-  .lo-plate-ring {
-    position: absolute; inset: -8px;
-    border: 2px solid rgba(34,255,170,0.0);
-    border-radius: 6px;
-    pointer-events: none;
-  }
-
-  /* Plate 1 — left lane, staggers through */
-  .lo-plate-1 { left: 4%; animation-delay: 0s; }
-  .lo-plate-2 { left: 38%; animation-delay: 1.7s; }
-  .lo-plate-3 { left: 72%; animation-delay: 3.4s; }
 
   @keyframes loPlateFlow {
-    0%   { top: -15%; opacity: 0; transform: scale(0.9); }
-    8%   { opacity: 1; transform: scale(1); }
-    55%  { opacity: 1; transform: scale(1); }
-    62%  { opacity: 1; transform: scale(1); }
-    65%  { opacity: 0; transform: scale(1.15); }
+    0%   { top: -18%; opacity: 0; }
+    6%   { opacity: 1; }
+    58%  { opacity: 1; }
     66%  { opacity: 0; }
-    100% { top: 75%; opacity: 0; transform: scale(1); }
+    100% { top: 82%; opacity: 0; }
   }
 
-  /* ── Kart ── */
+  /* ── Kart — doubled size, centered on middle lane ── */
   .lo-kart {
     position: absolute; z-index: 5;
-    left: 50%; bottom: 8%;
-    width: clamp(28px, 3.5vw, 50px);
+    left: 50%; bottom: 6%;
+    width: clamp(56px, 7vw, 100px);
     transform: translateX(-50%);
-    animation: loKartSway 4s ease-in-out infinite;
-  }
-  @keyframes loKartSway {
-    0%,100% { transform: translateX(-50%) translateX(0); }
-    25%     { transform: translateX(-50%) translateX(clamp(-20px, -3vw, -40px)); }
-    75%     { transform: translateX(-50%) translateX(clamp(20px, 3vw, 40px)); }
   }
   .lo-kart-glow {
-    position: absolute; left: -40%; right: -40%; bottom: -20%; height: 60%;
-    background: radial-gradient(ellipse, rgba(34,255,170,0.15) 0%, transparent 70%);
+    position: absolute; left: -30%; right: -30%; bottom: -15%; height: 50%;
+    background: radial-gradient(ellipse, rgba(34,255,170,0.12) 0%, transparent 65%);
     pointer-events: none;
-    filter: blur(4px);
   }
   .lo-kart-svg {
     width: 100%; height: auto;
     display: block;
-    filter: drop-shadow(0 0 6px rgba(255,255,255,0.1));
+    /* no filter — avoids GPU filter pass */
   }
 
-  /* ── Legend labels ── */
-  .lo-labels {
-    display: flex; justify-content: center;
-    gap: clamp(14px, 2vw, 32px);
-    margin-top: clamp(6px, 1vh, 14px);
-  }
-  .lo-label {
-    font-family: 'Orbitron', sans-serif;
-    font-size: clamp(7px, 0.8vw, 13px);
-    font-weight: 500;
-    color: rgba(255,255,255,0.35);
-    letter-spacing: 1px;
-    display: flex; align-items: center;
-    gap: clamp(4px, 0.4vw, 8px);
-  }
-  .lo-label-dot {
-    width: clamp(6px, 0.7vw, 10px); height: clamp(6px, 0.7vw, 10px);
-    border-radius: 50%;
-    display: inline-block;
-  }
-  .lo-dot-blue { background: #22aaff; box-shadow: 0 0 4px rgba(34,170,255,0.5); }
-  .lo-dot-amber { background: #ffcc00; box-shadow: 0 0 4px rgba(255,200,0,0.5); }
-  .lo-dot-green { background: #22ffaa; box-shadow: 0 0 4px rgba(34,255,170,0.5); }
 `;
 document.head.appendChild(loStyle);
 document.body.appendChild(loadingOverlay);
 
-// Animate lamp posts lighting up in sync with plate scroll timing
+// Animate lamp posts lighting up — simple toggle, low frequency
 const loLamps = loadingOverlay.querySelectorAll('.lo-lamp');
 let _loLampIdx = 0;
 setInterval(() => {
-  loLamps.forEach(l => l.classList.remove('lit'));
-  loLamps[_loLampIdx % loLamps.length].classList.add('lit');
-  loLamps[(_loLampIdx + 1) % loLamps.length].classList.add('lit');
-  _loLampIdx = (_loLampIdx + 2) % loLamps.length;
-}, 1700);
+  for (const l of loLamps) l.classList.remove('lit');
+  loLamps[_loLampIdx].classList.add('lit');
+  _loLampIdx = (_loLampIdx + 1) % loLamps.length;
+}, 2000);
 
 const loBarFill = loadingOverlay.querySelector('#lo-bar-fill');
 const loHint = loadingOverlay.querySelector('#lo-hint');

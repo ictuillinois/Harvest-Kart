@@ -93,9 +93,11 @@ export class WinScreen {
       .win-content {
         position: relative; z-index: 1;
         display: flex; flex-direction: column; align-items: center;
-        padding: clamp(10px, 1.5vh, 24px) clamp(16px, 3vw, 60px);
-        max-width: clamp(500px, 75vw, 1100px);
+        justify-content: center;
+        padding: clamp(8px, 1.2vh, 18px) clamp(16px, 3vw, 50px);
+        max-width: clamp(700px, 92vw, 1600px);
         width: 100%;
+        height: 100%;
         animation: winReveal 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
       }
       @keyframes winReveal {
@@ -112,7 +114,7 @@ export class WinScreen {
         display: flex; align-items: center;
         gap: clamp(14px, 2.5vw, 40px);
         animation: winFadeUp 0.6s ease-out 0.1s both;
-        margin-bottom: clamp(6px, 1vh, 14px);
+        margin-bottom: clamp(8px, 1.2vh, 18px);
       }
       .win-eoh-logo {
         width: clamp(120px, 18vw, 300px);
@@ -148,7 +150,7 @@ export class WinScreen {
         width: clamp(80px, 18vw, 300px);
         height: 2px;
         background: linear-gradient(90deg, transparent, rgba(34,255,170,0.4), transparent);
-        margin-bottom: clamp(6px, 1vh, 14px);
+        margin-bottom: clamp(8px, 1vh, 16px);
         animation: winFadeUp 0.6s ease-out 0.2s both;
       }
 
@@ -160,7 +162,7 @@ export class WinScreen {
         color: #fff;
         letter-spacing: clamp(4px, 0.8vw, 14px);
         text-align: center;
-        margin: 0 0 clamp(10px, 1.5vh, 22px);
+        margin: 0 0 clamp(10px, 1.5vh, 20px);
         white-space: nowrap;
         background: linear-gradient(180deg, #ffffff 20%, #22ffaa 100%);
         -webkit-background-clip: text;
@@ -176,8 +178,8 @@ export class WinScreen {
       /* ── Main row: driver left, stats right ── */
       .win-main-row {
         display: flex;
-        align-items: stretch;
-        gap: clamp(14px, 2.5vw, 40px);
+        align-items: center;
+        gap: clamp(20px, 3.5vw, 56px);
         width: 100%;
         animation: winFadeUp 0.7s ease-out 0.35s both;
       }
@@ -188,7 +190,7 @@ export class WinScreen {
         display: flex; align-items: center;
       }
       .win-driver-frame {
-        width: clamp(130px, 18vw, 280px);
+        width: clamp(160px, 22vw, 360px);
         border-radius: clamp(8px, 1vw, 16px);
         overflow: hidden;
         border: 2.5px solid rgba(34,255,170,0.3);
@@ -207,19 +209,19 @@ export class WinScreen {
         flex: 1;
         display: flex; flex-direction: column;
         justify-content: center;
-        gap: clamp(10px, 1.5vh, 22px);
+        gap: clamp(12px, 2vh, 28px);
       }
 
       /* 2×2 stats grid */
       .win-stats-grid {
         display: grid;
         grid-template-columns: 1fr 1fr;
-        gap: clamp(6px, 1vw, 16px);
+        gap: clamp(10px, 1.4vw, 22px);
       }
       .win-metric {
         display: flex; flex-direction: column; align-items: center;
-        gap: clamp(2px, 0.3vh, 5px);
-        padding: clamp(10px, 1.4vh, 22px) clamp(10px, 1.2vw, 24px);
+        gap: clamp(3px, 0.4vh, 7px);
+        padding: clamp(14px, 2vh, 30px) clamp(14px, 1.8vw, 32px);
         background: rgba(255,255,255,0.025);
         border: 1px solid rgba(255,255,255,0.06);
         border-radius: clamp(8px, 1vw, 16px);
@@ -240,13 +242,13 @@ export class WinScreen {
         background: radial-gradient(ellipse at 50% 0%, rgba(34,255,170,0.1) 0%, transparent 70%);
       }
       .win-metric-icon {
-        font-size: clamp(18px, 2.5vw, 34px);
+        font-size: clamp(22px, 3vw, 42px);
         filter: drop-shadow(0 0 4px rgba(34,255,170,0.3));
       }
       .win-metric-highlight .win-metric-icon { color: #22ffaa; }
       .win-metric-val {
         font-family: 'Orbitron', monospace;
-        font-size: clamp(20px, 3.2vw, 50px);
+        font-size: clamp(24px, 4vw, 60px);
         font-weight: 900; color: #fff; line-height: 1;
       }
       .win-metric-highlight .win-metric-val {
@@ -255,7 +257,7 @@ export class WinScreen {
       }
       .win-metric-lbl {
         font-family: 'Orbitron', monospace;
-        font-size: clamp(5px, 0.6vw, 10px);
+        font-size: clamp(6px, 0.8vw, 13px);
         font-weight: 500;
         color: rgba(255,255,255,0.3);
         letter-spacing: 2px;
@@ -285,9 +287,9 @@ export class WinScreen {
       .win-btn:hover .win-btn-arrow { transform: translateX(4px); }
 
       /* Responsive */
-      @media (max-width: 640px) {
+      @media (max-width: 800px) {
         .win-main-row { flex-direction: column; align-items: center; }
-        .win-driver-frame { width: clamp(100px, 30vw, 160px); }
+        .win-driver-frame { width: clamp(120px, 35vw, 200px); }
         .win-stats-grid { width: 100%; }
         .win-eoh-block { flex-direction: column; text-align: center; }
         .win-heading { white-space: normal; font-size: clamp(18px, 6vw, 36px); }
