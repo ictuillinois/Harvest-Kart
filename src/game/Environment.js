@@ -781,6 +781,19 @@ export class Environment {
   _buildUSA() {
     const RH = ROAD_WIDTH / 2;
 
+    // ── Chicago skyline backdrop (fixed, full-width horizon) ──
+    const chiTex = new THREE.TextureLoader().load(asset('chicago.webp'));
+    chiTex.colorSpace = THREE.SRGBColorSpace;
+    const chiMat = new THREE.MeshBasicMaterial({
+      map: chiTex, transparent: true, opacity: 0.55,
+      depthWrite: false, side: THREE.FrontSide, fog: false,
+    });
+    const chiPlane = new THREE.Mesh(new THREE.PlaneGeometry(640, 160), chiMat);
+    chiPlane.position.set(0, 22, -380);
+    chiPlane.renderOrder = -1;
+    this.scene.add(chiPlane);
+    this.themeObjects.push(chiPlane);
+
     // ── Lake Michigan ──
     const lake = new THREE.Mesh(
       new THREE.PlaneGeometry(200, 600),
