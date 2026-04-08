@@ -113,12 +113,8 @@ export class HUD {
     this.el = document.createElement('div');
     this.el.id = 'hud';
     this.el.innerHTML = `
-      <!-- Top-left: HOME + minimap + driver avatar -->
+      <!-- Top-left: minimap + driver avatar -->
       <div class="hud-tl">
-        <button class="hud-btn hud-glass" id="hud-home" aria-label="Home">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg>
-          HOME
-        </button>
         <div class="hud-glass mm-panel">
           <div class="mm-header">
             <div class="mm-dot"></div>
@@ -726,7 +722,7 @@ export class HUD {
          ══════════════════════════════════════════ */
       .hud-re {
         position: absolute;
-        right: clamp(8px, 1vw, 20px); top: 50%; transform: translateY(-50%);
+        right: clamp(8px, 1vw, 20px); top: 42%; transform: translateY(-50%);
         display: flex; align-items: center; gap: clamp(4px, 0.6vw, 10px);
       }
 
@@ -827,14 +823,17 @@ export class HUD {
          ══════════════════════════════════════════ */
       .hud-bl {
         position: absolute;
-        bottom: clamp(8px, 1.5vh, 20px); left: clamp(8px, 1.5vw, 24px);
+        bottom: clamp(46px, 10.5vh, 115px); left: clamp(8px, 1.5vw, 24px);
+        overflow: visible;
       }
       .tacho-wrap {
         width: clamp(200px, 28vw, 520px);
         position: relative;
+        overflow: visible;
       }
       .tacho-svg {
         width: 100%; height: auto;
+        overflow: visible;
         filter: drop-shadow(0 4px 16px rgba(0,0,0,0.5));
       }
       #tacho-needle {
@@ -863,14 +862,17 @@ export class HUD {
          ══════════════════════════════════════════ */
       .hud-br {
         position: absolute;
-        bottom: clamp(8px, 1.5vh, 20px); right: clamp(8px, 1.5vw, 24px);
+        bottom: clamp(46px, 10.5vh, 115px); right: clamp(8px, 1.5vw, 24px);
+        overflow: visible;
       }
       .speedo-wrap {
         width: clamp(200px, 28vw, 520px);
         position: relative;
+        overflow: visible;
       }
       .speedo-svg {
         width: 100%; height: auto;
+        overflow: visible;
         filter: drop-shadow(0 4px 16px rgba(0,0,0,0.5));
       }
       #speedo-needle {
@@ -1048,7 +1050,7 @@ export class HUD {
     document.body.appendChild(this.pauseOverlay);
 
     // ── Wire up buttons ──
-    this.el.querySelector('#hud-home').addEventListener('click', () => onHome());
+    // HOME button removed — users quit via Escape key
     this.el.querySelector('#hud-pause').addEventListener('click', () => onPause());
     this.pauseOverlay.querySelector('#pause-resume').addEventListener('click', () => onPause());
     this.pauseOverlay.querySelector('#pause-quit').addEventListener('click', () => onHome());

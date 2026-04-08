@@ -1037,6 +1037,9 @@ gameState.on('lampLit', ({ lampPostsLit }) => {
     hud.updateStage(lampPostsLit, TOTAL_LAMP_POSTS);
     hud.updateCharge(0);
 
+    // Light up tier bulb indicator (always, including final tier)
+    hud.updateBulbs(tier);
+
     // Tier transition: flash + set tier on all lamp posts
     if (tier < TOTAL_LAMP_POSTS) {
       lampPosts.setTier(tier, true);
@@ -1050,10 +1053,6 @@ gameState.on('lampLit', ({ lampPostsLit }) => {
           .easing(Easing.Quadratic.Out)
           .start();
       }
-
-      // Toast + urgency at tier 3
-      // Light up tier bulb indicator
-      hud.updateBulbs(tier);
 
       // Last tier before completion: persistent HURRY UP! + timer goes red + vibration
       if (tier === TOTAL_LAMP_POSTS - 1) {
