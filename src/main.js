@@ -26,7 +26,7 @@ import { CompletionSequence } from './game/CompletionSequence.js';
 import { AMBIENT_MULTIPLIERS } from './game/LampPost.js';
 
 import { setupControls } from './utils/controls.js';
-import { playPlateHit, playLampLit, playComboBreak, playWinFanfare, playLaneSwitch, haptic, playMusic, stopMusic, startEngineIdle, stopEngine, updateEngine, playGearShift, playCountdownTone, playCountdownRev, playFinalPowerOn, playStartPress, playDriverSelect, playMapSelect, playTurboBoost, preWarmEngine, preWarmPlateAudio, setVolume } from './utils/audio.js';
+import { playPlateHit, playLampLit, playComboBreak, playWinFanfare, playLaneSwitch, haptic, playMusic, stopMusic, startEngineIdle, stopEngine, updateEngine, playGearShift, playCountdownTone, playCountdownRev, playFinalPowerOn, playStartPress, playDriverSelect, playMapSelect, playTurboBoost, preWarmEngine, preWarmPlateAudio, setVolume, playOverrunPop, playAccelSurge } from './utils/audio.js';
 import { gameRoot } from './utils/base.js';
 import {
   MIN_SPEED_MPH, MAX_SPEED_MPH, STARTING_SPEED_MPH, SCROLL_FACTOR,
@@ -121,6 +121,9 @@ let shiftCooldown = 0;
 let currentRPM = RPM_IDLE;
 
 let _lastRpmQ = 0; // debounce engine audio updates
+let _popCooldown = 0;        // throttle decel pops
+let _prevFrameSpeed = 0;     // detect speed changes
+let _wasPedalDown = true;    // detect throttle pickup (init true to avoid spurious surge at GO)
 
 // ── Turbo boost state ──
 let turboActive = false;
@@ -1177,6 +1180,24 @@ function animate() {
         haptic(20);
       }
       currentRPM = rpm;
+
+      // ── Deceleration overrun pops ──
+      _popCooldown = Math.max(0, _popCooldown - delta);
+      if (!turboActive && _prevFrameSpeed > gameState.speed && gameState.speed > 20 && _popCooldown <= 0) {
+        const chance = controls.isBrakeDown() ? 0.06 : 0.025;
+        if (Math.random() < chance) {
+          playOverrunPop();
+          _popCooldown = 0.25 + Math.random() * 0.35;
+        }
+      }
+
+      // ── Throttle pickup surge ──
+      const pedalNow = controls.isPedalDown();
+      if (pedalNow && !_wasPedalDown && gameState.speed > 15) {
+        playAccelSurge();
+      }
+      _wasPedalDown = pedalNow;
+      _prevFrameSpeed = gameState.speed;
     }
 
     const speed = gameState.speed;

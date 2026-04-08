@@ -393,19 +393,20 @@ export function playMapSelect() {
 // =================================================================
 
 const ENG_BASE     = 45;     // fundamental idle Hz (deep V8)
-const ENG_IDLE_VOL = 0.04;   // master gain at idle — reduced so music is prominent
-const ENG_MAX_VOL  = 0.15;   // master gain at max rev — half of previous
-const ENG_FILT_LO  = 250;    // lowpass cutoff at idle (dark rumble)
-const ENG_FILT_HI  = 2800;   // cutoff at max (brighter, more aggressive)
-const ENG_SMOOTH   = 0.04;   // param smoothing time-constant (s) — fast response for gear shifts
-const ENG_FREQ_MUL = 2.8;    // frequency range: 1× → 3.8× (wider range for dramatic gear drops)
+const ENG_IDLE_VOL = 0.07;   // master gain at idle — audible presence without overpowering music
+const ENG_MAX_VOL  = 0.28;   // master gain at max rev — punchy at speed (~44% of music volume)
+const ENG_FILT_LO  = 220;    // lowpass cutoff at idle (dark muffled rumble)
+const ENG_FILT_HI  = 3400;   // cutoff at max (bright snarl, more aggression)
+const ENG_SMOOTH   = 0.035;  // param smoothing time-constant (s) — snappier for gear shifts
+const ENG_FREQ_MUL = 3.0;    // frequency range: 1× → 4.0× (wider for dramatic gear drops)
 
 // Oscillator bank: [waveform, harmonic, gain@idle, gain@max]
 const OSC_DEFS = [
-  { type: 'sawtooth', h: 1, gIdle: 0.35, gMax: 0.38 },  // fundamental rumble
-  { type: 'square',   h: 2, gIdle: 0.22, gMax: 0.28 },  // exhaust body
-  { type: 'sawtooth', h: 4, gIdle: 0.07, gMax: 0.16 },  // firing-frequency chug
-  { type: 'sine',     h: 3, gIdle: 0.04, gMax: 0.10 },  // midrange growl
+  { type: 'sawtooth', h: 1, gIdle: 0.30, gMax: 0.44 },  // fundamental rumble — wider dynamic swing
+  { type: 'square',   h: 2, gIdle: 0.18, gMax: 0.35 },  // exhaust body — swells into growl
+  { type: 'sawtooth', h: 4, gIdle: 0.04, gMax: 0.24 },  // firing-frequency chug — barely there at idle
+  { type: 'sine',     h: 3, gIdle: 0.03, gMax: 0.14 },  // midrange growl — more body at speed
+  { type: 'triangle', h: 6, gIdle: 0.00, gMax: 0.08 },  // high-harmonic snarl (rasp near redline)
 ];
 
 let _eOscs = [];          // { osc, gain, lfoScale, def }
@@ -464,14 +465,14 @@ export function startEngineIdle() {
 
   // Waveshaper — aggressive saturation for raw exhaust rasp
   _eDistort = c.createWaveShaper();
-  _eDistort.curve = _makeDistortionCurve(4.0);
+  _eDistort.curve = _makeDistortionCurve(4.5);
   _eDistort.oversample = '2x';
 
   // Lowpass — darker at idle, opens at speed
   _eFilter = c.createBiquadFilter();
   _eFilter.type = 'lowpass';
   _eFilter.frequency.setValueAtTime(ENG_FILT_LO, t);
-  _eFilter.Q.setValueAtTime(0.8, t);
+  _eFilter.Q.setValueAtTime(1.4, t);
 
   // Master engine gain — fades in from silence
   _eMaster = c.createGain();
@@ -491,9 +492,9 @@ export function startEngineIdle() {
   // Modulates master gain at ~1.8 Hz creating rhythmic throb
   _eLope = c.createOscillator();
   _eLope.type = 'sine';
-  _eLope.frequency.setValueAtTime(1.8, t);
+  _eLope.frequency.setValueAtTime(1.5, t);
   _eLopeGain = c.createGain();
-  // At idle the lope swings master gain ±30% (0.08 * 0.30 = ±0.024)
+  // At idle the lope swings master gain ±30% (0.07 * 0.30 = ±0.021)
   _eLopeGain.gain.setValueAtTime(ENG_IDLE_VOL * 0.30, t);
   _eLope.connect(_eLopeGain);
   _eLopeGain.connect(_eMaster.gain);  // additive modulation on gain AudioParam
@@ -583,7 +584,7 @@ export function updateEngine(rpm) {
   const lopeDepth = vol * (0.30 - s * 0.27);
   _eLopeGain.gain.setTargetAtTime(lopeDepth, t, ENG_SMOOTH);
   // Lope rate increases slightly (burble speeds up with RPM)
-  _eLope.frequency.setTargetAtTime(1.8 + s * 3, t, ENG_SMOOTH);
+  _eLope.frequency.setTargetAtTime(1.5 + s * 3.3, t, ENG_SMOOTH);
 }
 
 /**
@@ -599,102 +600,117 @@ export function playGearShift(isUpshift, gear = 0) {
   const gearFrac = Math.min(gear, 4) / 4; // 0.0 (1st) → 1.0 (5th)
 
   if (isUpshift) {
-    // ── 1. Brief engine dip (NOT silence — just softer, 15ms) ──
+    // ── 1. Engine dip on shift — deeper cut, punchier re-engagement ──
     const prevGain = _eMaster.gain.value;
     _eMaster.gain.cancelScheduledValues(t);
     _eMaster.gain.setValueAtTime(prevGain, t);
-    _eMaster.gain.linearRampToValueAtTime(prevGain * 0.55, t + 0.015);
-    // Quick bounce back, slightly louder than before (gear engaged surge)
-    _eMaster.gain.linearRampToValueAtTime(prevGain * 1.15, t + 0.06);
-    _eMaster.gain.setTargetAtTime(prevGain, t + 0.12, 0.06);
+    _eMaster.gain.linearRampToValueAtTime(prevGain * 0.40, t + 0.018);
+    // Aggressive bounce — gear slams into engagement
+    _eMaster.gain.linearRampToValueAtTime(prevGain * 1.30, t + 0.06);
+    _eMaster.gain.setTargetAtTime(prevGain, t + 0.10, 0.05);
 
-    // ── 2. Mechanical clunk (deeper for higher gears) ──
-    const clunkBuf = c.createBuffer(1, c.sampleRate * 0.035, c.sampleRate);
+    // ── 2. Mechanical clunk — punchier, richer ──
+    const clunkBuf = c.createBuffer(1, c.sampleRate * 0.04, c.sampleRate);
     const clunkData = clunkBuf.getChannelData(0);
     for (let i = 0; i < clunkData.length; i++) clunkData[i] = (Math.random() * 2 - 1);
     const clunk = c.createBufferSource();
     clunk.buffer = clunkBuf;
     const clunkBP = c.createBiquadFilter();
     clunkBP.type = 'bandpass';
-    clunkBP.frequency.value = 600 + gearFrac * 400; // 600-1000Hz, higher gears = tighter
-    clunkBP.Q.value = 2;
+    clunkBP.frequency.value = 500 + gearFrac * 500; // 500-1000Hz, wider low end
+    clunkBP.Q.value = 2.5;
     const clunkGain = c.createGain();
-    clunkGain.gain.setValueAtTime(0.10 + gearFrac * 0.04, t + 0.01);
-    clunkGain.gain.exponentialRampToValueAtTime(0.001, t + 0.045);
+    clunkGain.gain.setValueAtTime(0.16 + gearFrac * 0.06, t + 0.008);
+    clunkGain.gain.exponentialRampToValueAtTime(0.001, t + 0.05);
     clunk.connect(clunkBP).connect(clunkGain).connect(out);
-    clunk.start(t + 0.01);
+    clunk.start(t + 0.008);
 
-    // ── 3. Turbo whoosh / air release (rises with gear) ──
+    // ── 3. Turbo whoosh / air release — louder, more presence ──
     const whoosh = c.createBufferSource();
-    const whooshLen = 0.08 + gearFrac * 0.06; // longer whoosh in higher gears
+    const whooshLen = 0.10 + gearFrac * 0.08; // longer whoosh in higher gears
     const whooshBuf = c.createBuffer(1, c.sampleRate * whooshLen, c.sampleRate);
     const whooshData = whooshBuf.getChannelData(0);
     for (let i = 0; i < whooshData.length; i++) whooshData[i] = (Math.random() * 2 - 1) * 0.5;
     whoosh.buffer = whooshBuf;
     const whooshHP = c.createBiquadFilter();
     whooshHP.type = 'highpass';
-    whooshHP.frequency.value = 2000 + gearFrac * 2000; // higher gears = more sibilant
-    whooshHP.Q.value = 0.5;
+    whooshHP.frequency.value = 1800 + gearFrac * 2200; // wider range, more audible in low gears
+    whooshHP.Q.value = 0.7;
     const whooshGain = c.createGain();
-    whooshGain.gain.setValueAtTime(0.04 + gearFrac * 0.03, t + 0.02);
-    whooshGain.gain.exponentialRampToValueAtTime(0.001, t + 0.02 + whooshLen);
+    whooshGain.gain.setValueAtTime(0.08 + gearFrac * 0.06, t + 0.015);
+    whooshGain.gain.exponentialRampToValueAtTime(0.001, t + 0.015 + whooshLen);
     whoosh.connect(whooshHP).connect(whooshGain).connect(out);
-    whoosh.start(t + 0.02);
+    whoosh.start(t + 0.015);
 
-    // ── 4. Subtle "thump" — low-end punch on engagement ──
+    // ── 4. Thump — visceral low-end punch on engagement ──
     const thump = c.createOscillator();
     thump.type = 'sine';
-    thump.frequency.setValueAtTime(60 + gear * 15, t + 0.01); // deeper in higher gears
+    thump.frequency.setValueAtTime(55 + gear * 12, t + 0.008);
+    thump.frequency.exponentialRampToValueAtTime(30, t + 0.07);
     const thumpGain = c.createGain();
-    thumpGain.gain.setValueAtTime(0.06, t + 0.01);
-    thumpGain.gain.exponentialRampToValueAtTime(0.001, t + 0.06);
+    thumpGain.gain.setValueAtTime(0.12, t + 0.008);
+    thumpGain.gain.exponentialRampToValueAtTime(0.001, t + 0.08);
     thump.connect(thumpGain).connect(out);
-    thump.start(t + 0.01);
-    thump.stop(t + 0.08);
+    thump.start(t + 0.008);
+    thump.stop(t + 0.10);
 
   } else {
-    // ── DOWNSHIFT: rev-match blip + exhaust crackle ──
+    // ── DOWNSHIFT: aggressive rev-match blip + exhaust crackle ──
 
-    // 1. RPM spikes up briefly (engine braking blip)
+    // 1. RPM spikes up hard (rev-match blip)
     const prevGain = _eMaster.gain.value;
     _eMaster.gain.cancelScheduledValues(t);
     _eMaster.gain.setValueAtTime(prevGain, t);
-    _eMaster.gain.linearRampToValueAtTime(prevGain * 1.3, t + 0.03);
+    _eMaster.gain.linearRampToValueAtTime(prevGain * 1.45, t + 0.025);
     _eMaster.gain.setTargetAtTime(prevGain, t + 0.08, 0.04);
 
     for (const e of _eOscs) {
       const curr = e.osc.frequency.value;
       e.osc.frequency.cancelScheduledValues(t);
       e.osc.frequency.setValueAtTime(curr, t);
-      e.osc.frequency.linearRampToValueAtTime(curr * 1.35, t + 0.03);
+      e.osc.frequency.linearRampToValueAtTime(curr * 1.50, t + 0.025);
       e.osc.frequency.setTargetAtTime(curr, t + 0.06, 0.04);
     }
 
-    // 2. Brief filter spike (brighter exhaust note)
+    // 2. Filter spike — brighter, more aggressive exhaust bark
     const prevCut = _eFilter.frequency.value;
     _eFilter.frequency.cancelScheduledValues(t);
     _eFilter.frequency.setValueAtTime(prevCut, t);
-    _eFilter.frequency.linearRampToValueAtTime(Math.min(prevCut * 1.8, 3000), t + 0.03);
+    _eFilter.frequency.linearRampToValueAtTime(Math.min(prevCut * 2.0, 3800), t + 0.025);
     _eFilter.frequency.setTargetAtTime(prevCut, t + 0.08, 0.05);
 
-    // 3. Exhaust crackle — short burst of filtered noise pops
-    for (let p = 0; p < 3; p++) {
-      const popDelay = 0.03 + p * 0.025 + Math.random() * 0.01;
+    // 3. Exhaust crackle — louder, more pops
+    for (let p = 0; p < 4; p++) {
+      const popDelay = 0.025 + p * 0.03 + Math.random() * 0.015;
       const pop = c.createBufferSource();
-      const popBuf = c.createBuffer(1, c.sampleRate * 0.012, c.sampleRate);
+      const popBuf = c.createBuffer(1, c.sampleRate * 0.022, c.sampleRate);
       const popData = popBuf.getChannelData(0);
       for (let i = 0; i < popData.length; i++) popData[i] = (Math.random() * 2 - 1);
       pop.buffer = popBuf;
       const popBP = c.createBiquadFilter();
       popBP.type = 'bandpass';
-      popBP.frequency.value = 400 + Math.random() * 600;
-      popBP.Q.value = 3;
+      popBP.frequency.value = 350 + Math.random() * 650;
+      popBP.Q.value = 2.5 + Math.random();
       const popGain = c.createGain();
-      popGain.gain.setValueAtTime(0.06 + Math.random() * 0.04, t + popDelay);
-      popGain.gain.exponentialRampToValueAtTime(0.001, t + popDelay + 0.015);
+      popGain.gain.setValueAtTime(0.10 + Math.random() * 0.06, t + popDelay);
+      popGain.gain.exponentialRampToValueAtTime(0.001, t + popDelay + 0.025);
       pop.connect(popBP).connect(popGain).connect(out);
       pop.start(t + popDelay);
     }
+
+    // 4. Exhaust bark — low-mid thud on downshift
+    const bark = c.createOscillator();
+    bark.type = 'sawtooth';
+    bark.frequency.setValueAtTime(120, t + 0.02);
+    bark.frequency.exponentialRampToValueAtTime(60, t + 0.06);
+    const barkDist = c.createWaveShaper();
+    barkDist.curve = _makeDistortionCurve(8);
+    const barkGain = c.createGain();
+    barkGain.gain.setValueAtTime(0.10, t + 0.02);
+    barkGain.gain.exponentialRampToValueAtTime(0.001, t + 0.08);
+    bark.connect(barkDist).connect(barkGain).connect(out);
+    bark.start(t + 0.02);
+    bark.stop(t + 0.10);
   }
 }
 
@@ -943,6 +959,71 @@ export function playTurboBoost() {
   flutterLFO.stop(t + 1.0);
   flutter.start(t + 0.3);
   flutter.stop(t + 1.0);
+}
+
+/** Exhaust overrun pop — crackle during deceleration / engine braking */
+export function playOverrunPop() {
+  const c = getCtx();
+  const t = c.currentTime;
+  const out = getMaster();
+
+  // 1-3 staggered pops with random timing
+  const count = 1 + Math.floor(Math.random() * 3);
+  for (let i = 0; i < count; i++) {
+    const delay = i * (0.04 + Math.random() * 0.06);
+    const pop = c.createBufferSource();
+    const popBuf = c.createBuffer(1, c.sampleRate * 0.025, c.sampleRate);
+    const data = popBuf.getChannelData(0);
+    for (let j = 0; j < data.length; j++) data[j] = (Math.random() * 2 - 1);
+    pop.buffer = popBuf;
+
+    const bp = c.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.frequency.value = 250 + Math.random() * 500;
+    bp.Q.value = 2 + Math.random() * 2;
+
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.08 + Math.random() * 0.06, t + delay);
+    g.gain.exponentialRampToValueAtTime(0.001, t + delay + 0.035);
+
+    pop.connect(bp).connect(g).connect(out);
+    pop.start(t + delay);
+  }
+}
+
+/** Throttle pickup growl — intake rush + exhaust punch on throttle from coast */
+export function playAccelSurge() {
+  if (!_eRunning) return;
+  const c = getCtx();
+  const t = c.currentTime;
+  const out = getMaster();
+
+  // Intake rush — high-frequency noise swoosh
+  const noise = c.createBufferSource();
+  noise.buffer = getNoiseBuffer();
+  const hp = c.createBiquadFilter();
+  hp.type = 'highpass';
+  hp.frequency.setValueAtTime(1200, t);
+  hp.frequency.exponentialRampToValueAtTime(3000, t + 0.08);
+  const nG = c.createGain();
+  nG.gain.setValueAtTime(0.06, t);
+  nG.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+  noise.connect(hp).connect(nG).connect(out);
+  noise.start(t);
+
+  // Low exhaust punch — distorted sawtooth bark
+  const punch = c.createOscillator();
+  punch.type = 'sawtooth';
+  punch.frequency.setValueAtTime(70, t);
+  punch.frequency.exponentialRampToValueAtTime(110, t + 0.06);
+  const pDist = c.createWaveShaper();
+  pDist.curve = _makeDistortionCurve(6);
+  const pG = c.createGain();
+  pG.gain.setValueAtTime(0.08, t);
+  pG.gain.exponentialRampToValueAtTime(0.001, t + 0.10);
+  punch.connect(pDist).connect(pG).connect(out);
+  punch.start(t);
+  punch.stop(t + 0.12);
 }
 
 /** Haptic feedback (mobile vibration) */
