@@ -789,7 +789,7 @@ export class Environment {
       depthWrite: false, side: THREE.FrontSide, fog: false,
     });
     const chiPlane = new THREE.Mesh(new THREE.PlaneGeometry(640, 160), chiMat);
-    chiPlane.position.set(0, 22, -380);
+    chiPlane.position.set(0, 35, -380);
     chiPlane.renderOrder = -1;
     this.scene.add(chiPlane);
     this.themeObjects.push(chiPlane);
@@ -948,8 +948,8 @@ export class Environment {
       map: mpTex, transparent: true, opacity: 0.55,
       depthWrite: false, side: THREE.FrontSide, fog: false,
     });
-    const mpPlane = new THREE.Mesh(new THREE.PlaneGeometry(280, 80), mpMat);
-    mpPlane.position.set(0, 22, -380);
+    const mpPlane = new THREE.Mesh(new THREE.PlaneGeometry(560, 160), mpMat);
+    mpPlane.position.set(0, 35, -380);
     mpPlane.renderOrder = -1; // render behind everything
     this.scene.add(mpPlane);
     this.themeObjects.push(mpPlane);
@@ -989,28 +989,35 @@ export class Environment {
     // ══════════════════════════════════════════
     //  MOUNTAINS — vertex-colored + displaced (background)
     // ══════════════════════════════════════════
+    // Mixed green + brown palette for Andean mountains
+    const peruMtColors = [0x4a7a33, 0x3a6a25, 0x6a8a45, 0x8a7a55, 0x7a6a45, 0x9a8a65, 0x5a7040, 0x6a6040];
+
     const mtConfigs = [
+      // Central peaks (behind road)
       { r: 28, h: 55, x: -55, z: -250 },
-      { r: 22, h: 48, x: 60, z: -280 },
+      { r: 22, h: 48, x: 60,  z: -280 },
       { r: 20, h: 40, x: -80, z: -200 },
       { r: 24, h: 44, x: -90, z: -310 },
+      { r: 18, h: 38, x: 40,  z: -220 },
+      { r: 26, h: 50, x: -40, z: -300 },
+      { r: 16, h: 35, x: 70,  z: -180 },
+      { r: 20, h: 42, x: -65, z: -340 },
     ];
     for (const cfg of mtConfigs) {
-      // Main peak
       const mt = this._createAndeanMountain(cfg.r, cfg.h);
+      mt.material.color.set(peruMtColors[(cfg.r + cfg.h) % peruMtColors.length]);
       mt.position.set(cfg.x, cfg.h / 2 - 4, cfg.z);
       const dist = Math.abs(cfg.z) / 350;
-      // Atmospheric tint via material color instead of vertex colors
       if (dist > 0.3) mt.material.color.lerp(new THREE.Color(0xaabbcc), dist * 0.25);
       this.scene.add(mt);
       this.themeObjects.push(mt);
       this.background.push(mt);
 
-      // Single ridge behind larger peaks only
       if (cfg.h > 40) {
         const rr = cfg.r * 0.6;
         const rh = cfg.h * 0.5;
         const ridge = this._createAndeanMountain(rr, rh);
+        ridge.material.color.set(peruMtColors[(cfg.r + cfg.h + 3) % peruMtColors.length]);
         ridge.position.set(cfg.x + cfg.r * 0.3, rh / 2 - 4, cfg.z - 8);
         if (dist > 0.3) ridge.material.color.lerp(new THREE.Color(0xaabbcc), dist * 0.25);
         this.scene.add(ridge);
@@ -1019,23 +1026,32 @@ export class Environment {
       }
     }
 
-    // ── Big flanking mountain ranges (both sides, background) ──
+    // ── Big flanking mountain ranges (both sides) ──
     const flankConfigs = [
-      // Left side — pushed far from road
+      // Left side
       { r: 35, h: 65, x: -110, z: -120 },
       { r: 30, h: 58, x: -125, z: -200 },
       { r: 40, h: 70, x: -105, z: -320 },
       { r: 28, h: 50, x: -140, z: -160 },
       { r: 32, h: 55, x: -115, z: -260 },
-      // Right side — pushed far from road
+      { r: 22, h: 42, x: -95,  z: -180 },
+      { r: 26, h: 48, x: -130, z: -290 },
+      { r: 18, h: 36, x: -100, z: -340 },
+      { r: 34, h: 60, x: -120, z: -370 },
+      // Right side
       { r: 34, h: 62, x: 115,  z: -140 },
       { r: 38, h: 68, x: 105,  z: -230 },
       { r: 30, h: 55, x: 130,  z: -300 },
       { r: 26, h: 48, x: 120,  z: -180 },
       { r: 36, h: 60, x: 110,  z: -350 },
+      { r: 22, h: 40, x: 100,  z: -160 },
+      { r: 28, h: 52, x: 125,  z: -260 },
+      { r: 20, h: 38, x: 95,   z: -320 },
+      { r: 32, h: 56, x: 115,  z: -400 },
     ];
     for (const cfg of flankConfigs) {
       const mt = this._createAndeanMountain(cfg.r, cfg.h);
+      mt.material.color.set(peruMtColors[(cfg.r * 3 + cfg.h) % peruMtColors.length]);
       mt.position.set(cfg.x, cfg.h / 2 - 4, cfg.z);
       const dist = Math.abs(cfg.z) / 400;
       mt.material.color.lerp(new THREE.Color(0x9aaabb), dist * 0.3);
