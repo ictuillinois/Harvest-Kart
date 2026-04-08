@@ -356,6 +356,7 @@ export class MapSelect {
     `;
     document.head.appendChild(style);
 
+    this._onBack = onBack;
     this.el.querySelector('#ms-back').addEventListener('click', () => onBack());
 
     this._cardEls = [...this.el.querySelectorAll('.ms-card')];
@@ -427,13 +428,21 @@ export class MapSelect {
         if (!gp) continue;
         const ax = gp.axes[0] || 0;
         let idx = this._focusIdx;
-        if (ax > 0.5) idx = Math.min(idx + 1, this._cardEls.length - 1);
-        else if (ax < -0.5) idx = Math.max(idx - 1, 0);
+        // Analog stick OR D-pad for navigation
+        if (ax > 0.5 || gp.buttons[15]?.pressed) idx = Math.min(idx + 1, this._cardEls.length - 1);
+        else if (ax < -0.5 || gp.buttons[14]?.pressed) idx = Math.max(idx - 1, 0);
         if (idx !== this._focusIdx) { this._setFocus(idx); this._gpCooldown = 12; return; }
+        // A button = confirm
         if (gp.buttons[0]?.pressed) {
           this._gpCooldown = 30;
           const card = this._cardEls[this._focusIdx];
           this._selectCard(card, parseInt(card.dataset.index));
+          return;
+        }
+        // B button = back
+        if (gp.buttons[1]?.pressed) {
+          this._gpCooldown = 30;
+          this._onBack();
           return;
         }
       }

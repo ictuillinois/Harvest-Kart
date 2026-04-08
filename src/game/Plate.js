@@ -144,20 +144,8 @@ function createPlate() {
   return group;
 }
 
-// ── Lane sequence generator ──
-function generateLaneSequence(count) {
-  const seq = [];
-  let last = 1;
-
-  for (let i = 0; i < count; i++) {
-    // Each plate must be in a DIFFERENT lane from the previous one
-    const options = [0, 1, 2].filter(l => l !== last);
-    const lane = options[Math.floor(Math.random() * options.length)];
-    seq.push(lane);
-    last = lane;
-  }
-  return seq;
-}
+// ── Tier-aware minimum gap between plates ──
+const MIN_GAPS = [38, 38, 25]; // Tier 0: 1.5x, Tier 1: 1.5x, Tier 2: 1x
 
 export class Plate {
   constructor(scene) {
@@ -165,8 +153,8 @@ export class Plate {
     this.plates = [];
     this.timeSinceSpawn = 0;
     this.spawnInterval = PLATE_SPAWN_INTERVAL;
-    this._sequence = generateLaneSequence(200);
-    this._seqIdx = 0;
+    this._lastLane = 1;  // start center
+    this._tier = 0;
 
     for (let i = 0; i < POOL_SIZE; i++) {
       const plate = createPlate();
@@ -180,8 +168,14 @@ export class Plate {
     const plate = this.plates.find(p => !p.userData.active);
     if (!plate) return;
 
-    const laneIdx = this._sequence[this._seqIdx % this._sequence.length];
-    this._seqIdx++;
+    // On-the-fly lane selection — tier-aware
+    let options = [0, 1, 2].filter(l => l !== this._lastLane);
+    if (this._tier === 0) {
+      // Tier 0: adjacent lanes only (max 1 lane separation)
+      options = options.filter(l => Math.abs(l - this._lastLane) <= 1);
+    }
+    const laneIdx = options[Math.floor(Math.random() * options.length)];
+    this._lastLane = laneIdx;
 
     plate.position.set(LANE_POSITIONS[laneIdx], 0, aheadZ);
     plate.visible = true;
@@ -261,10 +255,11 @@ export class Plate {
       this.timeSinceSpawn = 0;
       const spawnZ = -(ROAD_SEGMENT_LENGTH * 0.9 + Math.random() * 30);
       if (spawnZ < -20) {
-        // Enforce minimum gap — no plate within 25 units of any active plate
+        // Enforce tier-aware minimum gap between plates
+        const minGap = MIN_GAPS[this._tier] || 25;
         let tooClose = false;
         for (let i = 0; i < this.plates.length; i++) {
-          if (this.plates[i].userData.active && Math.abs(this.plates[i].position.z - spawnZ) < 25) {
+          if (this.plates[i].userData.active && Math.abs(this.plates[i].position.z - spawnZ) < minGap) {
             tooClose = true; break;
           }
         }
@@ -312,9 +307,17 @@ export class Plate {
     this.spawnInterval = interval;
   }
 
+  setTier(tier) {
+    this._tier = Math.min(tier, 2);
+  }
+
+  resetTier() {
+    this._tier = 0;
+    this._lastLane = 1;
+  }
+
   resetSpawnRate() {
     this.spawnInterval = PLATE_SPAWN_INTERVAL;
-    this._seqIdx = 0;
-    this._sequence = generateLaneSequence(200);
+    this._lastLane = 1;
   }
 }

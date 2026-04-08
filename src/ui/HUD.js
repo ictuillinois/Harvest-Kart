@@ -25,12 +25,14 @@ function describeArc(cx, cy, r, startDeg, sweepDeg) {
 
 const ARC_D = describeArc(ARC_CX, ARC_CY, ARC_R, ARC_START_DEG, ARC_SWEEP_DEG);
 
+const SPEEDO_MAX = 140; // MPH — top of speedometer arc
+
 // ── Build minor tick marks (every 10 MPH, skip major ticks at 20) ──
 function buildMinorTicks() {
   const ticks = [];
-  for (let mph = 0; mph <= 100; mph += 10) {
+  for (let mph = 0; mph <= SPEEDO_MAX; mph += 10) {
     if (mph % 20 === 0) continue;
-    const frac = mph / 100;
+    const frac = mph / SPEEDO_MAX;
     const deg = ARC_START_DEG + frac * ARC_SWEEP_DEG;
     const inner = polarToXY(ARC_CX, ARC_CY, ARC_R - 10, deg);
     const outer = polarToXY(ARC_CX, ARC_CY, ARC_R - 5, deg);
@@ -39,11 +41,11 @@ function buildMinorTicks() {
   return ticks.join('');
 }
 
-// ── Build major tick marks (every 20 MPH: 0,20,40,60,80,100) ──
+// ── Build major tick marks (every 20 MPH: 0,20,40,...,140) ──
 function buildTicks() {
   const ticks = [];
-  for (let mph = 0; mph <= 100; mph += 20) {
-    const frac = mph / 100;
+  for (let mph = 0; mph <= SPEEDO_MAX; mph += 20) {
+    const frac = mph / SPEEDO_MAX;
     const deg = ARC_START_DEG + frac * ARC_SWEEP_DEG;
     const inner = polarToXY(ARC_CX, ARC_CY, ARC_R - 14, deg);
     const outer = polarToXY(ARC_CX, ARC_CY, ARC_R - 4, deg);
@@ -104,12 +106,6 @@ export class HUD {
     // ── Tachometer needle start ──
     const tachoNeedleStart = polarToXY(ARC_CX, ARC_CY, ARC_R - 18, ARC_START_DEG);
 
-    // ── Minimap lamp markers ──
-    const lampHTML = Array.from({ length: TOTAL_LAMP_POSTS }, (_, i) => {
-      const pct = ((i + 1) / TOTAL_LAMP_POSTS) * 92 + 4;
-      return `<div class="mm-lamp" data-lamp="${i}" style="bottom:${pct.toFixed(1)}%"></div>`;
-    }).join('');
-
     // ── Needle initial angle ──
     const needleEnd = polarToXY(ARC_CX, ARC_CY, ARC_R - 18, ARC_START_DEG);
 
@@ -130,24 +126,14 @@ export class HUD {
             <div class="mm-dot"></div>
           </div>
           <div class="mm-track">
-            <div class="mm-terrain mm-terrain-l"></div>
-            <div class="mm-road">
-              <div class="mm-edge mm-edge-l"></div>
-              <div class="mm-edge mm-edge-r"></div>
-              <div class="mm-stripe mm-stripe-l"></div>
-              <div class="mm-stripe mm-stripe-r"></div>
-              <div class="mm-finish"></div>
-              <div class="mm-start"></div>
-              ${lampHTML}
-              <div class="mm-player" id="mm-player">
-                <svg class="mm-kart-icon" viewBox="0 0 10 14" fill="none">
-                  <path d="M5 0L9 5V12C9 13 8 14 7 14H3C2 14 1 13 1 12V5L5 0Z" fill="currentColor"/>
-                  <rect x="0" y="4" width="2" height="4" rx="0.5" fill="currentColor" opacity="0.5"/>
-                  <rect x="8" y="4" width="2" height="4" rx="0.5" fill="currentColor" opacity="0.5"/>
-                </svg>
+            <div class="mm-viewport">
+              <div class="mm-city" id="mm-city"></div>
+              <div class="mm-nav-dot" id="mm-nav-dot">
+                <div class="mm-nav-ring"></div>
+                <div class="mm-nav-core"></div>
+                <div class="mm-nav-chevron"></div>
               </div>
             </div>
-            <div class="mm-terrain mm-terrain-r"></div>
           </div>
           <div class="mm-footer">
             <div class="mm-dist-bar"><div class="mm-dist-fill" id="mm-dist-fill"></div></div>
@@ -236,8 +222,19 @@ export class HUD {
         </div>
       </div>
 
-      <!-- Right edge: energy gauge -->
+      <!-- Right edge: energy gauge + tier bulbs -->
       <div class="hud-re">
+        <div class="en-bulbs" id="en-bulbs">
+          <div class="en-bulb" data-bulb="2">
+            <svg viewBox="0 0 24 32" fill="none"><path d="M12 2C7 2 3 6 3 11c0 3.5 2 6.5 5 8v3c0 1.1.9 2 2 2h4c1.1 0 2-.9 2-2v-3c3-1.5 5-4.5 5-8 0-5-4-9-9-9z" fill="currentColor"/><rect x="8" y="24" width="8" height="2" rx="1" fill="currentColor" opacity="0.6"/><rect x="8" y="27" width="8" height="2" rx="1" fill="currentColor" opacity="0.4"/></svg>
+          </div>
+          <div class="en-bulb" data-bulb="1">
+            <svg viewBox="0 0 24 32" fill="none"><path d="M12 2C7 2 3 6 3 11c0 3.5 2 6.5 5 8v3c0 1.1.9 2 2 2h4c1.1 0 2-.9 2-2v-3c3-1.5 5-4.5 5-8 0-5-4-9-9-9z" fill="currentColor"/><rect x="8" y="24" width="8" height="2" rx="1" fill="currentColor" opacity="0.6"/><rect x="8" y="27" width="8" height="2" rx="1" fill="currentColor" opacity="0.4"/></svg>
+          </div>
+          <div class="en-bulb" data-bulb="0">
+            <svg viewBox="0 0 24 32" fill="none"><path d="M12 2C7 2 3 6 3 11c0 3.5 2 6.5 5 8v3c0 1.1.9 2 2 2h4c1.1 0 2-.9 2-2v-3c3-1.5 5-4.5 5-8 0-5-4-9-9-9z" fill="currentColor"/><rect x="8" y="24" width="8" height="2" rx="1" fill="currentColor" opacity="0.6"/><rect x="8" y="27" width="8" height="2" rx="1" fill="currentColor" opacity="0.4"/></svg>
+          </div>
+        </div>
         <div class="hud-glass en-panel">
           <svg class="en-bolt" viewBox="0 0 24 24" fill="var(--hud-accent)" width="16" height="16"><path d="M13 2L3 14h9l-1 10 10-12h-9l1-10z"/></svg>
           <div class="en-bar" id="en-bar">${enHTML}</div>
@@ -415,96 +412,201 @@ export class HUD {
         box-shadow: 0 0 4px var(--hud-accent-glow);
       }
 
-      /* Track container: terrain + road */
+      /* Track container — phone map viewport */
       .mm-track {
-        display: flex;
-        gap: 0;
         height: clamp(150px, 30vh, 360px);
-      }
-      .mm-terrain {
-        flex: 0 0 clamp(9px, 1vw, 21px);
-        border-radius: 2px;
-      }
-      .mm-terrain-l {
-        background: linear-gradient(180deg,
-          rgba(40,80,40,0.25) 0%, rgba(60,100,50,0.15) 30%,
-          rgba(40,70,40,0.2) 60%, rgba(30,60,30,0.25) 100%);
-        border-right: 1px solid rgba(255,255,255,0.04);
-      }
-      .mm-terrain-r {
-        background: linear-gradient(180deg,
-          rgba(40,80,40,0.25) 0%, rgba(50,90,45,0.15) 40%,
-          rgba(40,70,40,0.2) 70%, rgba(30,60,30,0.25) 100%);
-        border-left: 1px solid rgba(255,255,255,0.04);
-      }
-
-      /* Road surface */
-      .mm-road {
         position: relative;
-        flex: 1;
-        background: linear-gradient(180deg, rgba(45,45,55,0.9) 0%, rgba(35,35,42,0.9) 100%);
+        border-radius: 4px;
         overflow: hidden;
+        background: #1a1c20;
+      }
+      .mm-viewport {
+        position: relative;
+        width: 100%; height: 100%;
+        overflow: hidden;
+        contain: layout style paint;
+      }
+      .mm-city {
+        position: absolute; left: 0; right: 0;
+        will-change: transform;
       }
 
-      /* Road edges (curb lines) */
-      .mm-edge {
-        position: absolute; top: 0; bottom: 0; width: 1.5px;
-        background: rgba(255,255,255,0.12);
+      /* ── City grid streets ── */
+      .mm-street {
+        position: absolute;
+        background: rgba(160,160,170,0.12);
       }
-      .mm-edge-l { left: 0; }
-      .mm-edge-r { right: 0; }
+      .mm-street-h { height: 1px; left: 0; right: 0; }
+      .mm-street-v { width: 1px; top: 0; bottom: 0; }
 
-      /* Dashed lane stripes (two lanes) */
-      .mm-stripe {
-        position: absolute; top: 0; bottom: 0; width: 1px;
+      /* ── Highway ── */
+      .mm-highway {
+        position: absolute; left: 50%; transform: translateX(-50%);
+        width: 22%; top: 0; bottom: 0;
+        background: rgba(65,133,220,0.3);
+        border-left: 1.5px solid rgba(255,255,255,0.15);
+        border-right: 1.5px solid rgba(255,255,255,0.15);
+        overflow: visible;
+      }
+      .mm-hw-dash {
+        position: absolute; left: 50%; top: 0; bottom: 0; width: 1px;
+        transform: translateX(-50%);
         background: repeating-linear-gradient(
           to bottom,
-          rgba(255,255,255,0.18) 0, rgba(255,255,255,0.18) 4px,
-          transparent 4px, transparent 10px
+          rgba(255,255,255,0.3) 0, rgba(255,255,255,0.3) 5px,
+          transparent 5px, transparent 12px
         );
       }
-      .mm-stripe-l { left: 33%; }
-      .mm-stripe-r { left: 66%; }
-
-      /* Finish line at top */
-      .mm-finish {
-        position: absolute; top: 2%; left: 8%; right: 8%; height: 3px;
-        background: repeating-linear-gradient(
-          90deg, #fff 0, #fff 3px, #222 3px, #222 6px
-        );
-        opacity: 0.4;
-        border-radius: 1px;
+      .mm-hw-edge-l, .mm-hw-edge-r {
+        position: absolute; top: 0; bottom: 0; width: 1px;
+        background: rgba(255,200,50,0.2);
       }
-      /* Start line at bottom */
-      .mm-start {
-        position: absolute; bottom: 2%; left: 8%; right: 8%; height: 2px;
-        background: rgba(34,255,170,0.3);
-        border-radius: 1px;
+      .mm-hw-edge-l { left: 15%; }
+      .mm-hw-edge-r { right: 15%; }
+
+      /* GPS route highlight — blue glow on highway */
+      .mm-route-highlight {
+        position: absolute; inset: 0;
+        background: linear-gradient(180deg,
+          rgba(66,133,244,0.08) 0%, rgba(66,133,244,0.15) 50%, rgba(66,133,244,0.08) 100%);
+        pointer-events: none;
       }
 
-      /* Lamp markers */
+      /* Route shield label */
+      .mm-shield {
+        position: sticky; top: 8px; z-index: 5;
+        margin: 0 auto; width: fit-content;
+        padding: 1px 4px;
+        background: rgba(40,80,160,0.7);
+        border: 1px solid rgba(255,255,255,0.25);
+        border-radius: 3px;
+        font-family: var(--hud-font);
+        font-size: 6px; font-weight: 700;
+        color: #fff;
+        letter-spacing: 0.5px;
+        text-align: center;
+      }
+
+      /* ── Building blocks ── */
+      .mm-block {
+        position: absolute;
+        border-radius: 2px;
+        border: 0.5px solid rgba(255,255,255,0.03);
+      }
+
+      /* ── Parks with tree dots ── */
+      .mm-park {
+        position: absolute;
+        border-radius: 5px;
+        background: rgba(45,105,45,0.22);
+        border: 0.5px solid rgba(70,140,70,0.10);
+        overflow: hidden;
+      }
+      .mm-tree {
+        position: absolute;
+        width: 4px; height: 4px; border-radius: 50%;
+        background: rgba(60,140,60,0.4);
+        box-shadow: 0 0 2px rgba(60,140,60,0.3);
+        transform: translate(-50%, -50%);
+      }
+
+      /* ── Water features ── */
+      .mm-water {
+        position: absolute;
+        background: rgba(50,110,175,0.22);
+        border: 0.5px solid rgba(70,140,210,0.10);
+      }
+      .mm-river { border-radius: 0; }
+      .mm-lake { border-radius: 40%; }
+
+      /* ── Roundabouts ── */
+      .mm-roundabout {
+        position: absolute; z-index: 3;
+        width: 10px; height: 10px;
+        border-radius: 50%;
+        background: rgba(28,32,38,0.9);
+        border: 1.5px solid rgba(160,160,170,0.18);
+        transform: translate(-50%, -50%);
+      }
+
+      /* ── ETA bar (fixed at top of viewport) ── */
+      .mm-eta {
+        position: absolute; top: 0; left: 0; right: 0; z-index: 12;
+        display: flex; align-items: center; justify-content: center; gap: 5px;
+        padding: 3px 6px;
+        background: rgba(15,18,24,0.85);
+        backdrop-filter: blur(4px);
+        border-bottom: 1px solid rgba(255,255,255,0.06);
+        font-family: var(--hud-font);
+        font-size: clamp(6px, 0.6vw, 10px);
+        color: rgba(255,255,255,0.6);
+        letter-spacing: 0.5px;
+      }
+      .mm-eta-dist { color: #4285F4; font-weight: 700; }
+      .mm-eta-sep { color: rgba(255,255,255,0.2); }
+      .mm-eta-time { color: rgba(255,255,255,0.4); }
+
+      /* ── Lamp markers (on highway) ── */
       .mm-lamp {
         position: absolute; left: 50%;
-        width: clamp(10px, 1vw, 20px); height: clamp(10px, 1vw, 20px);
+        width: clamp(8px, 0.9vw, 16px); height: clamp(8px, 0.9vw, 16px);
         border-radius: 50%;
-        background: var(--hud-segment-empty);
-        border: 1.5px solid rgba(255,190,0,0.25);
+        background: rgba(255,190,0,0.15);
+        border: 1.5px solid rgba(255,190,0,0.3);
         transform: translate(-50%, 50%);
         transition: background 0.4s, border-color 0.4s, box-shadow 0.4s;
-      }
-      .mm-lamp::after {
-        content: '';
-        position: absolute; inset: -3px;
-        border-radius: 50%;
-        border: 1px solid rgba(255,190,0,0.08);
+        z-index: 2;
       }
       .mm-lamp.lit {
         background: var(--hud-warning);
         border-color: var(--hud-warning);
         box-shadow: 0 0 6px 2px rgba(255,220,0,0.6);
       }
-      .mm-lamp.lit::after {
-        border-color: rgba(255,220,0,0.2);
+
+      /* ── Finish / start markers (on highway) ── */
+      .mm-finish {
+        position: absolute; top: 1%; left: 10%; right: 10%; height: 3px;
+        background: repeating-linear-gradient(90deg, #fff 0, #fff 3px, #333 3px, #333 6px);
+        opacity: 0.5; border-radius: 1px; z-index: 2;
+      }
+      .mm-start {
+        position: absolute; bottom: 1%; left: 10%; right: 10%; height: 2px;
+        background: rgba(34,255,170,0.4); border-radius: 1px; z-index: 2;
+      }
+
+      /* ── Navigation dot (fixed in viewport) ── */
+      .mm-nav-dot {
+        position: absolute; left: 50%; top: 70%;
+        transform: translate(-50%, -50%);
+        width: clamp(16px, 1.8vw, 28px); height: clamp(16px, 1.8vw, 28px);
+        z-index: 10;
+        pointer-events: none;
+      }
+      .mm-nav-core {
+        position: absolute; inset: 25%;
+        background: #4285F4;
+        border-radius: 50%;
+        border: 2px solid #fff;
+        box-shadow: 0 0 6px rgba(66,133,244,0.8);
+      }
+      .mm-nav-ring {
+        position: absolute; inset: 0;
+        border-radius: 50%;
+        background: rgba(66,133,244,0.18);
+        animation: mmNavPulse 2s ease-in-out infinite;
+      }
+      .mm-nav-chevron {
+        position: absolute; left: 50%; top: -2px;
+        transform: translateX(-50%);
+        width: 0; height: 0;
+        border-left: 4px solid transparent;
+        border-right: 4px solid transparent;
+        border-bottom: 6px solid #fff;
+        filter: drop-shadow(0 0 2px rgba(66,133,244,0.6));
+      }
+      @keyframes mmNavPulse {
+        0%, 100% { transform: scale(1); opacity: 0.6; }
+        50% { transform: scale(1.4); opacity: 0.2; }
       }
 
       /* Progress bar at bottom */
@@ -542,23 +644,7 @@ export class HUD {
         user-select: none;
         filter: drop-shadow(0 1px 2px rgba(0,0,0,0.4));
       }
-      .mm-player {
-        position: absolute; left: 50%; bottom: 4%;
-        width: clamp(14px, 1.6vw, 28px); height: clamp(20px, 2.2vw, 40px);
-        color: var(--hud-accent);
-        filter: drop-shadow(0 0 4px var(--hud-accent-glow));
-        transform: translate(-50%, 50%);
-        transition: bottom 0.28s ease-out;
-        animation: kartPulse 1.5s ease-in-out infinite;
-      }
-      .mm-kart-icon {
-        width: 100%; height: 100%;
-        display: block;
-      }
-      @keyframes kartPulse {
-        0%, 100% { filter: drop-shadow(0 0 4px var(--hud-accent-glow)); }
-        50%      { filter: drop-shadow(0 0 8px var(--hud-accent-glow)) brightness(1.3); }
-      }
+      /* (player dot replaced by nav-dot in city map) */
 
       /* ══════════════════════════════════════════
          TOP-CENTER — SCORE + COMBO
@@ -641,6 +727,37 @@ export class HUD {
       .hud-re {
         position: absolute;
         right: clamp(8px, 1vw, 20px); top: 50%; transform: translateY(-50%);
+        display: flex; align-items: center; gap: clamp(4px, 0.6vw, 10px);
+      }
+
+      /* ── Tier light bulb indicators ── */
+      .en-bulbs {
+        display: flex; flex-direction: column; gap: clamp(6px, 1vh, 12px);
+        align-items: center;
+      }
+      .en-bulb {
+        width: clamp(36px, 4.4vw, 64px); height: clamp(48px, 5.6vw, 80px);
+        color: #2a2a2a;
+        transition: color 0.3s, filter 0.3s;
+        filter: drop-shadow(0 0 1px rgba(255,255,255,0.05));
+      }
+      .en-bulb svg { width: 100%; height: 100%; }
+      .en-bulb.lit {
+        color: #ffcc00;
+        filter: drop-shadow(0 0 6px rgba(255,204,0,0.7)) drop-shadow(0 0 14px rgba(255,170,0,0.35));
+        animation: bulbGlow 2s ease-in-out infinite;
+      }
+      .en-bulb.lighting {
+        animation: bulbLightUp 0.6s ease-out forwards;
+      }
+      @keyframes bulbGlow {
+        0%, 100% { filter: drop-shadow(0 0 6px rgba(255,204,0,0.7)) drop-shadow(0 0 14px rgba(255,170,0,0.35)); }
+        50% { filter: drop-shadow(0 0 10px rgba(255,204,0,0.9)) drop-shadow(0 0 20px rgba(255,170,0,0.5)); }
+      }
+      @keyframes bulbLightUp {
+        0% { color: #2a2a2a; filter: none; transform: scale(1); }
+        30% { color: #ffffff; filter: drop-shadow(0 0 16px rgba(255,255,255,0.9)); transform: scale(1.25); }
+        100% { color: #ffcc00; filter: drop-shadow(0 0 6px rgba(255,204,0,0.7)) drop-shadow(0 0 14px rgba(255,170,0,0.35)); transform: scale(1); }
       }
       .en-panel {
         display: flex; flex-direction: column;
@@ -864,7 +981,7 @@ export class HUD {
 
       .hud-hurry {
         position: fixed; z-index: 119;
-        left: 50%; top: 28%;
+        left: 50%; top: 18%;
         transform: translate(-50%, -50%);
         font-family: var(--hud-font);
         font-size: clamp(16px, 2vw, 36px);
@@ -938,14 +1055,18 @@ export class HUD {
 
     // ── Cache DOM refs ──
     this.enSegs      = [...this.el.querySelectorAll('.en-seg')];
-    this.mmLamps     = [...this.el.querySelectorAll('.mm-lamp')];
-    this.mmPlayer    = this.el.querySelector('#mm-player');
     this._distFill   = this.el.querySelector('#mm-dist-fill');
+    this._cityEl     = this.el.querySelector('#mm-city');
+    this._mmViewport = this.el.querySelector('.mm-viewport');
+    this._buildCityMap();
+    this.mmLamps     = [...this._cityEl.querySelectorAll('.mm-lamp')];
     this.spTime      = this.el.querySelector('#sp-time');
     this.enLampCount = this.el.querySelector('#en-lamp-count');
     this.scoreEl     = this.el.querySelector('#hud-score');
     this.comboEl     = this.el.querySelector('#hud-combo');
     this.enBolt      = this.el.querySelector('.en-bolt');
+    this._bulbEls    = [...this.el.querySelectorAll('.en-bulb')];
+    this._litBulbs   = 0;
     this._avatarImg  = this.el.querySelector('#hud-avatar');
 
     // Speedometer refs
@@ -973,12 +1094,164 @@ export class HUD {
     return 'on-g';
   }
 
+  _buildCityMap() {
+    const city = this._cityEl;
+    const CITY_H = 1200;
+    city.style.height = CITY_H + 'px';
+    city.style.bottom = '0';
+
+    // Seed-based pseudo-random for consistency
+    let seed = 42;
+    const rand = () => { seed = (seed * 16807 + 0) % 2147483647; return (seed - 1) / 2147483646; };
+    const el = (cls, css) => { const d = document.createElement('div'); d.className = cls; if (css) d.style.cssText = css; return d; };
+
+    // ── Base layer: subtle land fill ──
+    city.appendChild(el('mm-land', `position:absolute;inset:0;background:rgba(28,32,38,1);`));
+
+    // ── Grid streets (primary + secondary widths) ──
+    const hSpacing = 35, vSpacing = 30;
+    for (let y = 0; y < CITY_H; y += hSpacing) {
+      const major = y % (hSpacing * 3) === 0;
+      const s = el('mm-street mm-street-h');
+      s.style.top = y + 'px';
+      if (major) s.style.height = '2px';
+      city.appendChild(s);
+    }
+    for (let x = 8; x < 100; x += vSpacing) {
+      if (x > 30 && x < 70) continue;
+      const s = el('mm-street mm-street-v');
+      s.style.left = x + '%';
+      city.appendChild(s);
+    }
+
+    // ── Cross streets that bridge across the highway ──
+    const crossYs = [140, 350, 560, 770, 980];
+    for (const cy of crossYs) {
+      const cs = el('mm-street mm-street-h mm-cross');
+      cs.style.cssText = `top:${cy}px; height:2px; z-index:3; background:rgba(180,180,190,0.18);`;
+      city.appendChild(cs);
+    }
+
+    // ── Highway with edge lines + center dashes ──
+    const hw = el('mm-highway');
+    hw.appendChild(el('mm-hw-dash'));
+    hw.appendChild(el('mm-hw-edge-l'));
+    hw.appendChild(el('mm-hw-edge-r'));
+
+    // Highway on-ramp (angled connector)
+    const ramp1 = el('mm-ramp', `position:absolute; top:25%; right:-40%; width:50%; height:2px; background:rgba(65,133,220,0.25); transform:rotate(-25deg); transform-origin:left center; z-index:1;`);
+    hw.appendChild(ramp1);
+    const ramp2 = el('mm-ramp', `position:absolute; top:68%; left:-40%; width:50%; height:2px; background:rgba(65,133,220,0.25); transform:rotate(25deg); transform-origin:right center; z-index:1;`);
+    hw.appendChild(ramp2);
+
+    // Route shield label
+    const shield = el('mm-shield');
+    shield.textContent = 'I-95';
+    hw.appendChild(shield);
+
+    // Lamp markers on highway
+    for (let i = 0; i < TOTAL_LAMP_POSTS; i++) {
+      const pct = 100 - ((i + 1) / TOTAL_LAMP_POSTS) * 92 - 4;
+      const lamp = el('mm-lamp');
+      lamp.dataset.lamp = i;
+      lamp.style.top = pct.toFixed(1) + '%';
+      hw.appendChild(lamp);
+    }
+
+    hw.appendChild(el('mm-finish'));
+    hw.appendChild(el('mm-start'));
+    city.appendChild(hw);
+
+    // ── Building blocks — varied shapes ──
+    const blockColors = [
+      'rgba(195,185,165,0.14)', 'rgba(175,175,185,0.12)',
+      'rgba(205,192,170,0.13)', 'rgba(160,158,170,0.11)',
+      'rgba(185,175,155,0.14)', 'rgba(170,165,175,0.10)',
+      'rgba(200,188,168,0.12)', 'rgba(165,170,180,0.11)',
+    ];
+    for (let y = 6; y < CITY_H - 20; y += hSpacing) {
+      for (let xPct = 4; xPct < 96; xPct += vSpacing) {
+        if (xPct > 28 && xPct < 72) continue;
+        if (rand() < 0.2) continue;
+        const bW = (vSpacing - 6) * (0.7 + rand() * 0.3);
+        const bH = (hSpacing - 8) * (0.7 + rand() * 0.3);
+        const bOx = (vSpacing - 6 - bW) * rand() * 0.5;
+        const b = el('mm-block');
+        b.style.cssText = `top:${y + 3}px; left:${(xPct + 2 + bOx).toFixed(1)}%; width:${bW.toFixed(1)}%; height:${bH.toFixed(0)}px; background:${blockColors[Math.floor(rand() * blockColors.length)]};`;
+        city.appendChild(b);
+      }
+    }
+
+    // ── Parks with tree dots ──
+    const parkPositions = [
+      { top: '10%', left: '4%', w: '24%', h: '65px' },
+      { top: '45%', left: '73%', w: '22%', h: '55px' },
+      { top: '75%', left: '5%', w: '20%', h: '50px' },
+      { top: '60%', left: '3%', w: '14%', h: '35px' },
+    ];
+    for (const p of parkPositions) {
+      const pk = el('mm-park');
+      pk.style.cssText = `top:${p.top}; left:${p.left}; width:${p.w}; height:${p.h};`;
+      // Tree dots inside park
+      for (let t = 0; t < 3 + Math.floor(rand() * 4); t++) {
+        const tree = el('mm-tree');
+        tree.style.cssText = `left:${10 + rand() * 75}%; top:${10 + rand() * 70}%;`;
+        pk.appendChild(tree);
+      }
+      city.appendChild(pk);
+    }
+
+    // ── Water features — river + small lake ──
+    const river = el('mm-water mm-river');
+    river.style.cssText = `top:36%; left:0; width:100%; height:28px;`;
+    city.appendChild(river);
+    const lake = el('mm-water mm-lake');
+    lake.style.cssText = `top:88%; left:72%; width:24%; height:40px; border-radius:40%;`;
+    city.appendChild(lake);
+
+    // ── Roundabouts at intersections ──
+    const roundabouts = [
+      { top: 140, left: '8%' }, { top: 560, left: '80%' }, { top: 980, left: '14%' },
+    ];
+    for (const r of roundabouts) {
+      const rb = el('mm-roundabout');
+      rb.style.cssText = `top:${r.top - 5}px; left:${r.left};`;
+      city.appendChild(rb);
+    }
+
+    // ── GPS route highlight overlay on highway ──
+    const route = el('mm-route-highlight');
+    hw.appendChild(route);
+
+    // ── Distance / ETA label at top of viewport (stays fixed) ──
+    // (added to viewport, not city, so it doesn't scroll)
+    const eta = el('mm-eta');
+    eta.innerHTML = '<span class="mm-eta-dist" id="mm-eta-dist">0.0 mi</span><span class="mm-eta-sep">·</span><span class="mm-eta-time">ETA --:--</span>';
+    this._mmViewport.appendChild(eta);
+    this._etaDist = eta.querySelector('#mm-eta-dist');
+
+    this._cityHeight = CITY_H;
+  }
+
   _updateMinimap() {
     const totalPlates = TOTAL_LAMP_POSTS * PLATES_TO_FILL_BAR;
     const progress = (this._lamps * PLATES_TO_FILL_BAR + this._charge) / totalPlates;
-    const pct = 4 + Math.min(92, progress * 92);
-    this.mmPlayer.style.bottom = pct.toFixed(1) + '%';
+
+    // Scroll city so nav-dot appears to move through the map
+    if (this._cityEl && this._mmViewport) {
+      const viewH = this._mmViewport.offsetHeight || 250;
+      const scrollRange = this._cityHeight - viewH;
+      const scrollY = progress * scrollRange;
+      this._cityEl.style.transform = `translateY(${scrollY}px)`;
+    }
     if (this._distFill) this._distFill.style.width = (progress * 100).toFixed(1) + '%';
+
+    // Update ETA distance readout
+    if (this._etaDist) {
+      const totalMi = 2.4; // fictional route length
+      const remaining = ((1 - progress) * totalMi).toFixed(1);
+      this._etaDist.textContent = remaining + ' mi';
+    }
   }
 
   // ── Public API ──
@@ -996,7 +1269,7 @@ export class HUD {
     if (rounded === this._lastSpeedVal) return;  // Skip if unchanged
     this._lastSpeedVal = rounded;
 
-    const frac = Math.max(0, Math.min(1, mph / 100));
+    const frac = Math.max(0, Math.min(1, mph / SPEEDO_MAX));
 
     // Arc fill
     this._arcFill.style.strokeDashoffset = String(this._arcLength * (1 - frac));
@@ -1061,6 +1334,27 @@ export class HUD {
     this.enLampCount.textContent = `${lit}/${TOTAL_LAMP_POSTS}`;
     this.mmLamps.forEach((el, i) => el.classList.toggle('lit', i < lit));
     this._updateMinimap();
+  }
+
+  updateBulbs(count) {
+    // _bulbEls are ordered top-to-bottom: data-bulb 2, 1, 0
+    this._bulbEls.forEach(el => {
+      const idx = parseInt(el.dataset.bulb);
+      const shouldLight = idx < count;
+      const wasLit = el.classList.contains('lit');
+      if (shouldLight && !wasLit) {
+        el.classList.add('lighting');
+        el.addEventListener('animationend', () => {
+          el.classList.remove('lighting');
+          el.classList.add('lit');
+        }, { once: true });
+      } else if (shouldLight) {
+        el.classList.add('lit');
+      } else {
+        el.classList.remove('lit', 'lighting');
+      }
+    });
+    this._litBulbs = count;
   }
 
   updateScore(score) {
@@ -1191,6 +1485,7 @@ export class HUD {
     this._lamps  = 0;
     this._prevLit = 0;
     this.hideHurry();
+    this.updateBulbs(0);
     this.updateCharge(0);
     this.updateLamps(0);
     this.updateSpeed(0);

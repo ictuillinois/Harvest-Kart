@@ -14,10 +14,13 @@ export class DriverSelect {
     this.el = document.createElement('div');
     this.el.id = 'driver-select';
 
-    const cards = DRIVER_TYPES.map((d, i) => `
+    const cards = DRIVER_TYPES.map((d, i) => {
+      const isElite = d.name === 'Al-Qadi';
+      return `
       <div class="ds-card" data-index="${i}" style="--accent:${d.accentColor}; --delay:${i * 0.06}s">
         <div class="ds-card-inner">
           <div class="ds-glow"></div>
+          ${isElite ? '<div class="ds-medal"><svg viewBox="0 0 24 24"><circle cx="12" cy="10" r="7" fill="url(#ds-gold)"/><circle cx="12" cy="10" r="5.2" fill="none" stroke="rgba(255,255,255,0.5)" stroke-width="0.5"/><text x="12" y="12.5" text-anchor="middle" font-size="7" font-weight="900" fill="#7a5c00" font-family="serif">&#9733;</text><path d="M8 16.5L7 22l5-2.5L17 22l-1-5.5" fill="url(#ds-gold)" stroke="#b8860b" stroke-width="0.3"/><defs><linearGradient id="ds-gold" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#ffe066"/><stop offset="50%" stop-color="#ffd700"/><stop offset="100%" stop-color="#b8860b"/></linearGradient></defs></svg></div>' : ''}
           <div class="ds-img-wrap">
             <img class="ds-img" src="${d.avatar}" alt="${d.name}" draggable="false" />
             <div class="ds-sweep"></div>
@@ -29,7 +32,7 @@ export class DriverSelect {
           </div>
         </div>
       </div>
-    `).join('');
+    `}).join('');
 
     this.el.innerHTML = `
       <div class="ds-bg">
@@ -91,16 +94,16 @@ export class DriverSelect {
       .ds-content {
         position: relative; z-index: 1;
         text-align: center;
-        padding: clamp(6px, 1vh, 16px) clamp(10px, 1.5vw, 28px);
+        padding: clamp(6px, 0.8vh, 12px) clamp(12px, 1.2vw, 24px);
         width: 100%;
-        max-width: clamp(600px, 90vw, 1500px);
+        max-width: 92vw;
       }
 
       /* ── Header with racing stripes ── */
       .ds-header {
         display: flex; align-items: center;
         gap: clamp(10px, 1.5vw, 24px);
-        margin-bottom: clamp(10px, 1.8vh, 28px);
+        margin-bottom: clamp(6px, 1vh, 16px);
         justify-content: center;
       }
       .ds-stripe {
@@ -130,11 +133,11 @@ export class DriverSelect {
         white-space: nowrap;
       }
 
-      /* ── Card grid: 2 rows × 4 cols ── */
+      /* ── Card grid: 2 rows × 6 cols ── */
       .ds-roster {
         display: grid;
-        grid-template-columns: repeat(4, 1fr);
-        gap: clamp(6px, 0.8vw, 16px);
+        grid-template-columns: repeat(6, 1fr);
+        gap: clamp(6px, 0.8vw, 14px);
       }
 
       /* ── Card ── */
@@ -146,6 +149,20 @@ export class DriverSelect {
       @keyframes dsCardEnter {
         0%   { transform: translateY(20px); opacity: 0; }
         100% { transform: translateY(0); opacity: 1; }
+      }
+
+      /* ── Gold medal badge ── */
+      .ds-medal {
+        position: absolute; top: 4px; left: 4px; z-index: 5;
+        width: clamp(44px, 5vw, 80px); height: clamp(44px, 5vw, 80px);
+        filter: drop-shadow(0 1px 3px rgba(0,0,0,0.6)) drop-shadow(0 0 6px rgba(255,215,0,0.4));
+        pointer-events: none;
+        animation: dsMedalShine 3s ease-in-out infinite;
+      }
+      .ds-medal svg { width: 100%; height: 100%; }
+      @keyframes dsMedalShine {
+        0%, 100% { filter: drop-shadow(0 1px 3px rgba(0,0,0,0.6)) drop-shadow(0 0 6px rgba(255,215,0,0.4)); }
+        50% { filter: drop-shadow(0 1px 3px rgba(0,0,0,0.6)) drop-shadow(0 0 12px rgba(255,215,0,0.7)); }
       }
 
       .ds-card-inner {
@@ -269,7 +286,7 @@ export class DriverSelect {
         position: relative; z-index: 1;
         display: flex; flex-direction: column;
         gap: clamp(2px, 0.25vh, 4px);
-        padding: clamp(4px, 0.5vh, 10px) clamp(6px, 0.6vw, 14px);
+        padding: clamp(3px, 0.35vh, 7px) clamp(4px, 0.4vw, 10px);
         background: linear-gradient(180deg, rgba(0,0,0,0.4) 0%, rgba(0,0,0,0.6) 100%);
         border-top: 1px solid rgba(255,255,255,0.04);
       }
@@ -308,7 +325,7 @@ export class DriverSelect {
 
       /* ── Input hint bar ── */
       .ds-hint {
-        margin-top: clamp(10px, 1.5vh, 22px);
+        margin-top: clamp(6px, 0.8vh, 14px);
         font-family: 'Orbitron', sans-serif;
         font-size: clamp(7px, 0.7vw, 12px);
         font-weight: 500;
@@ -337,6 +354,7 @@ export class DriverSelect {
     `;
     document.head.appendChild(style);
 
+    this._onBack = onBack;
     this.el.querySelector('#ds-back').addEventListener('click', () => onBack());
 
     this._cardEls = [...this.el.querySelectorAll('.ds-card')];
@@ -370,7 +388,7 @@ export class DriverSelect {
     // Keyboard navigation
     this._keyHandler = (e) => {
       if (this.el.style.display === 'none' || this._selected || this._inputGate) return;
-      const cols = 4;
+      const cols = 6;
       let idx = this._focusIdx;
       if (e.key === 'ArrowRight') idx = Math.min(idx + 1, this._cardEls.length - 1);
       else if (e.key === 'ArrowLeft') idx = Math.max(idx - 1, 0);
@@ -411,15 +429,23 @@ export class DriverSelect {
         if (!gp) continue;
         const ax = gp.axes[0] || 0, ay = gp.axes[1] || 0;
         let idx = this._focusIdx;
-        if (ax > 0.5) idx = Math.min(idx + 1, this._cardEls.length - 1);
-        else if (ax < -0.5) idx = Math.max(idx - 1, 0);
-        else if (ay > 0.5) idx = Math.min(idx + cols, this._cardEls.length - 1);
-        else if (ay < -0.5) idx = Math.max(idx - cols, 0);
+        // Analog stick OR D-pad for navigation
+        if (ax > 0.5 || gp.buttons[15]?.pressed) idx = Math.min(idx + 1, this._cardEls.length - 1);
+        else if (ax < -0.5 || gp.buttons[14]?.pressed) idx = Math.max(idx - 1, 0);
+        else if (ay > 0.5 || gp.buttons[13]?.pressed) idx = Math.min(idx + cols, this._cardEls.length - 1);
+        else if (ay < -0.5 || gp.buttons[12]?.pressed) idx = Math.max(idx - cols, 0);
         if (idx !== this._focusIdx) { this._setFocus(idx); this._gpCooldown = 12; return; }
+        // A button = confirm
         if (gp.buttons[0]?.pressed) {
           this._gpCooldown = 30;
           const card = this._cardEls[this._focusIdx];
           this._selectCard(card, parseInt(card.dataset.index));
+          return;
+        }
+        // B button = back
+        if (gp.buttons[1]?.pressed) {
+          this._gpCooldown = 30;
+          this._onBack();
           return;
         }
       }

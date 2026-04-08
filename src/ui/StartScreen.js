@@ -442,8 +442,13 @@ export class StartScreen {
 
     // Universal input — any click, key, touch, or gamepad triggers start
     this._started = false;
+    this._inputLocked = true; // locked until 1s after show()
+    this._promptEl = this.el.querySelector('.ss-prompt');
+    this._promptEl.style.opacity = '0';
+    this._promptEl.style.transition = 'opacity 0.5s ease';
+
     const triggerStart = () => {
-      if (this._started || this.el.style.display === 'none') return;
+      if (this._started || this._inputLocked || this.el.style.display === 'none') return;
       this._started = true;
       onStart();
     };
@@ -452,13 +457,14 @@ export class StartScreen {
     this.el.addEventListener('touchstart', (e) => { e.preventDefault(); triggerStart(); });
 
     this._keyHandler = (e) => {
-      if (this.el.style.display === 'none') return;
+      if (this.el.style.display === 'none' || this._inputLocked) return;
       triggerStart();
     };
     window.addEventListener('keydown', this._keyHandler);
 
-    // Gamepad polling
+    // Gamepad polling — only respond to newly pressed buttons (edge detection)
     this._gamepadPoll = null;
+    this._prevBtnState = new Map(); // track previous pressed state per button
     const pollGamepad = () => {
       if (this._started || this.el.style.display === 'none') {
         this._gamepadPoll = null;
@@ -467,8 +473,13 @@ export class StartScreen {
       const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
       for (const gp of gamepads) {
         if (!gp) continue;
-        for (const btn of gp.buttons) {
-          if (btn.pressed) { triggerStart(); return; }
+        for (let i = 0; i < gp.buttons.length; i++) {
+          const key = gp.index + ':' + i;
+          const wasPressed = this._prevBtnState.get(key) || false;
+          const isPressed = gp.buttons[i].pressed;
+          this._prevBtnState.set(key, isPressed);
+          // Only trigger on rising edge (newly pressed, not held)
+          if (isPressed && !wasPressed) { triggerStart(); return; }
         }
       }
       this._gamepadPoll = requestAnimationFrame(pollGamepad);
@@ -481,6 +492,17 @@ export class StartScreen {
 
   show(longFade = false) {
     this._started = false;
+    this._inputLocked = true;
+    this._prevBtnState.clear();
+    this._promptEl.style.opacity = '0';
+
+    // Unlock input and reveal prompt after 1 second
+    clearTimeout(this._unlockTimer);
+    this._unlockTimer = setTimeout(() => {
+      this._inputLocked = false;
+      this._promptEl.style.opacity = '1';
+    }, 1000);
+
     if (this._startGamepadPoll) this._startGamepadPoll();
     if (longFade) {
       this.el.style.transition = '';

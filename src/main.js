@@ -32,7 +32,7 @@ import {
   MIN_SPEED_MPH, MAX_SPEED_MPH, STARTING_SPEED_MPH, SCROLL_FACTOR,
   GEAR_THRESHOLDS, GEAR_ACCEL, DECEL_RATE, SHIFT_PAUSE_MS,
   RPM_IDLE, RPM_REDLINE,
-  MAP_THEMES, PLATE_SPAWN_INTERVAL, TOTAL_LAMP_POSTS,
+  MAP_THEMES, TOTAL_LAMP_POSTS,
   CAMERA_OFFSET, CAMERA_LOOK_AHEAD,
   CAMERA_FOV_MIN, CAMERA_FOV_MAX, CAMERA_SHAKE_THRESHOLD,
   getDriverPhysics, DRIVER_TYPES,
@@ -209,6 +209,7 @@ function goHome() {
   kart.isSwitching = false;
   kart.group.position.x = 0;
   plates.resetSpawnRate();
+  plates.resetTier();
   gameState.transition('menu');
 }
 
@@ -580,6 +581,7 @@ const mapSelect = new MapSelect(
     lampPosts.resetAll();
     lampPosts.setTier(0, false);
     plates.resetSpawnRate();
+    plates.resetTier();
 
     // Pre-create particles + turbo glow light
     kart.warmUp();
@@ -924,14 +926,14 @@ gameState.on('stateChange', ({ from, to }) => {
             // one overloaded frame and gives the browser a clean compositing boundary.
             requestAnimationFrame(() => {
               gameState.speed = STARTING_SPEED_MPH;
-              currentGear = 1; // gear 2 (0-indexed)
+              const startGear = computeGearAndRPM(STARTING_SPEED_MPH);
+              currentGear = startGear.gear;
               shiftCooldown = 0;
               turboActive = false;
               turboTimer = 0;
-              const { rpm } = computeGearAndRPM(STARTING_SPEED_MPH);
-              currentRPM = rpm;
+              currentRPM = startGear.rpm;
               hud.updateSpeed(STARTING_SPEED_MPH);
-              hud.updateTacho(rpm, 2);
+              hud.updateTacho(startGear.rpm, startGear.gear + 1);
               raceStart = null;
             });
           },
@@ -1050,19 +1052,16 @@ gameState.on('lampLit', ({ lampPostsLit }) => {
       }
 
       // Toast + urgency at tier 3
-      const labels = ['', 'SECTOR 1 POWERED', 'SECTOR 2 POWERED'];
-      if (tier <= 2) {
-        hud.showToast(labels[tier]);
-      }
+      // Light up tier bulb indicator
+      hud.updateBulbs(tier);
 
       // Last tier before completion: persistent HURRY UP! + timer goes red + vibration
       if (tier === TOTAL_LAMP_POSTS - 1) {
         hud.showHurry();
       }
 
-      // Increase difficulty
-      const newRate = PLATE_SPAWN_INTERVAL - lampPostsLit * 0.08;
-      plates.setSpawnRate(Math.max(newRate, 0.5));
+      // Tier-based difficulty: gap distance + lane rules scale with tier
+      plates.setTier(tier);
 
       // ── TURBO BOOST — instant +10 MPH for 3 seconds ──
       turboActive = true;
@@ -1099,6 +1098,17 @@ function animate() {
   tweenGroup.update();
   controls.pollGamepad();
 
+  // ── G920 Start button → pause/resume ──
+  if (controls.consumeStartPress()) {
+    if (gameState.state === 'playing' || gameState.state === 'paused') togglePause();
+  }
+  // ── G920 B button → resume / back ──
+  if (controls.consumeBPress()) {
+    if (gameState.state === 'paused') togglePause();
+    else if (gameState.state === 'driverSelect') gameState.transition('menu');
+    else if (gameState.state === 'mapSelect') gameState.transition('driverSelect');
+  }
+
   // Always animate sky (clouds, stars) even on menus
   const isActive = gameState.state === 'playing' || gameState.state === 'completing';
   environment.update(delta, isActive ? gameState.speed * SCROLL_FACTOR : 0);
@@ -1122,7 +1132,7 @@ function animate() {
 
       // Per-driver gear-aware acceleration (turbo-aware top speed)
       const effectiveTopSpeed = turboActive
-        ? activePhysics.topSpeed + TURBO_BOOST_MPH
+        ? activePhysics.topSpeed + (activePhysics.turboBoost || TURBO_BOOST_MPH)
         : activePhysics.topSpeed;
 
       if (turboActive) {
@@ -1134,8 +1144,10 @@ function animate() {
         if (shiftCooldown <= 0) {
           gameState.speed = Math.min(gameState.speed + activePhysics.gearAccel[currentGear] * delta, effectiveTopSpeed);
         }
+      } else if (controls.isBrakeDown()) {
+        gameState.speed = Math.max(gameState.speed - activePhysics.decelRate * 2.5 * delta, 0);
       } else {
-        gameState.speed = Math.max(gameState.speed - activePhysics.decelRate * delta, activePhysics.coastFloor);
+        gameState.speed = Math.max(gameState.speed - activePhysics.decelRate * delta, 0);
       }
       shiftCooldown = Math.max(0, shiftCooldown - delta);
 

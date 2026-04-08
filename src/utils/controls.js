@@ -298,11 +298,18 @@ export function setupControls(onSwitch, onRelease) {
   let _gpLeftHeld = false;
   let _gpRightHeld = false;
   let _gpPedalDown = false;
+  let _gpBrakeDown = false;
+
+  // Edge-detected buttons (true for one frame on rising edge)
+  let _prevStart = false, _prevB = false;
+  let _startJustPressed = false, _bJustPressed = false;
 
   function pollGamepad() {
     const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
     let steer = 0;
     let gas = false;
+    let brake = false;
+    let startNow = false, bNow = false;
 
     for (const gp of gamepads) {
       if (!gp) continue;
@@ -315,15 +322,22 @@ export function setupControls(onSwitch, onRelease) {
       if (gp.buttons[14]?.pressed) steer = -1;
       if (gp.buttons[15]?.pressed) steer = 1;
 
-      // ── Gas: check axes 1-3 for pedal input ──
-      // Standard pad: axes[1] < -0.3 = left stick pushed up
-      // Racing wheel: axes[1] rests at ~1.0, pressed = -1.0; same for axes[2]/[3]
-      for (let a = 1; a < Math.min(gp.axes.length, 4); a++) {
-        if (gp.axes[a] < GP_GAS_THRESHOLD) { gas = true; break; }
+      // ── Pedals: discriminate racing wheel (4+ axes) vs standard gamepad ──
+      if (gp.axes.length >= 4) {
+        // Racing wheel: axes[2] = gas, axes[3] = brake (rest ~1.0, pressed ~-1.0)
+        if (gp.axes[2] < GP_GAS_THRESHOLD) gas = true;
+        if (gp.axes[3] < GP_GAS_THRESHOLD) brake = true;
+      } else {
+        // Standard gamepad: axes[1] < -0.3 = left stick pushed up → gas
+        if (gp.axes[1] != null && gp.axes[1] < GP_GAS_THRESHOLD) gas = true;
       }
 
       // ── Gas buttons: RT (7), A (0), d-pad up (12) ──
       if (gp.buttons[7]?.pressed || gp.buttons[0]?.pressed || gp.buttons[12]?.pressed) gas = true;
+
+      // ── Start (9) and B (1) buttons ──
+      if (gp.buttons[9]?.pressed) startNow = true;
+      if (gp.buttons[1]?.pressed) bNow = true;
     }
 
     // Update gamepad held state
@@ -331,6 +345,13 @@ export function setupControls(onSwitch, onRelease) {
     _gpLeftHeld = steer < -GP_STEER_DEADZONE;
     _gpRightHeld = steer > GP_STEER_DEADZONE;
     _gpPedalDown = gas;
+    _gpBrakeDown = brake;
+
+    // Edge detection for Start and B buttons
+    _startJustPressed = startNow && !_prevStart;
+    _bJustPressed = bNow && !_prevB;
+    _prevStart = startNow;
+    _prevB = bNow;
 
     // Visual feedback on on-screen buttons
     if (_gpLeftHeld !== prevLeft) leftBtn.classList.toggle('active', _gpLeftHeld || _leftHeld);
@@ -348,8 +369,11 @@ export function setupControls(onSwitch, onRelease) {
     },
     hideButtons() { container.style.display = 'none'; },
     isPedalDown() { return !_locked && (_pedalDown || _gpPedalDown); },
+    isBrakeDown() { return !_locked && _gpBrakeDown; },
     isLeftHeld()  { return !_locked && (_leftHeld || _gpLeftHeld); },
     isRightHeld() { return !_locked && (_rightHeld || _gpRightHeld); },
+    consumeStartPress() { if (_startJustPressed) { _startJustPressed = false; return true; } return false; },
+    consumeBPress() { if (_bJustPressed) { _bJustPressed = false; return true; } return false; },
     pollGamepad,
     lock()   { _locked = true; },
     unlock() { _locked = false; },
