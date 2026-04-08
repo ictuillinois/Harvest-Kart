@@ -80,6 +80,14 @@ export class Environment {
       this._buildMountainSky();
       this.sunDirection.set(0.3, 0.85, -0.3).normalize();
       this.renderer.toneMappingExposure = 1.3;
+    } else if (theme.id === 'shanghai') {
+      this._buildShanghaiSky();
+      this.sunDirection.set(0.5, 0.45, -0.5).normalize(); // rising sun, east
+      this.renderer.toneMappingExposure = 1.3;
+    } else if (theme.id === 'delhi') {
+      this._buildDelhiSky();
+      this.sunDirection.set(-0.3, 0.2, -0.8).normalize();
+      this.renderer.toneMappingExposure = 1.0;
     } else {
       this.sky = new Sky();
       this.sky.scale.setScalar(10000);
@@ -138,6 +146,12 @@ export class Environment {
     } else if (theme.id === 'peru') {
       this.hemiLight = new THREE.HemisphereLight(0x6699cc, 0x8b7355, 0.6);
       this.dirLight.position.set(15, 35, -10);
+    } else if (theme.id === 'shanghai') {
+      this.hemiLight = new THREE.HemisphereLight(0x99bbdd, 0x556644, 0.65);
+      this.dirLight.position.set(30, 25, -40); // morning sun from east
+    } else if (theme.id === 'delhi') {
+      this.hemiLight = new THREE.HemisphereLight(0xcc9966, 0x664433, 0.5);
+      this.dirLight.position.set(-25, 15, -80);
     } else {
       this.hemiLight = new THREE.HemisphereLight(theme.dirColor, theme.ground, 0.5);
     }
@@ -185,6 +199,8 @@ export class Environment {
       case 'brazil': this._buildBrazil(); break;
       case 'usa': this._buildUSA(); break;
       case 'peru': this._buildPeru(); break;
+      case 'shanghai': this._buildShanghai(); break;
+      case 'delhi': this._buildDelhi(); break;
     }
 
     // ICT billboards along the road (all maps)
@@ -1120,6 +1136,1270 @@ export class Environment {
   }
 
   // =====================================================================
+  //  SHANGHAI SKY (dawn/dusk gradient — lavender to peach)
+  // =====================================================================
+  _buildShanghaiSky() {
+    const skyGeo = new THREE.SphereGeometry(500, 32, 16);
+    const skyMat = new THREE.ShaderMaterial({
+      side: THREE.BackSide,
+      depthWrite: false,
+      uniforms: {},
+      vertexShader: `
+        varying vec3 vWorldPos;
+        void main() {
+          vWorldPos = (modelMatrix * vec4(position, 1.0)).xyz;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        varying vec3 vWorldPos;
+        void main() {
+          float h = normalize(vWorldPos).y;
+          vec3 zenith  = vec3(0.22, 0.35, 0.60);   // crisp morning blue
+          vec3 upper   = vec3(0.40, 0.55, 0.75);   // light blue
+          vec3 mid     = vec3(0.65, 0.70, 0.80);   // pale sky
+          vec3 lower   = vec3(0.90, 0.75, 0.65);   // warm peach-pink
+          vec3 horizon = vec3(1.00, 0.80, 0.55);   // golden sunrise glow
+
+          vec3 col;
+          if (h > 0.5) col = mix(upper, zenith, (h - 0.5) / 0.5);
+          else if (h > 0.25) col = mix(mid, upper, (h - 0.25) / 0.25);
+          else if (h > 0.08) col = mix(lower, mid, (h - 0.08) / 0.17);
+          else if (h > 0.0) col = mix(horizon, lower, h / 0.08);
+          else col = horizon;
+
+          gl_FragColor = vec4(col, 1.0);
+        }
+      `,
+    });
+    this.sky = new THREE.Mesh(skyGeo, skyMat);
+    this.scene.add(this.sky);
+
+    // Morning clouds — cool white/pink tints
+    const cloudTex = this._makeCloudTexture();
+    const tints = [0xeeddff, 0xffddcc, 0xddeeff];
+    for (let i = 0; i < 3; i++) {
+      const w = 40 + Math.random() * 50;
+      const h = 6 + Math.random() * 6;
+      const cloudMat = new THREE.MeshBasicMaterial({
+        map: cloudTex, transparent: true,
+        opacity: 0.3 + Math.random() * 0.15,
+        depthWrite: false, side: THREE.DoubleSide,
+        color: tints[i],
+      });
+      const cloud = new THREE.Mesh(new THREE.PlaneGeometry(w, h), cloudMat);
+      cloud.position.set(
+        -70 + Math.random() * 140,
+        30 + Math.random() * 25,
+        -150 - Math.random() * 150,
+      );
+      cloud.lookAt(0, cloud.position.y, 0);
+      this.scene.add(cloud);
+      this.themeObjects.push(cloud);
+      this.background.push(cloud);
+    }
+  }
+
+  // =====================================================================
+  //  SHANGHAI — Bund buildings + pagodas (left), Huangpu River + Pudong (right)
+  // =====================================================================
+  _buildShanghai() {
+    const RH = ROAD_WIDTH / 2;
+
+    // No river — buildings on BOTH sides like Chicago.
+    // Pudong skyline far in background, Chinese hoardings on left.
+
+    // ── Sidewalk strips (both sides) ──
+    const sidewalkMat = new THREE.MeshBasicMaterial({ color: 0x555550 });
+    for (const side of [-1, 1]) {
+      const strip = new THREE.Mesh(new THREE.PlaneGeometry(5, 600), sidewalkMat);
+      strip.rotation.x = -Math.PI / 2;
+      strip.position.set(side * (RH + 3.5), 0.01, -150);
+      this.scene.add(strip);
+      this.themeObjects.push(strip);
+    }
+
+    // ══════════════════════════════════════════
+    //  ROADSIDE PROPS
+    // ══════════════════════════════════════════
+    if (this.modelsReady) {
+      this._scatterProps(
+        [MODEL_URLS.bench, MODEL_URLS.trafficLight, MODEL_URLS.trashcan,
+         MODEL_URLS.firehydrant, MODEL_URLS.trafficCone],
+        6, [2, 5], 55, 'fg',
+      );
+    }
+
+    // ══════════════════════════════════════════
+    //  MIDGROUND — Buildings on BOTH sides (like Chicago)
+    // ══════════════════════════════════════════
+    const texPool = this._buildShanghaiTexPool();
+    for (const side of [-1, 1]) {
+      let z = 10;
+      while (z > -370) {
+        const w = 5 + Math.random() * 8;
+        const h = 6 + Math.random() * 14;
+        const d = 4 + Math.random() * 5;
+        const gap = 3 + Math.random() * 4;
+        const bldg = this._createShanghaiBuilding(w, h, d, texPool);
+        bldg.position.x = side * (RH + 8 + d / 2 + Math.random() * 3);
+        bldg.position.z = z - w / 2;
+        this.scene.add(bldg);
+        this.themeObjects.push(bldg);
+        this.midground.push(bldg);
+        z -= w + gap;
+      }
+    }
+
+    // ══════════════════════════════════════════
+    //  MIDGROUND LEFT — Pagodas rising above buildings
+    // ══════════════════════════════════════════
+    const pagodaMat = new THREE.MeshStandardMaterial({ color: 0x8b3510, roughness: 0.75 });
+    const roofMat = new THREE.MeshStandardMaterial({ color: 0x2a2a2a, roughness: 0.6 });
+    const goldMat = new THREE.MeshStandardMaterial({ color: 0xccaa44, metalness: 0.7 });
+
+    for (const pp of [
+      { x: -(RH + 20), z: -70, levels: 6, scale: 1.0 },
+      { x: -(RH + 24), z: -200, levels: 4, scale: 0.85 },
+      { x: -(RH + 18), z: -330, levels: 5, scale: 0.75 },
+    ]) {
+      const pg = new THREE.Group();
+      for (let lv = 0; lv < pp.levels; lv++) {
+        const sc = 1 - lv * 0.13;
+        const bw = 5 * sc;
+        const body = new THREE.Mesh(new THREE.BoxGeometry(bw, 2.5, bw), pagodaMat);
+        body.position.y = lv * 3.5 + 1.25; pg.add(body);
+        const rw = bw + 1.5;
+        const roof = new THREE.Mesh(new THREE.ConeGeometry(rw * 0.7, 1.2, 4), roofMat);
+        roof.position.y = lv * 3.5 + 2.9; roof.rotation.y = Math.PI / 4; pg.add(roof);
+      }
+      const spire = new THREE.Mesh(new THREE.ConeGeometry(0.2, 3, 6), goldMat);
+      spire.position.y = pp.levels * 3.5 + 1.5; pg.add(spire);
+      pg.scale.setScalar(pp.scale);
+      pg.position.set(pp.x, 0, pp.z);
+      this.scene.add(pg); this.themeObjects.push(pg); this.midground.push(pg);
+    }
+
+    // ── Chinese paifang gates (left side) ──
+    const gateMat = new THREE.MeshStandardMaterial({ color: 0xaa2222, roughness: 0.7 });
+    for (const gz of [-140, -280]) {
+      const gg = new THREE.Group();
+      for (const gx of [-2.5, 2.5]) {
+        const p = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.5, 7, 6), gateMat);
+        p.position.set(gx, 3.5, 0); gg.add(p);
+      }
+      const beam = new THREE.Mesh(new THREE.BoxGeometry(7, 0.8, 1), gateMat);
+      beam.position.y = 7; gg.add(beam);
+      const gr = new THREE.Mesh(new THREE.ConeGeometry(4, 1.5, 4), roofMat);
+      gr.position.y = 8; gr.rotation.y = Math.PI / 4; gg.add(gr);
+      gg.position.set(-(RH + 14), 0, gz);
+      this.scene.add(gg); this.themeObjects.push(gg); this.midground.push(gg);
+    }
+
+    // ── Chinese hoardings/signs (left side, above buildings) ──
+    const signTexts = ['上海', '火锅', '奶茶', '小笼包', '饺子', '福'];
+    const signBgColors = ['#cc2222', '#dd8811', '#2255aa', '#228833', '#cc2266', '#aa6600'];
+    const hoardingTextures = signTexts.map((txt, i) => {
+      const c = document.createElement('canvas');
+      c.width = 128; c.height = 64;
+      const cx = c.getContext('2d');
+      cx.fillStyle = signBgColors[i];
+      cx.fillRect(0, 0, 128, 64);
+      // Gold border
+      cx.strokeStyle = '#ffcc44';
+      cx.lineWidth = 4;
+      cx.strokeRect(4, 4, 120, 56);
+      cx.fillStyle = '#ffdd44';
+      cx.font = 'bold 36px sans-serif';
+      cx.textAlign = 'center';
+      cx.textBaseline = 'middle';
+      cx.fillText(txt, 64, 34);
+      const t = new THREE.CanvasTexture(c);
+      t.magFilter = THREE.NearestFilter;
+      return t;
+    });
+    for (let i = 0; i < 6; i++) {
+      const hg = new THREE.Group();
+      // Sign board
+      const board = new THREE.Mesh(new THREE.BoxGeometry(2.5, 1.2, 0.1),
+        new THREE.MeshBasicMaterial({ map: hoardingTextures[i] }));
+      hg.add(board);
+      // Pole
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 3, 4),
+        new THREE.MeshStandardMaterial({ color: 0x555555 }));
+      pole.position.y = -2; hg.add(pole);
+      const side = i % 2 === 0 ? -1 : 1;
+      hg.position.set(side * (RH + 5 + Math.random() * 2), 5 + Math.random() * 2, -i * 50 - 20);
+      this.scene.add(hg); this.themeObjects.push(hg); this.midground.push(hg);
+    }
+
+    // ══════════════════════════════════════════
+    //  BACKGROUND — Pudong skyline (far, visible between buildings)
+    // ══════════════════════════════════════════
+
+    // Distant skyline buildings on both sides
+    const bgColors = [0x556677, 0x445566, 0x667788, 0x334455, 0x778899];
+    for (let i = 0; i < 12; i++) {
+      const w = 4 + Math.random() * 6;
+      const h = 15 + Math.random() * 30;
+      const d = 4 + Math.random() * 5;
+      const bldg = new THREE.Mesh(
+        new THREE.BoxGeometry(w, h, d),
+        new THREE.MeshBasicMaterial({ color: bgColors[i % bgColors.length] }),
+      );
+      const side = i < 6 ? 1 : -1;
+      bldg.position.set(
+        side * (RH + 35 + Math.random() * 45), h / 2,
+        -i * 30 - 60 - Math.random() * 30,
+      );
+      this.scene.add(bldg); this.themeObjects.push(bldg); this.background.push(bldg);
+    }
+
+    // ── Oriental Pearl Tower (far right, visible between right-side buildings) ──
+    const pearlGroup = new THREE.Group();
+    const pearlMat = new THREE.MeshStandardMaterial({
+      color: 0xccbbcc, metalness: 0.6, roughness: 0.2,
+      emissive: 0xff4488, emissiveIntensity: 0.15,
+    });
+    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.8, 45, 8), pearlMat);
+    shaft.position.y = 22.5; pearlGroup.add(shaft);
+    const sphereMat = new THREE.MeshStandardMaterial({ color: 0xff6699, metalness: 0.4, roughness: 0.3, emissive: 0xff2266, emissiveIntensity: 0.3 });
+    const ls = new THREE.Mesh(new THREE.SphereGeometry(4, 8, 6), sphereMat);
+    ls.position.y = 14; pearlGroup.add(ls);
+    const us = new THREE.Mesh(new THREE.SphereGeometry(2.5, 8, 6), sphereMat);
+    us.position.y = 35; pearlGroup.add(us);
+    const spire = new THREE.Mesh(new THREE.ConeGeometry(0.3, 8, 6), pearlMat);
+    spire.position.y = 49; pearlGroup.add(spire);
+    pearlGroup.position.set(RH + 60, 0, -150);
+    this.scene.add(pearlGroup); this.themeObjects.push(pearlGroup); this.background.push(pearlGroup);
+
+    // ── Shanghai Tower (tallest) ──
+    const shTower = new THREE.Mesh(new THREE.CylinderGeometry(2.5, 3.5, 60, 6),
+      new THREE.MeshStandardMaterial({ color: 0x6688aa, metalness: 0.7, roughness: 0.15, emissive: 0x334466, emissiveIntensity: 0.2 }));
+    shTower.position.set(RH + 75, 30, -280);
+    this.scene.add(shTower); this.themeObjects.push(shTower); this.background.push(shTower);
+
+    // ── SWFC ──
+    const swfc = new THREE.Mesh(new THREE.BoxGeometry(4, 50, 4),
+      new THREE.MeshStandardMaterial({ color: 0x445566, metalness: 0.6, roughness: 0.2, emissive: 0x223344, emissiveIntensity: 0.15 }));
+    swfc.position.set(RH + 65, 25, -300);
+    this.scene.add(swfc); this.themeObjects.push(swfc); this.background.push(swfc);
+
+    // ── Jin Mao Tower ──
+    const jinMao = new THREE.Mesh(new THREE.BoxGeometry(3.5, 40, 3.5),
+      new THREE.MeshStandardMaterial({ color: 0x8899aa, metalness: 0.5, roughness: 0.2, emissive: 0x445566, emissiveIntensity: 0.15 }));
+    jinMao.position.set(-(RH + 55), 20, -350);
+    this.scene.add(jinMao); this.themeObjects.push(jinMao); this.background.push(jinMao);
+
+    // ══════════════════════════════════════════
+    //  FOREGROUND — Lamps, trees, signs
+    // ══════════════════════════════════════════
+
+    // ── Street lamps (both sides) ──
+    const lampPoleMat = new THREE.MeshStandardMaterial({
+      color: 0x222222, metalness: 0.6, roughness: 0.2,
+      emissive: 0xffaa55, emissiveIntensity: 0.1,
+    });
+    const lpGeo = new THREE.CylinderGeometry(0.04, 0.05, 4.5, 5);
+    const lfGeo = new THREE.SphereGeometry(0.2, 4, 3);
+    lpGeo.translate(0, 2.25, 0);
+    lfGeo.translate(0, 4.6, 0);
+    const lampMerged = mergeGeometries([lpGeo, lfGeo], false);
+    for (let i = 0; i < 8; i++) {
+      const side = i % 2 === 0 ? -1 : 1;
+      const lamp = new THREE.Mesh(lampMerged, lampPoleMat);
+      lamp.position.set(side * (RH + 1.5), 0, -i * 35 - Math.random() * 10);
+      this.scene.add(lamp); this.themeObjects.push(lamp); this.foreground.push(lamp);
+    }
+
+    // ── Trees (both sides, between buildings) ──
+    const trunkMat = new THREE.MeshStandardMaterial({ color: 0x4a3a2a, roughness: 0.9 });
+    const leafMat = new THREE.MeshStandardMaterial({ color: 0x2a5a2a, roughness: 0.8 });
+    for (let i = 0; i < 8; i++) {
+      const tg = new THREE.Group();
+      const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.2, 2.5, 5), trunkMat);
+      trunk.position.y = 1.25; tg.add(trunk);
+      const canopy = new THREE.Mesh(new THREE.SphereGeometry(1.5, 6, 5), leafMat);
+      canopy.position.y = 3.5; canopy.scale.set(1, 0.7, 1); tg.add(canopy);
+      const side = i % 2 === 0 ? -1 : 1;
+      tg.position.set(side * (RH + 2.5 + Math.random() * 2), 0, -i * 40 - Math.random() * 15);
+      this.scene.add(tg); this.themeObjects.push(tg); this.foreground.push(tg);
+    }
+
+    // ── Chinese street stalls (food carts + shops) ──
+    const stallWood = new THREE.MeshStandardMaterial({ color: 0x664422, roughness: 0.8 });
+    const stallNames = ['包子', '烧烤', '奶茶', '炒面', '饺子'];
+    const stallBgs = ['#cc2222', '#dd7711', '#22aa44', '#2255bb', '#cc2266'];
+    const stallSignTex = stallNames.map((name, i) => {
+      const c = document.createElement('canvas');
+      c.width = 128; c.height = 48;
+      const cx = c.getContext('2d');
+      cx.fillStyle = stallBgs[i];
+      cx.fillRect(0, 0, 128, 48);
+      cx.strokeStyle = '#ffcc44'; cx.lineWidth = 3;
+      cx.strokeRect(3, 3, 122, 42);
+      cx.fillStyle = '#ffdd44';
+      cx.font = 'bold 26px sans-serif';
+      cx.textAlign = 'center'; cx.textBaseline = 'middle';
+      cx.fillText(name, 64, 25);
+      const t = new THREE.CanvasTexture(c);
+      t.magFilter = THREE.NearestFilter;
+      return t;
+    });
+    const canopyColors = [0xcc2222, 0xdd8811, 0x228833, 0x2255aa, 0xcc2266];
+    for (let i = 0; i < 5; i++) {
+      const sg = new THREE.Group();
+      // Cart body
+      const cart = new THREE.Mesh(new THREE.BoxGeometry(2, 1.8, 1.2), stallWood);
+      cart.position.y = 0.9; sg.add(cart);
+      // Counter shelf
+      const shelf = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.08, 0.7),
+        new THREE.MeshStandardMaterial({ color: 0x554433 }));
+      shelf.position.set(0, 0.95, 0.8); sg.add(shelf);
+      // Canopy with Chinese curved roof shape
+      const canopyBase = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.06, 2),
+        new THREE.MeshBasicMaterial({ color: canopyColors[i] }));
+      canopyBase.position.set(0, 2.1, 0.2); sg.add(canopyBase);
+      const canopyRoof = new THREE.Mesh(new THREE.ConeGeometry(1.6, 0.6, 4),
+        new THREE.MeshBasicMaterial({ color: 0x1a1a1a }));
+      canopyRoof.position.set(0, 2.5, 0.2); canopyRoof.rotation.y = Math.PI / 4; sg.add(canopyRoof);
+      // Sign with Chinese text
+      const sign = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.45, 0.05),
+        new THREE.MeshBasicMaterial({ map: stallSignTex[i] }));
+      sign.position.set(0, 2.15, 0.95); sg.add(sign);
+      // Small stool
+      const stool = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.4, 5),
+        new THREE.MeshStandardMaterial({ color: 0x444444, metalness: 0.3 }));
+      stool.position.set(0.5, 0.2, 1.2); sg.add(stool);
+      // Steam pot (round on counter)
+      const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.25, 0.3, 6),
+        new THREE.MeshStandardMaterial({ color: 0x888888, metalness: 0.5 }));
+      pot.position.set(-0.3, 1.15, 0.5); sg.add(pot);
+
+      const side = i % 2 === 0 ? -1 : 1;
+      sg.position.set(side * (RH + 2.5), 0, -i * 60 - 25);
+      sg.rotation.y = side > 0 ? -Math.PI / 2 : Math.PI / 2;
+      this.scene.add(sg); this.themeObjects.push(sg); this.foreground.push(sg);
+    }
+
+    // ── Red lanterns (hanging between lamp posts — Chinese street vibe) ──
+    const lanternMat = new THREE.MeshBasicMaterial({ color: 0xcc2222 });
+    for (let i = 0; i < 6; i++) {
+      const lantern = new THREE.Mesh(new THREE.SphereGeometry(0.3, 6, 5), lanternMat);
+      const side = i % 2 === 0 ? -1 : 1;
+      lantern.position.set(side * (RH + 1.2), 3.8, -i * 45 - 10 - Math.random() * 10);
+      lantern.scale.set(1, 1.3, 1);
+      this.scene.add(lantern); this.themeObjects.push(lantern); this.foreground.push(lantern);
+    }
+  }
+
+  /** Procedural texture for Shanghai Bund-style buildings. */
+  _shanghaiWindowTex(wSegs, hSegs, wallColor) {
+    const cW = 16, cH = 20;
+    const canvas = document.createElement('canvas');
+    canvas.width = wSegs * cW;
+    canvas.height = hSegs * cH;
+    const ctx = canvas.getContext('2d');
+    const wc = new THREE.Color(wallColor);
+    ctx.fillStyle = `rgb(${wc.r * 255 | 0},${wc.g * 255 | 0},${wc.b * 255 | 0})`;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    // Horizontal floor lines (colonial style)
+    for (let y = 0; y < hSegs; y++) {
+      ctx.fillStyle = 'rgba(0,0,0,0.1)';
+      ctx.fillRect(0, y * cH, canvas.width, 1);
+    }
+    for (let y = 0; y < hSegs; y++) {
+      for (let x = 0; x < wSegs; x++) {
+        const wx = x * cW + 3, wy = y * cH + 4, ww = cW - 6, wh = cH - 8;
+        ctx.fillStyle = 'rgba(0,0,0,0.2)';
+        ctx.fillRect(wx - 1, wy - 1, ww + 2, wh + 2);
+        if (Math.random() > 0.2) {
+          const r = 200 + (Math.random() * 55 | 0);
+          const g = 160 + (Math.random() * 50 | 0);
+          const b = 60 + (Math.random() * 50 | 0);
+          ctx.fillStyle = `rgb(${r},${g},${b})`;
+        } else {
+          const d = 20 + (Math.random() * 20 | 0);
+          ctx.fillStyle = `rgb(${d},${d + 5},${d + 15})`;
+        }
+        ctx.fillRect(wx, wy, ww, wh);
+      }
+    }
+    // Ground floor shopfront
+    if (hSegs > 2) {
+      const gy = (hSegs - 1) * cH;
+      const awnings = ['#cc2222', '#ddaa11', '#226633', '#2255aa'];
+      ctx.fillStyle = awnings[(Math.random() * awnings.length) | 0];
+      ctx.fillRect(1, gy, canvas.width - 2, 4);
+    }
+    // Cornice at top
+    ctx.fillStyle = 'rgba(255,255,255,0.15)';
+    ctx.fillRect(0, 0, canvas.width, 2);
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.magFilter = THREE.NearestFilter;
+    return tex;
+  }
+
+  _buildShanghaiTexPool() {
+    const REF = 6;
+    // Bund colonial palette: warm brick, cream stone, gray concrete, terracotta
+    const colors = [0x8B5533, 0xDDCCAA, 0x889988, 0xBB7744, 0x776666];
+    const pool = {};
+    for (let gi = 0; gi < colors.length; gi++) {
+      const tex = this._shanghaiWindowTex(REF, REF, colors[gi]);
+      tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+      pool[gi] = tex;
+    }
+    return pool;
+  }
+
+  _createShanghaiBuilding(w, h, d, texPool) {
+    const poolSize = 5;
+    const gi = (Math.random() * poolSize) | 0;
+    const segs = Math.max(2, (Math.max(w, d) / 1.5) | 0);
+    const hSegs = Math.max(3, (h / 2.5) | 0);
+    const REF = 6;
+    const tex = texPool[gi].clone();
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    tex.repeat.set(segs / REF, hSegs / REF);
+
+    const group = new THREE.Group();
+
+    // Building body
+    const mat = new THREE.MeshBasicMaterial({ map: tex });
+    const body = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+    body.position.y = h / 2;
+    group.add(body);
+
+    // Chinese curved roof on top (wider than building, dark tiles)
+    const roofMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.6 });
+    const roofW = w + 1.5;
+    const roofD = d + 1.0;
+    const roof = new THREE.Mesh(new THREE.ConeGeometry(roofW * 0.55, 1.8, 4), roofMat);
+    roof.position.y = h + 0.6;
+    roof.rotation.y = Math.PI / 4;
+    group.add(roof);
+
+    // Ridge ornament (gold tip on some buildings)
+    if (Math.random() > 0.4) {
+      const ridgeMat = new THREE.MeshStandardMaterial({ color: 0xccaa44, metalness: 0.6 });
+      const ridge = new THREE.Mesh(new THREE.ConeGeometry(0.15, 1, 4), ridgeMat);
+      ridge.position.y = h + 1.8;
+      group.add(ridge);
+    }
+
+    // Eave overhang (flat wider rim under the roof — classic Chinese style)
+    const eaveMat = new THREE.MeshBasicMaterial({ color: 0x2a2222 });
+    const eave = new THREE.Mesh(new THREE.BoxGeometry(roofW, 0.15, roofD), eaveMat);
+    eave.position.y = h + 0.05;
+    group.add(eave);
+
+    return group;
+  }
+
+  // =====================================================================
+  //  DELHI SKY — warm dusk gradient (saffron → deep indigo)
+  // =====================================================================
+  _buildDelhiSky() {
+    const skyGeo = new THREE.SphereGeometry(500, 32, 16);
+    const skyMat = new THREE.ShaderMaterial({
+      side: THREE.BackSide,
+      depthWrite: false,
+      uniforms: {},
+      vertexShader: `
+        varying vec3 vWorldPos;
+        void main() {
+          vWorldPos = (modelMatrix * vec4(position, 1.0)).xyz;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        varying vec3 vWorldPos;
+        void main() {
+          float h = normalize(vWorldPos).y;
+          vec3 zenith  = vec3(0.10, 0.08, 0.22);   // deep indigo night
+          vec3 upper   = vec3(0.20, 0.14, 0.38);   // purple-blue
+          vec3 mid     = vec3(0.50, 0.30, 0.45);   // dusky mauve
+          vec3 lower   = vec3(0.85, 0.50, 0.30);   // warm saffron
+          vec3 horizon = vec3(1.00, 0.70, 0.35);   // golden-orange haze
+
+          vec3 col;
+          if (h > 0.5) col = mix(upper, zenith, (h - 0.5) / 0.5);
+          else if (h > 0.25) col = mix(mid, upper, (h - 0.25) / 0.25);
+          else if (h > 0.08) col = mix(lower, mid, (h - 0.08) / 0.17);
+          else if (h > 0.0) col = mix(horizon, lower, h / 0.08);
+          else col = horizon;
+
+          gl_FragColor = vec4(col, 1.0);
+        }
+      `,
+    });
+    this.sky = new THREE.Mesh(skyGeo, skyMat);
+    this.scene.add(this.sky);
+
+    // Warm-tinted clouds
+    const cloudTex = this._makeCloudTexture();
+    const tints = [0xffcc88, 0xffaa66, 0xeebb77];
+    for (let i = 0; i < 3; i++) {
+      const w = 40 + Math.random() * 50;
+      const h = 6 + Math.random() * 6;
+      const cloudMat = new THREE.MeshBasicMaterial({
+        map: cloudTex, transparent: true,
+        opacity: 0.3 + Math.random() * 0.15,
+        depthWrite: false, side: THREE.DoubleSide,
+        color: tints[i],
+      });
+      const cloud = new THREE.Mesh(new THREE.PlaneGeometry(w, h), cloudMat);
+      cloud.position.set(
+        -70 + Math.random() * 140,
+        30 + Math.random() * 25,
+        -150 - Math.random() * 150,
+      );
+      cloud.lookAt(0, cloud.position.y, 0);
+      this.scene.add(cloud);
+      this.themeObjects.push(cloud);
+      this.background.push(cloud);
+    }
+  }
+
+  // =====================================================================
+  //  DELHI — Indian street with temples, colorful havelis, banyan trees
+  // =====================================================================
+
+  /** Procedural texture for vibrant Indian haveli buildings. */
+  _delhiHaveliTex(wSegs, hSegs, wallColor) {
+    const cW = 16, cH = 20;
+    const canvas = document.createElement('canvas');
+    canvas.width = wSegs * cW;
+    canvas.height = hSegs * cH;
+    const ctx = canvas.getContext('2d');
+    const wc = new THREE.Color(wallColor);
+    ctx.fillStyle = `rgb(${wc.r * 255 | 0},${wc.g * 255 | 0},${wc.b * 255 | 0})`;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Horizontal decorative bands between floors (Rajasthani pattern)
+    for (let y = 0; y < hSegs; y++) {
+      ctx.fillStyle = 'rgba(255,220,120,0.3)';
+      ctx.fillRect(0, y * cH, canvas.width, 2);
+    }
+
+    for (let y = 0; y < hSegs; y++) {
+      for (let x = 0; x < wSegs; x++) {
+        const wx = x * cW + 2, wy = y * cH + 4, ww = cW - 4, wh = cH - 7;
+        // Arched window frame (bright contrast)
+        ctx.fillStyle = 'rgba(255,255,255,0.25)';
+        ctx.fillRect(wx - 1, wy - 1, ww + 2, wh + 2);
+        // Draw arch top
+        ctx.beginPath();
+        ctx.arc(wx + ww / 2, wy, ww / 2, Math.PI, 0);
+        ctx.fillStyle = 'rgba(255,255,255,0.2)';
+        ctx.fill();
+
+        // Bright warm window interior (lit up)
+        if (Math.random() > 0.2) {
+          const warmR = 220 + (Math.random() * 35 | 0);
+          const warmG = 150 + (Math.random() * 70 | 0);
+          const warmB = 40 + (Math.random() * 60 | 0);
+          ctx.fillStyle = `rgb(${warmR},${warmG},${warmB})`;
+        } else {
+          // Some dark windows
+          const d = 20 + (Math.random() * 15 | 0);
+          ctx.fillStyle = `rgb(${d},${d + 5},${d + 10})`;
+        }
+        ctx.fillRect(wx, wy, ww, wh);
+
+        // Tiny balcony rail on some windows
+        if (Math.random() > 0.5) {
+          ctx.fillStyle = 'rgba(200,170,80,0.6)';
+          ctx.fillRect(wx - 1, wy + wh - 2, ww + 2, 2);
+        }
+      }
+    }
+    // Ground-floor shopfronts (vivid Indian market colors)
+    if (hSegs > 2) {
+      const gy = (hSegs - 1) * cH;
+      const awnings = ['#ff4422', '#dd2266', '#22aa55', '#ff9911', '#7722cc', '#dd6600', '#2288bb'];
+      ctx.fillStyle = awnings[(Math.random() * awnings.length) | 0];
+      ctx.fillRect(1, gy, canvas.width - 2, 5);
+    }
+    // Bold decorative trim at roofline (gold/white)
+    ctx.fillStyle = '#ddcc66';
+    ctx.fillRect(0, 0, canvas.width, 3);
+    ctx.fillStyle = 'rgba(255,255,255,0.3)';
+    ctx.fillRect(0, 3, canvas.width, 1);
+
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.magFilter = THREE.NearestFilter;
+    return tex;
+  }
+
+  /** Pool of 6 haveli wall styles — vivid Rajasthani palette. */
+  _buildHaveliTexPool() {
+    const REF = 6;
+    const colors = [
+      0xEE6633,  // bright terracotta orange
+      0xDDBB22,  // vivid marigold yellow
+      0xDD5588,  // Jaipur pink
+      0x44AAAA,  // teal / turquoise (Jodhpur blue-ish)
+      0xCC4444,  // deep red (sandstone)
+      0x88BB44,  // lime green
+    ];
+    const pool = {};
+    for (let gi = 0; gi < colors.length; gi++) {
+      const tex = this._delhiHaveliTex(REF, REF, colors[gi]);
+      tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+      pool[gi] = tex;
+    }
+    return pool;
+  }
+
+  /** Create a single procedural haveli building (shared texture pool). */
+  _createHaveli(w, h, d, texPool) {
+    const poolSize = 6;
+    const gi = (Math.random() * poolSize) | 0;
+    const segs = Math.max(2, (Math.max(w, d) / 1.5) | 0);
+    const hSegs = Math.max(3, (h / 2.5) | 0);
+    const REF = 6;
+    const tex = texPool[gi].clone();
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    tex.repeat.set(segs / REF, hSegs / REF);
+    const mat = new THREE.MeshBasicMaterial({ map: tex });
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+    mesh.position.y = h / 2;
+    return mesh;
+  }
+
+  _buildDelhi() {
+    const RH = ROAD_WIDTH / 2;
+
+    // Layout: LEFT = havelis + temples + trees | RIGHT = open lake + Taj + fort
+    // No backdrop image, no right-side buildings — clean lake view.
+
+    // ── LAKE — right side only, bright blue, sits ABOVE ground (ground is Y=-0.1) ──
+    // PlaneGeometry is centered on its position, so width 200 at X = RH+108
+    // covers from X=8 (just past road edge) to X=208 — right side only.
+    const lake = new THREE.Mesh(
+      new THREE.PlaneGeometry(200, 600),
+      new THREE.MeshBasicMaterial({ color: 0x2288bb }),
+    );
+    lake.rotation.x = -Math.PI / 2;
+    lake.position.set(RH + 108, 0.0, -150);
+    this.scene.add(lake);
+    this.themeObjects.push(lake);
+
+    // ── Grass strip (LEFT side only) ──
+    const grassStrip = new THREE.Mesh(
+      new THREE.PlaneGeometry(5, 600),
+      new THREE.MeshBasicMaterial({ color: 0x3a5a28 }),
+    );
+    grassStrip.rotation.x = -Math.PI / 2;
+    grassStrip.position.set(-(RH + 3.5), 0.01, -150);
+    this.scene.add(grassStrip);
+    this.themeObjects.push(grassStrip);
+
+    // ══════════════════════════════════════════
+    //  ROADSIDE PROPS (LEFT side only)
+    // ══════════════════════════════════════════
+    if (this.modelsReady) {
+      this._scatterProps(
+        [MODEL_URLS.bench, MODEL_URLS.trafficLight, MODEL_URLS.trashcan],
+        4, [2, 4], 70, 'fg',
+      );
+    }
+
+    // ══════════════════════════════════════════
+    //  MIDGROUND — LEFT side ONLY: colorful havelis
+    // ══════════════════════════════════════════
+    const haveliPool = this._buildHaveliTexPool();
+    {
+      let z = 10;
+      while (z > -370) {
+        const w = 5 + Math.random() * 6;
+        const h = 4 + Math.random() * 8;
+        const d = 3 + Math.random() * 4;
+        const gap = 2 + Math.random() * 4;
+
+        const bldg = this._createHaveli(w, h, d, haveliPool);
+        bldg.position.x = -(RH + 8 + d / 2 + Math.random() * 3);
+        bldg.position.z = z - w / 2;
+        this.scene.add(bldg);
+        this.themeObjects.push(bldg);
+        this.midground.push(bldg);
+
+        z -= w + gap;
+      }
+    }
+
+    // ══════════════════════════════════════════
+    //  MIDGROUND — LEFT: Temple gopurams (rise above havelis)
+    // ══════════════════════════════════════════
+    const templeStoneMat = new THREE.MeshStandardMaterial({
+      color: 0xaa7744, roughness: 0.75, metalness: 0.05,
+      emissive: 0x553322, emissiveIntensity: 0.1,
+    });
+    const goldMat = new THREE.MeshStandardMaterial({
+      color: 0xccaa44, metalness: 0.6, roughness: 0.3,
+    });
+
+    for (const tp of [
+      { x: -(RH + 18), z: -60, scale: 1.0 },
+      { x: -(RH + 22), z: -180, scale: 0.85 },
+      { x: -(RH + 16), z: -300, scale: 0.7 },
+    ]) {
+      const templeGroup = new THREE.Group();
+      const levels = 5;
+      for (let lv = 0; lv < levels; lv++) {
+        const sc = 1 - lv * 0.14;
+        const bw = 5 * sc;
+        const bh = 2.5;
+        const body = new THREE.Mesh(new THREE.BoxGeometry(bw, bh, bw), templeStoneMat);
+        body.position.y = lv * 3 + bh / 2;
+        templeGroup.add(body);
+      }
+      const spire = new THREE.Mesh(new THREE.ConeGeometry(1, 5, 6), goldMat);
+      spire.position.y = levels * 3 + 2.5;
+      templeGroup.add(spire);
+      templeGroup.scale.setScalar(tp.scale);
+      templeGroup.position.set(tp.x, 0, tp.z);
+      this.scene.add(templeGroup);
+      this.themeObjects.push(templeGroup);
+      this.midground.push(templeGroup);
+    }
+
+    // ── Mughal archway gates (LEFT side) ──
+    const archMat = new THREE.MeshStandardMaterial({ color: 0xcc8844, roughness: 0.7 });
+    const archDomeMat = new THREE.MeshStandardMaterial({ color: 0xddaa55, roughness: 0.5 });
+    for (const az of [-120, -250]) {
+      const ag = new THREE.Group();
+      const p1 = new THREE.Mesh(new THREE.BoxGeometry(1.5, 8, 1.5), archMat);
+      p1.position.set(-2.5, 4, 0); ag.add(p1);
+      const p2 = p1.clone(); p2.position.set(2.5, 4, 0); ag.add(p2);
+      const top = new THREE.Mesh(new THREE.BoxGeometry(7, 1.5, 1.5), archMat);
+      top.position.y = 8.5; ag.add(top);
+      const ad = new THREE.Mesh(
+        new THREE.SphereGeometry(2, 8, 5, 0, Math.PI * 2, 0, Math.PI / 2), archDomeMat);
+      ad.position.y = 9.5; ag.add(ad);
+      ag.position.set(-(RH + 14), 0, az);
+      this.scene.add(ag);
+      this.themeObjects.push(ag);
+      this.midground.push(ag);
+    }
+
+    // ══════════════════════════════════════════
+    //  BACKGROUND — Delhi landmarks across the lake (like Shanghai skyline)
+    //  Spread across Z: Lotus Temple, Qutub Minar, Red Fort
+    // ══════════════════════════════════════════
+
+    // Shared materials
+    const sandstoneMat = new THREE.MeshStandardMaterial({
+      color: 0xcc9966, roughness: 0.75, metalness: 0.05,
+      emissive: 0x553322, emissiveIntensity: 0.08,
+    });
+    const redStoneMat = new THREE.MeshStandardMaterial({
+      color: 0x8b4422, roughness: 0.7,
+      emissive: 0x331100, emissiveIntensity: 0.1,
+    });
+    const whiteMat = new THREE.MeshStandardMaterial({
+      color: 0xf0e8dd, roughness: 0.3, metalness: 0.1,
+      emissive: 0xeeddcc, emissiveIntensity: 0.1,
+    });
+    const goldFinialMat = new THREE.MeshStandardMaterial({
+      color: 0xccaa44, metalness: 0.6, roughness: 0.3,
+    });
+
+    // ── 1. LOTUS TEMPLE (Z = -80) — iconic petal-shaped Bahai temple ──
+    const lotusGroup = new THREE.Group();
+    // Base platform (circular)
+    const lotusBase = new THREE.Mesh(
+      new THREE.CylinderGeometry(8, 10, 2, 12), sandstoneMat);
+    lotusBase.position.y = 1;
+    lotusGroup.add(lotusBase);
+    // Inner pool ring
+    const poolRing = new THREE.Mesh(
+      new THREE.CylinderGeometry(9.5, 9.5, 0.3, 16),
+      new THREE.MeshBasicMaterial({ color: 0x3399cc }),
+    );
+    poolRing.position.y = 0.15;
+    lotusGroup.add(poolRing);
+    // Outer petals (9 petals arranged in a circle, leaning outward)
+    const petalMat = new THREE.MeshStandardMaterial({
+      color: 0xf5f0e8, metalness: 0.2, roughness: 0.2,
+      emissive: 0xffeedd, emissiveIntensity: 0.15,
+    });
+    for (let i = 0; i < 9; i++) {
+      const angle = (i / 9) * Math.PI * 2;
+      // Outer petal (tall, leaning out)
+      const outerPetal = new THREE.Mesh(
+        new THREE.ConeGeometry(2.2, 12, 4), petalMat);
+      outerPetal.position.set(Math.cos(angle) * 5, 8, Math.sin(angle) * 5);
+      outerPetal.rotation.x = Math.sin(angle) * 0.25;
+      outerPetal.rotation.z = -Math.cos(angle) * 0.25;
+      lotusGroup.add(outerPetal);
+      // Inner petal (shorter, more upright)
+      const innerPetal = new THREE.Mesh(
+        new THREE.ConeGeometry(1.5, 9, 4), petalMat);
+      innerPetal.position.set(Math.cos(angle) * 3, 6.5, Math.sin(angle) * 3);
+      innerPetal.rotation.x = Math.sin(angle) * 0.1;
+      innerPetal.rotation.z = -Math.cos(angle) * 0.1;
+      lotusGroup.add(innerPetal);
+    }
+    // Central spire
+    const lotusCrown = new THREE.Mesh(
+      new THREE.ConeGeometry(1, 5, 6), petalMat);
+    lotusCrown.position.y = 16;
+    lotusGroup.add(lotusCrown);
+
+    lotusGroup.position.set(RH + 50, 0, -80);
+    this.scene.add(lotusGroup);
+    this.themeObjects.push(lotusGroup);
+    this.background.push(lotusGroup);
+
+    // ── 2. QUTUB MINAR (Z = -180) — tapered tower with gate ──
+    const qutubGroup = new THREE.Group();
+    // Base platform
+    const qPlatform = new THREE.Mesh(new THREE.BoxGeometry(16, 1.5, 10), sandstoneMat);
+    qPlatform.position.y = 0.75;
+    qutubGroup.add(qPlatform);
+    // Tower — 5 tapered tiers, alternating red/sandstone
+    let towerY = 1.5;
+    for (let t = 0; t < 5; t++) {
+      const botR = 2.2 - t * 0.35;
+      const topR = botR - 0.25;
+      const tierH = 7 - t * 0.8;
+      const tier = new THREE.Mesh(
+        new THREE.CylinderGeometry(topR, botR, tierH, 8),
+        t % 2 === 0 ? redStoneMat : sandstoneMat);
+      tier.position.y = towerY + tierH / 2;
+      qutubGroup.add(tier);
+      if (t < 4) {
+        const balcony = new THREE.Mesh(
+          new THREE.CylinderGeometry(topR + 0.4, topR + 0.4, 0.4, 8), whiteMat);
+        balcony.position.y = towerY + tierH;
+        qutubGroup.add(balcony);
+      }
+      towerY += tierH;
+    }
+    const qCap = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.5, 2, 6), whiteMat);
+    qCap.position.y = towerY + 1;
+    qutubGroup.add(qCap);
+    // Alai Darwaza (gate with dome)
+    const gateBody = new THREE.Mesh(new THREE.BoxGeometry(5, 5, 5), sandstoneMat);
+    gateBody.position.set(-5, 4, 0);
+    qutubGroup.add(gateBody);
+    const gateArch = new THREE.Mesh(new THREE.BoxGeometry(2, 3.5, 0.5),
+      new THREE.MeshBasicMaterial({ color: 0x111111 }));
+    gateArch.position.set(-5, 3, 2.6);
+    qutubGroup.add(gateArch);
+    const gateDome = new THREE.Mesh(
+      new THREE.SphereGeometry(2.8, 8, 5, 0, Math.PI * 2, 0, Math.PI / 2), whiteMat);
+    gateDome.position.set(-5, 6.5, 0);
+    qutubGroup.add(gateDome);
+    const gateFinial = new THREE.Mesh(new THREE.ConeGeometry(0.2, 1.5, 5), goldFinialMat);
+    gateFinial.position.set(-5, 9.5, 0);
+    qutubGroup.add(gateFinial);
+
+    qutubGroup.position.set(RH + 55, 0, -180);
+    this.scene.add(qutubGroup);
+    this.themeObjects.push(qutubGroup);
+    this.background.push(qutubGroup);
+
+    // ── 3. RED FORT (Z = -280) — iconic Mughal fortress ──
+    const fortGroup = new THREE.Group();
+    // Main wall (long, red sandstone)
+    const fortWall = new THREE.Mesh(new THREE.BoxGeometry(30, 10, 5), redStoneMat);
+    fortWall.position.y = 5;
+    fortGroup.add(fortWall);
+    // Crenellations along the top
+    for (let c = -13; c <= 13; c += 2.5) {
+      const cren = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.5, 5.2), redStoneMat);
+      cren.position.set(c, 11, 0);
+      fortGroup.add(cren);
+    }
+    // Two corner towers
+    for (const tx of [-15, 15]) {
+      const tower = new THREE.Mesh(new THREE.CylinderGeometry(2.5, 3, 14, 8), redStoneMat);
+      tower.position.set(tx, 7, 0);
+      fortGroup.add(tower);
+      // Domed cap on each tower
+      const tCap = new THREE.Mesh(
+        new THREE.SphereGeometry(2.8, 8, 5, 0, Math.PI * 2, 0, Math.PI / 2), whiteMat);
+      tCap.position.set(tx, 14, 0);
+      fortGroup.add(tCap);
+      const tFinial = new THREE.Mesh(new THREE.ConeGeometry(0.2, 1.5, 5), goldFinialMat);
+      tFinial.position.set(tx, 17, 0);
+      fortGroup.add(tFinial);
+    }
+    // Central gate (Lahori Gate)
+    const mainGate = new THREE.Mesh(new THREE.BoxGeometry(8, 14, 6), redStoneMat);
+    mainGate.position.y = 7;
+    fortGroup.add(mainGate);
+    const mainGateArch = new THREE.Mesh(new THREE.BoxGeometry(3.5, 7, 0.5),
+      new THREE.MeshBasicMaterial({ color: 0x111111 }));
+    mainGateArch.position.set(0, 5, 3.1);
+    fortGroup.add(mainGateArch);
+    // Central dome
+    const mainDome = new THREE.Mesh(
+      new THREE.SphereGeometry(4, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), whiteMat);
+    mainDome.position.y = 14;
+    fortGroup.add(mainDome);
+    const mainFinial = new THREE.Mesh(new THREE.ConeGeometry(0.3, 2, 5), goldFinialMat);
+    mainFinial.position.y = 18.5;
+    fortGroup.add(mainFinial);
+
+    fortGroup.position.set(RH + 50, 0, -280);
+    this.scene.add(fortGroup);
+    this.themeObjects.push(fortGroup);
+    this.background.push(fortGroup);
+
+    // Distant buildings far LEFT (behind temples)
+    const bgColors = [0x8b6644, 0x776655, 0x996644, 0x665544, 0x887766];
+    for (let i = 0; i < 6; i++) {
+      const w = 4 + Math.random() * 6;
+      const h = 10 + Math.random() * 20;
+      const d = 4 + Math.random() * 5;
+      const bldg = new THREE.Mesh(
+        new THREE.BoxGeometry(w, h, d),
+        new THREE.MeshBasicMaterial({ color: bgColors[i % bgColors.length] }),
+      );
+      bldg.position.set(-(RH + 35 + Math.random() * 40), h / 2, -i * 50 - 60 - Math.random() * 30);
+      this.scene.add(bldg);
+      this.themeObjects.push(bldg);
+      this.background.push(bldg);
+    }
+
+    // ══════════════════════════════════════════
+    //  FOREGROUND — RIGHT: Park strip (benches, tea stall, small trees)
+    // ══════════════════════════════════════════
+
+    // ── Park grass strip (between road and lake) ──
+    const parkGrass = new THREE.Mesh(
+      new THREE.PlaneGeometry(6, 600),
+      new THREE.MeshBasicMaterial({ color: 0x4a8a2a }),
+    );
+    parkGrass.rotation.x = -Math.PI / 2;
+    parkGrass.position.set(RH + 4, 0.02, -150);
+    this.scene.add(parkGrass);
+    this.themeObjects.push(parkGrass);
+
+    // ── Sitting benches along the lake edge ──
+    const benchWoodMat = new THREE.MeshStandardMaterial({ color: 0x664422, roughness: 0.85 });
+    const benchLegMat = new THREE.MeshStandardMaterial({ color: 0x333333, metalness: 0.4, roughness: 0.3 });
+    for (let i = 0; i < 6; i++) {
+      const benchGroup = new THREE.Group();
+      // Seat plank
+      const seat = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.1, 0.6), benchWoodMat);
+      seat.position.y = 0.5;
+      benchGroup.add(seat);
+      // Back rest
+      const back = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.6, 0.08), benchWoodMat);
+      back.position.set(0, 0.85, -0.25);
+      benchGroup.add(back);
+      // Two legs
+      for (const lx of [-0.7, 0.7]) {
+        const leg = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.5, 0.5), benchLegMat);
+        leg.position.set(lx, 0.25, 0);
+        benchGroup.add(leg);
+      }
+      benchGroup.position.set(RH + 3 + Math.random() * 3, 0, -i * 50 - 15 - Math.random() * 10);
+      benchGroup.rotation.y = Math.PI / 2 + (Math.random() - 0.5) * 0.3;
+      this.scene.add(benchGroup);
+      this.themeObjects.push(benchGroup);
+      this.foreground.push(benchGroup);
+    }
+
+    // ── Tea stalls with name signs ──
+    const stallWallMat = new THREE.MeshStandardMaterial({ color: 0x886644, roughness: 0.8 });
+    const canopyColors = [0xcc3333, 0xff9922, 0x2266aa, 0x33aa55];
+    const stallNames = ['CHAI', 'LASSI', 'SAMOSA'];
+    // Build name textures
+    const stallNameTextures = stallNames.map(name => {
+      const c = document.createElement('canvas');
+      c.width = 128; c.height = 40;
+      const cx = c.getContext('2d');
+      cx.fillStyle = '#222222';
+      cx.fillRect(0, 0, 128, 40);
+      cx.fillStyle = '#ffcc00';
+      cx.font = 'bold 24px Arial, sans-serif';
+      cx.textAlign = 'center';
+      cx.textBaseline = 'middle';
+      cx.fillText(name, 64, 20);
+      const t = new THREE.CanvasTexture(c);
+      t.magFilter = THREE.NearestFilter;
+      return t;
+    });
+
+    for (let i = 0; i < 3; i++) {
+      const stallGroup = new THREE.Group();
+      // Shack body
+      const shack = new THREE.Mesh(new THREE.BoxGeometry(2, 2, 1.5), stallWallMat);
+      shack.position.y = 1;
+      stallGroup.add(shack);
+      // Counter (front)
+      const counter = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.1, 0.8),
+        new THREE.MeshStandardMaterial({ color: 0x554433, roughness: 0.7 }));
+      counter.position.set(0, 1.0, 1.0);
+      stallGroup.add(counter);
+      // Canopy (angled roof)
+      const canopy = new THREE.Mesh(new THREE.BoxGeometry(2.8, 0.08, 2.2),
+        new THREE.MeshBasicMaterial({ color: canopyColors[i % canopyColors.length] }));
+      canopy.position.set(0, 2.3, 0.3);
+      canopy.rotation.x = -0.15;
+      stallGroup.add(canopy);
+      // Named sign board
+      const sign = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.5, 0.06),
+        new THREE.MeshBasicMaterial({ map: stallNameTextures[i] }));
+      sign.position.set(0, 2.55, 0.8);
+      stallGroup.add(sign);
+
+      stallGroup.position.set(RH + 3.5, 0, -i * 100 - 40);
+      stallGroup.rotation.y = -Math.PI / 2;
+      this.scene.add(stallGroup);
+      this.themeObjects.push(stallGroup);
+      this.foreground.push(stallGroup);
+    }
+
+    // ── Cheering crowd with Indian flags ──
+    const skinColors = [0xc68642, 0x8d5524, 0xe0ac69, 0xb07040];
+    const shirtColors = [0xff6633, 0x2288cc, 0xeeee33, 0x33cc55, 0xcc33aa, 0xffffff, 0xff9933];
+    // India flag colors
+    const flagSaffron = 0xff9933;
+    const flagWhite = 0xffffff;
+    const flagGreen = 0x138808;
+
+    for (let i = 0; i < 10; i++) {
+      const personGroup = new THREE.Group();
+      const skinCol = skinColors[i % skinColors.length];
+      const shirtCol = shirtColors[i % shirtColors.length];
+
+      // Body
+      const torso = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.6, 0.25),
+        new THREE.MeshBasicMaterial({ color: shirtCol }));
+      torso.position.y = 1.0;
+      personGroup.add(torso);
+      // Head
+      const head = new THREE.Mesh(new THREE.SphereGeometry(0.18, 5, 4),
+        new THREE.MeshBasicMaterial({ color: skinCol }));
+      head.position.y = 1.5;
+      personGroup.add(head);
+      // Legs
+      for (const lx of [-0.1, 0.1]) {
+        const leg = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.55, 0.15),
+          new THREE.MeshBasicMaterial({ color: 0x333355 }));
+        leg.position.set(lx, 0.4, 0);
+        personGroup.add(leg);
+      }
+      // Raised arm (waving)
+      const arm = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.5, 0.1),
+        new THREE.MeshBasicMaterial({ color: skinCol }));
+      arm.position.set(0.28, 1.35, 0);
+      arm.rotation.z = -0.6 - Math.random() * 0.4;
+      personGroup.add(arm);
+
+      // Indian flag in hand (every other person)
+      if (i % 2 === 0) {
+        const flagGroup = new THREE.Group();
+        // Pole
+        const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.8, 3),
+          new THREE.MeshBasicMaterial({ color: 0x888888 }));
+        pole.position.y = 0.4;
+        flagGroup.add(pole);
+        // Saffron stripe
+        const s1 = new THREE.Mesh(new THREE.PlaneGeometry(0.4, 0.12),
+          new THREE.MeshBasicMaterial({ color: flagSaffron, side: THREE.DoubleSide }));
+        s1.position.set(0.2, 0.74, 0);
+        flagGroup.add(s1);
+        // White stripe
+        const s2 = new THREE.Mesh(new THREE.PlaneGeometry(0.4, 0.12),
+          new THREE.MeshBasicMaterial({ color: flagWhite, side: THREE.DoubleSide }));
+        s2.position.set(0.2, 0.62, 0);
+        flagGroup.add(s2);
+        // Green stripe
+        const s3 = new THREE.Mesh(new THREE.PlaneGeometry(0.4, 0.12),
+          new THREE.MeshBasicMaterial({ color: flagGreen, side: THREE.DoubleSide }));
+        s3.position.set(0.2, 0.50, 0);
+        flagGroup.add(s3);
+
+        flagGroup.position.set(0.35, 1.2, 0);
+        flagGroup.rotation.z = -0.3;
+        personGroup.add(flagGroup);
+      }
+
+      // Place along both sides of the road
+      const side = i % 3 === 0 ? 1 : -1;
+      const xOff = side > 0 ? (RH + 1.5 + Math.random() * 1.5) : -(RH + 1.5 + Math.random() * 1.5);
+      personGroup.position.set(xOff, 0, -i * 30 - 10 - Math.random() * 15);
+      this.scene.add(personGroup);
+      this.themeObjects.push(personGroup);
+      this.foreground.push(personGroup);
+    }
+
+    // ── Small park trees (right side, along the lake edge) ──
+    const parkTrunkMat = new THREE.MeshStandardMaterial({ color: 0x5a4a2a, roughness: 0.9 });
+    const parkLeafMat = new THREE.MeshStandardMaterial({ color: 0x33882a, roughness: 0.7 });
+    for (let i = 0; i < 5; i++) {
+      const treeGroup = new THREE.Group();
+      const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.15, 2.5, 5), parkTrunkMat);
+      trunk.position.y = 1.25;
+      treeGroup.add(trunk);
+      const canopy = new THREE.Mesh(new THREE.SphereGeometry(1.5, 5, 4), parkLeafMat);
+      canopy.position.y = 3.2;
+      canopy.scale.set(1, 0.7, 1);
+      treeGroup.add(canopy);
+      treeGroup.position.set(RH + 2 + Math.random() * 4, 0, -i * 55 - 25 - Math.random() * 15);
+      this.scene.add(treeGroup);
+      this.themeObjects.push(treeGroup);
+      this.foreground.push(treeGroup);
+    }
+
+    // ── Low park railing (between grass and lake) ──
+    const railMat = new THREE.MeshStandardMaterial({ color: 0x444444, metalness: 0.4, roughness: 0.3 });
+    const railGeo = new THREE.BoxGeometry(0.06, 0.6, 30);
+    for (let i = 0; i < 6; i++) {
+      const rail = new THREE.Mesh(railGeo, railMat);
+      rail.position.set(RH + 7, 0.3, -i * 50 - 25);
+      this.scene.add(rail);
+      this.themeObjects.push(rail);
+      this.foreground.push(rail);
+    }
+
+    // ── Boats on the lake ──
+    const boatColors = [0xcc4422, 0x2266aa, 0xeeeecc, 0x33aa55, 0xdd8822, 0xcc3366];
+    for (let i = 0; i < 5; i++) {
+      const boatGroup = new THREE.Group();
+      const bCol = boatColors[i % boatColors.length];
+      // Hull
+      const hull = new THREE.Mesh(
+        new THREE.BoxGeometry(0.8, 0.35, 2.2),
+        new THREE.MeshBasicMaterial({ color: bCol }),
+      );
+      hull.position.y = 0.18;
+      boatGroup.add(hull);
+      // Cabin / canopy
+      const cabin = new THREE.Mesh(
+        new THREE.BoxGeometry(0.5, 0.35, 0.6),
+        new THREE.MeshBasicMaterial({ color: 0xeeeeee }),
+      );
+      cabin.position.set(0, 0.52, 0.2);
+      boatGroup.add(cabin);
+      boatGroup.position.set(
+        RH + 15 + Math.random() * 40, 0.05,
+        -i * 60 - 30 - Math.random() * 30,
+      );
+      boatGroup.rotation.y = Math.random() * Math.PI * 2;
+      boatGroup.scale.setScalar(1.5 + Math.random() * 0.8);
+      this.scene.add(boatGroup);
+      this.themeObjects.push(boatGroup);
+      this.background.push(boatGroup);
+    }
+
+    // ── Eater joints / dhabas (larger food stalls with seating) ──
+    const dhabaRoofColors = [0xdd4422, 0x22aa44, 0xeeaa11, 0x2255bb];
+    for (let i = 0; i < 3; i++) {
+      const dhabaGroup = new THREE.Group();
+      // Main structure (wider than tea stall)
+      const body = new THREE.Mesh(new THREE.BoxGeometry(3, 2.2, 2),
+        new THREE.MeshStandardMaterial({ color: 0xddccaa, roughness: 0.8 }));
+      body.position.y = 1.1;
+      dhabaGroup.add(body);
+      // Open front counter
+      const counter = new THREE.Mesh(new THREE.BoxGeometry(3.2, 0.12, 1),
+        new THREE.MeshStandardMaterial({ color: 0x665533, roughness: 0.7 }));
+      counter.position.set(0, 0.9, 1.3);
+      dhabaGroup.add(counter);
+      // Corrugated roof (colored)
+      const roof = new THREE.Mesh(new THREE.BoxGeometry(3.6, 0.1, 3),
+        new THREE.MeshBasicMaterial({ color: dhabaRoofColors[i % dhabaRoofColors.length] }));
+      roof.position.set(0, 2.5, 0.3);
+      roof.rotation.x = -0.1;
+      dhabaGroup.add(roof);
+      // Two stools in front
+      const stoolMat = new THREE.MeshStandardMaterial({ color: 0x444444, metalness: 0.3 });
+      for (const sx of [-0.7, 0.7]) {
+        const stool = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.5, 5), stoolMat);
+        stool.position.set(sx, 0.25, 1.8);
+        dhabaGroup.add(stool);
+      }
+      // Menu board
+      const menu = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.6, 0.05),
+        new THREE.MeshBasicMaterial({ color: 0x222222 }));
+      menu.position.set(0, 2.6, 1.05);
+      dhabaGroup.add(menu);
+      const menuText = new THREE.Mesh(new THREE.PlaneGeometry(1.0, 0.4),
+        new THREE.MeshBasicMaterial({ color: 0xffcc00 }));
+      menuText.position.set(0, 2.6, 1.08);
+      dhabaGroup.add(menuText);
+
+      dhabaGroup.position.set(RH + 3, 0, -i * 110 - 70);
+      dhabaGroup.rotation.y = -Math.PI / 2;
+      this.scene.add(dhabaGroup);
+      this.themeObjects.push(dhabaGroup);
+      this.foreground.push(dhabaGroup);
+    }
+
+    // ══════════════════════════════════════════
+    //  FOREGROUND — LEFT: Banyan trees, lamps, signs
+    // ══════════════════════════════════════════
+
+    // ── Banyan trees (LEFT side only) ──
+    const banyanTrunkMat = new THREE.MeshStandardMaterial({ color: 0x5a4a30, roughness: 0.9 });
+    const banyanLeafMat = new THREE.MeshStandardMaterial({ color: 0x2a6a22, roughness: 0.75 });
+    for (let i = 0; i < 5; i++) {
+      const treeGroup = new THREE.Group();
+      const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.5, 4, 6), banyanTrunkMat);
+      trunk.position.y = 2; treeGroup.add(trunk);
+      const canopy = new THREE.Mesh(new THREE.SphereGeometry(3, 6, 5), banyanLeafMat);
+      canopy.position.y = 5; canopy.scale.set(1.4, 0.6, 1.4); treeGroup.add(canopy);
+      for (let r = 0; r < 3; r++) {
+        const root = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.03, 0.04, 2 + Math.random(), 3), banyanTrunkMat);
+        root.position.set((Math.random() - 0.5) * 2, 3 + Math.random(), (Math.random() - 0.5) * 2);
+        treeGroup.add(root);
+      }
+      treeGroup.position.set(-(RH + 2.5 + Math.random() * 2), 0, -i * 55 - Math.random() * 20);
+      this.scene.add(treeGroup);
+      this.themeObjects.push(treeGroup);
+      this.foreground.push(treeGroup);
+    }
+
+    // ── Street lamps (LEFT side only — right is open lake) ──
+    const lampPoleMat = new THREE.MeshStandardMaterial({
+      color: 0x332211, metalness: 0.5, roughness: 0.3,
+      emissive: 0xffaa44, emissiveIntensity: 0.12,
+    });
+    const lpGeo = new THREE.CylinderGeometry(0.05, 0.06, 4.5, 5);
+    const lfGeo = new THREE.SphereGeometry(0.25, 5, 4);
+    lpGeo.translate(0, 2.25, 0);
+    lfGeo.translate(0, 4.7, 0);
+    const lampMerged = mergeGeometries([lpGeo, lfGeo], false);
+    for (let i = 0; i < 8; i++) {
+      const lamp = new THREE.Mesh(lampMerged, lampPoleMat);
+      lamp.position.set(-(RH + 1.5), 0, -i * 35 - Math.random() * 10);
+      this.scene.add(lamp);
+      this.themeObjects.push(lamp);
+      this.foreground.push(lamp);
+    }
+
+    // ── Colorful market signs (LEFT side) ──
+    const signColors = [0xff6633, 0xcc3366, 0x339966, 0xff9933, 0x6633cc];
+    const signMat = new THREE.MeshStandardMaterial({ color: 0x555544 });
+    const signBackGeo = new THREE.BoxGeometry(2.5, 1.0, 0.1);
+    const signPoleGeo = new THREE.CylinderGeometry(0.04, 0.04, 3, 4);
+    signPoleGeo.translate(0, -2, 0);
+    const signMerged = mergeGeometries([signBackGeo, signPoleGeo], false);
+    for (let i = 0; i < 3; i++) {
+      const sg = new THREE.Group();
+      sg.add(new THREE.Mesh(signMerged, signMat));
+      const face = new THREE.Mesh(new THREE.PlaneGeometry(2.2, 0.7),
+        new THREE.MeshBasicMaterial({ color: signColors[(Math.random() * signColors.length) | 0] }));
+      face.position.z = 0.06; sg.add(face);
+      sg.position.set(-(RH + 5), 4.5 + Math.random() * 1.5, -i * 55 - 30);
+      this.scene.add(sg);
+      this.themeObjects.push(sg);
+      this.midground.push(sg);
+    }
+  }
+
+  // =====================================================================
   //  BILLBOARDS — ICT logo signs along the road
   // =====================================================================
 
@@ -1142,9 +2422,11 @@ export class Environment {
 
     // Per-map post/frame style
     const styles = {
-      brazil: { postColor: 0x8b6914, postRoughness: 0.85, frameColor: 0xa07828, frameRoughness: 0.7, postWidth: 0.25, postDepth: 0.25, panelBack: 0x6b4e1e, roadOffset: 4 },
-      usa:    { postColor: 0x888899, postRoughness: 0.2,  frameColor: 0x666677, frameRoughness: 0.15, postWidth: 0.15, postDepth: 0.15, panelBack: 0x444455, roadOffset: 1.5 },
-      peru:   { postColor: 0x7a6b50, postRoughness: 0.9,  frameColor: 0x5a4a3a, frameRoughness: 0.8, postWidth: 0.30, postDepth: 0.30, panelBack: 0x5a4a32, roadOffset: 4 },
+      brazil:   { postColor: 0x8b6914, postRoughness: 0.85, frameColor: 0xa07828, frameRoughness: 0.7, postWidth: 0.25, postDepth: 0.25, panelBack: 0x6b4e1e, roadOffset: 4 },
+      usa:      { postColor: 0x888899, postRoughness: 0.2,  frameColor: 0x666677, frameRoughness: 0.15, postWidth: 0.15, postDepth: 0.15, panelBack: 0x444455, roadOffset: 1.5 },
+      peru:     { postColor: 0x7a6b50, postRoughness: 0.9,  frameColor: 0x5a4a3a, frameRoughness: 0.8, postWidth: 0.30, postDepth: 0.30, panelBack: 0x5a4a32, roadOffset: 4 },
+      shanghai: { postColor: 0x555566, postRoughness: 0.15, frameColor: 0x444455, frameRoughness: 0.1, postWidth: 0.12, postDepth: 0.12, panelBack: 0x333344, roadOffset: 2 },
+      delhi:    { postColor: 0x8b6914, postRoughness: 0.80, frameColor: 0x7a5a2a, frameRoughness: 0.7, postWidth: 0.22, postDepth: 0.22, panelBack: 0x5a4020, roadOffset: 3 },
     };
     const s = styles[style] || styles.usa;
     const isMetal = style === 'usa';

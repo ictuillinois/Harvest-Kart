@@ -157,9 +157,11 @@ function computeGearAndRPM(speedMph) {
 
 // Per-theme vehicle lighting config — aggressive intensities
 const THEME_VEHICLE_LIGHT = {
-  usa:    { headlights: 5.0, backfill: 4.0, underglow: 5.0 },
-  brazil: { headlights: 2.0, backfill: 2.5, underglow: 3.0 },
-  peru:   { headlights: 3.0, backfill: 3.0, underglow: 4.0 },
+  usa:      { headlights: 5.0, backfill: 4.0, underglow: 5.0 },
+  brazil:   { headlights: 2.0, backfill: 2.5, underglow: 3.0 },
+  peru:     { headlights: 3.0, backfill: 3.0, underglow: 4.0 },
+  shanghai: { headlights: 4.0, backfill: 3.5, underglow: 4.5 },
+  delhi:    { headlights: 4.5, backfill: 3.5, underglow: 5.0 },
 };
 
 let kartLights = [];
@@ -756,7 +758,7 @@ const controls = setupControls(
 );
 
 // Map index → music key
-const MAP_MUSIC_KEYS = ['brazil', 'usa', 'peru'];
+const MAP_MUSIC_KEYS = ['brazil', 'usa', 'peru', 'shanghai', 'delhi'];
 
 // ── Start line decoration ──
 let startLineObjects = [];

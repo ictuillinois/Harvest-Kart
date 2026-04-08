@@ -130,9 +130,11 @@ export const PLATE_COLLISION_Z_THRESHOLD = 2.5;
 // These are real asphalt gray. Intentionally LIGHT for vehicle contrast.
 // Color multiplies with procedural asphalt texture in Road.js.
 export const ROAD_SURFACE_COLORS = {
-  brazil: 0xababb5,   // light gray — strong contrast with dark vehicles
-  usa:    0x9a9a92,   // warm light gray
-  peru:   0xa3a3ab,   // neutral light gray
+  brazil:   0xababb5,   // light gray — strong contrast with dark vehicles
+  usa:      0x9a9a92,   // warm light gray
+  peru:     0xa3a3ab,   // neutral light gray
+  shanghai: 0x2a2a2e,   // black asphalt — Chinese city road
+  delhi:    0x9a9a9e,   // warm gray — dusty Indian highway
 };
 
 // Colors
@@ -361,6 +363,76 @@ export const MAP_THEMES = [
     stars: false,
     shadow: { far: 50, size: 18 },
     colorGrade: { saturation: 1.0, contrast: 1.0, brightness: 1.0 },
+  },
+  {
+    id: 'shanghai',
+    name: 'China',
+    description: 'Early morning skyline & ancient heritage',
+    subtitle: 'Shanghai\nDowntown',
+    city: 'Shanghai',
+    flag: asset('flags/china.png'),
+    features: ['Futuristic skyline', 'Huangpu River', 'Pagoda gardens'],
+    sky: {
+      turbidity: 6,
+      rayleigh: 2.0,
+      mieCoefficient: 0.015,
+      mieDirectionalG: 0.80,
+      sunElevation: 20,      // rising sun — early morning
+      sunAzimuth: 90,       // east
+      exposure: 0.9,
+    },
+    clouds: {
+      coverage: 0.2,
+      density: 0.25,
+      scale: 0.00025,
+      speed: 0.0001,
+      elevation: 0.5,
+    },
+    fog: 0xaabbcc,            // cool morning mist
+    fogDensity: 0.003,
+    ground: 0x3a4a2a,
+    ambientColor: 0x99aacc,
+    ambientIntensity: 0.6,
+    dirColor: 0xffeebb,       // warm sunrise light
+    dirIntensity: 1.8,
+    stars: false,
+    shadow: { far: 55, size: 20 },
+    colorGrade: { saturation: 1.05, contrast: 1.0, brightness: 1.08 },
+  },
+  {
+    id: 'delhi',
+    name: 'India',
+    description: 'Warm nights & ancient wonders',
+    subtitle: 'Delhi\nHighway',
+    city: 'Delhi',
+    flag: asset('flags/india.png'),
+    features: ['Taj Mahal silhouette', 'Temple spires', 'Coastal neon road'],
+    sky: {
+      turbidity: 5,
+      rayleigh: 1.8,
+      mieCoefficient: 0.012,
+      mieDirectionalG: 0.80,
+      sunElevation: 6,       // very low sun — warm dusk
+      sunAzimuth: 210,
+      exposure: 0.65,
+    },
+    clouds: {
+      coverage: 0.3,
+      density: 0.3,
+      scale: 0.00022,
+      speed: 0.00012,
+      elevation: 0.45,
+    },
+    fog: 0xbb8866,           // warm dusty haze
+    fogDensity: 0.004,
+    ground: 0x4a3a2a,
+    ambientColor: 0xcc9966,
+    ambientIntensity: 0.45,
+    dirColor: 0xffbb77,
+    dirIntensity: 1.5,
+    stars: false,
+    shadow: { far: 55, size: 20 },
+    colorGrade: { saturation: 1.08, contrast: 1.02, brightness: 1.0 },
   },
 ];
 

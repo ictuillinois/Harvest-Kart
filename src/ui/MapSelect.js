@@ -2,19 +2,23 @@ import { MAP_THEMES } from '../utils/constants.js';
 import { gameRoot, asset } from '../utils/base.js';
 import { fadeIn, fadeOut } from '../utils/transition.js';
 
-// Display order: Peru, USA, Brazil  (theme indices 2, 1, 0)
-const DISPLAY_ORDER = [2, 1, 0];
+// Display order: Peru, USA, Brazil, Shanghai, Delhi  (theme indices 2, 1, 0, 3, 4)
+const DISPLAY_ORDER = [2, 1, 0, 3, 4];
 
 const MAP_IMAGES = {
   peru:   'maps/peru.webp',
   usa:    'maps/chicago.webp',
-  brazil: 'maps/rio-de-janeiro.webp',
+  brazil:   'maps/rio-de-janeiro.webp',
+  shanghai: 'maps/shanghai.webp',
+  delhi:    'maps/delhi.webp',
 };
 
 const MAP_ICONS = {
   peru:   '&#129433;',  // llama
   usa:    '&#127751;',  // cityscape
-  brazil: '&#127796;',  // palm tree
+  brazil:   '&#127796;',  // palm tree
+  shanghai: '&#127983;',  // cityscape tower
+  delhi:    '&#127965;',  // classical building
 };
 
 export class MapSelect {
@@ -22,7 +26,7 @@ export class MapSelect {
     this.el = document.createElement('div');
     this.el.id = 'map-select';
 
-    const accents = { brazil: '#ffaa44', usa: '#7788ff', peru: '#55cc66' };
+    const accents = { brazil: '#ffaa44', usa: '#7788ff', peru: '#55cc66', shanghai: '#ff4466', delhi: '#ff9933' };
 
     const cards = DISPLAY_ORDER.map((themeIdx, cardIdx) => {
       const m = MAP_THEMES[themeIdx];
@@ -65,7 +69,7 @@ export class MapSelect {
         </div>
         <div class="ms-cards">${cards}</div>
         <div class="ms-hint">
-          <span class="ms-hint-key">&#9664; &#9654;</span> Navigate
+          <span class="ms-hint-key">&#9664; &#9654; &#9650; &#9660;</span> Navigate
           <span class="ms-hint-sep">|</span>
           <span class="ms-hint-key">ENTER</span> Select
         </div>
@@ -146,15 +150,17 @@ export class MapSelect {
       }
 
       .ms-cards {
-        display: flex; justify-content: center;
+        display: flex; justify-content: center; flex-wrap: wrap;
         gap: clamp(10px, 1.2vw, 28px);
         align-items: stretch;
+        max-width: clamp(600px, 75vw, 1400px);
+        margin: 0 auto;
       }
 
-      /* ── Card ── */
+      /* ── Card — 3 per row, 2 centered on second row ── */
       .ms-card {
         cursor: pointer; user-select: none;
-        width: clamp(180px, 22vw, 440px);
+        width: clamp(160px, 20vw, 380px);
         animation: msCardEnter 0.5s ease-out calc(var(--delay)) both;
       }
       @keyframes msCardEnter {
@@ -387,12 +393,15 @@ export class MapSelect {
     this._keyUpHandler = () => { this._inputGate = false; };
     window.addEventListener('keyup', this._keyUpHandler);
 
-    // Keyboard navigation
+    // Keyboard navigation (3 top row + 2 bottom row)
     this._keyHandler = (e) => {
       if (this.el.style.display === 'none' || this._selected || this._inputGate) return;
       let idx = this._focusIdx;
+      const cols = 3; // first row has 3 cards
       if (e.key === 'ArrowRight') idx = Math.min(idx + 1, this._cardEls.length - 1);
       else if (e.key === 'ArrowLeft') idx = Math.max(idx - 1, 0);
+      else if (e.key === 'ArrowDown') idx = Math.min(idx + cols, this._cardEls.length - 1);
+      else if (e.key === 'ArrowUp') idx = Math.max(idx - cols, 0);
       else if (e.key === 'Enter' || e.key === ' ') {
         e.preventDefault();
         const card = this._cardEls[this._focusIdx];
@@ -427,10 +436,14 @@ export class MapSelect {
       for (const gp of gps) {
         if (!gp) continue;
         const ax = gp.axes[0] || 0;
+        const ay = gp.axes[1] || 0;
+        const cols = 3;
         let idx = this._focusIdx;
         // Analog stick OR D-pad for navigation
         if (ax > 0.5 || gp.buttons[15]?.pressed) idx = Math.min(idx + 1, this._cardEls.length - 1);
         else if (ax < -0.5 || gp.buttons[14]?.pressed) idx = Math.max(idx - 1, 0);
+        else if (ay > 0.5 || gp.buttons[13]?.pressed) idx = Math.min(idx + cols, this._cardEls.length - 1);
+        else if (ay < -0.5 || gp.buttons[12]?.pressed) idx = Math.max(idx - cols, 0);
         if (idx !== this._focusIdx) { this._setFocus(idx); this._gpCooldown = 12; return; }
         // A button = confirm
         if (gp.buttons[0]?.pressed) {
