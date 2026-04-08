@@ -515,6 +515,21 @@ export class Environment {
   _buildBrazil() {
     const RH = ROAD_WIDTH / 2;
 
+    // ── Rio de Janeiro backdrop (fixed on left horizon) ──
+    const rioTex = new THREE.TextureLoader().load(asset('rio-de-janeiro.webp'));
+    rioTex.colorSpace = THREE.SRGBColorSpace;
+    const rioMat = new THREE.MeshBasicMaterial({
+      map: rioTex, transparent: true, opacity: 0.5,
+      depthWrite: false, side: THREE.FrontSide, fog: false,
+    });
+    const rioPlane = new THREE.Mesh(new THREE.PlaneGeometry(200, 70), rioMat);
+    rioPlane.position.set(-160, 20, -350);
+    rioPlane.rotation.y = 0.4; // angled toward the player from far left
+    rioPlane.renderOrder = -1;
+    this.scene.add(rioPlane);
+    this.themeObjects.push(rioPlane);
+    // NOT in any parallax layer — stays fixed on the horizon
+
     // ── OCEAN — vibrant tropical blue ──
     const oceanGeo = new THREE.PlaneGeometry(300, 600, 20, 20);
     const oceanMat = new THREE.MeshStandardMaterial({
@@ -559,85 +574,61 @@ export class Environment {
     this.scene.add(hillGround);
     this.themeObjects.push(hillGround);
 
-    // ── SUGARLOAF MOUNTAIN — on the LEFT (land side), behind the city ──
-    const sugarloaf = new THREE.Mesh(
-      new THREE.ConeGeometry(18, 35, 8),
-      new THREE.MeshStandardMaterial({ color: 0x4a6a3a, roughness: 0.85, flatShading: true }),
-    );
-    sugarloaf.position.set(-(RH + 80), 12, -280);
-    this.scene.add(sugarloaf);
-    this.themeObjects.push(sugarloaf);
-    this.background.push(sugarloaf);
-
-    // Second peak
-    const sugarloaf2 = new THREE.Mesh(
-      new THREE.ConeGeometry(12, 25, 6),
-      new THREE.MeshStandardMaterial({ color: 0x5a7a4a, roughness: 0.85, flatShading: true }),
-    );
-    sugarloaf2.position.set(-(RH + 60), 8, -250);
-    this.scene.add(sugarloaf2);
-    this.themeObjects.push(sugarloaf2);
-    this.background.push(sugarloaf2);
-
-    // ── CHRIST THE REDEEMER — on top of Corcovado mountain, far left background ──
-    const corcovadoGroup = new THREE.Group();
-
-    // Mountain base (Corcovado)
-    const mtHeight = 50;
-    const mtRadius = 22;
-    const mountain = new THREE.Mesh(
-      new THREE.ConeGeometry(mtRadius, mtHeight, 7),
-      new THREE.MeshStandardMaterial({ color: 0x3a6a2a, roughness: 0.85, flatShading: true }),
-    );
-    mountain.position.y = mtHeight / 2;
-    corcovadoGroup.add(mountain);
-
-    // Statue on top
-    const statueMat = new THREE.MeshStandardMaterial({
-      color: 0xeeeeee, emissive: 0xcccccc, emissiveIntensity: 0.25, roughness: 0.5,
-    });
-    const statueGroup = new THREE.Group();
-    // Body
-    const body = new THREE.Mesh(new THREE.BoxGeometry(1.2, 6, 1), statueMat);
-    body.position.y = 3;
-    statueGroup.add(body);
-    // Arms
-    const arms = new THREE.Mesh(new THREE.BoxGeometry(8, 0.8, 0.8), statueMat);
-    arms.position.y = 5.2;
-    statueGroup.add(arms);
-    // Head
-    const head = new THREE.Mesh(new THREE.SphereGeometry(0.7, 8, 6), statueMat);
-    head.position.y = 6.8;
-    statueGroup.add(head);
-    // Pedestal
-    const ped = new THREE.Mesh(
-      new THREE.BoxGeometry(3, 2, 3),
-      new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.8 }),
-    );
-    ped.position.y = -1;
-    statueGroup.add(ped);
-
-    statueGroup.scale.setScalar(1.8);
-    statueGroup.position.y = mtHeight;
-    corcovadoGroup.add(statueGroup);
-
-    // Place far left and deep in background so it's always visible
-    corcovadoGroup.position.set(-(RH + 120), 0, -400);
-    this.scene.add(corcovadoGroup);
-    this.themeObjects.push(corcovadoGroup);
-    this.background.push(corcovadoGroup);
-
-    // Distant city skyline removed for performance
+    // ── Green mountains surrounding the Rio backdrop ──
+    const brMtColors = [0x3a6a2a, 0x4a7a3a, 0x2a5a1a, 0x5a8a4a, 0x3a7030];
+    const brMtConfigs = [
+      // Tight cluster around the backdrop (X:-160, Z:-350) — low profile
+      { r: 22, h: 22, x: -190, z: -340 },
+      { r: 18, h: 20, x: -130, z: -360 },
+      { r: 25, h: 26, x: -175, z: -380 },
+      { r: 20, h: 21, x: -145, z: -330 },
+      { r: 16, h: 17, x: -200, z: -370 },
+      { r: 24, h: 24, x: -160, z: -400 },
+      { r: 20, h: 20, x: -210, z: -350 },
+      { r: 18, h: 19, x: -135, z: -390 },
+      // Wider spread — left side mountain range
+      { r: 20, h: 26, x: -110, z: -280 },
+      { r: 28, h: 32, x: -140, z: -250 },
+      { r: 15, h: 20, x: -90,  z: -300 },
+      { r: 22, h: 28, x: -170, z: -220 },
+      { r: 18, h: 24, x: -120, z: -200 },
+      { r: 26, h: 30, x: -155, z: -290 },
+      { r: 14, h: 18, x: -100, z: -340 },
+      { r: 20, h: 25, x: -185, z: -260 },
+      { r: 16, h: 22, x: -130, z: -180 },
+      { r: 22, h: 26, x: -160, z: -310 },
+      { r: 18, h: 20, x: -105, z: -240 },
+      // Closer to road — foothills
+      { r: 12, h: 15, x: -60,  z: -220 },
+      { r: 14, h: 18, x: -70,  z: -300 },
+      { r: 10, h: 14, x: -55,  z: -160 },
+      { r: 16, h: 20, x: -80,  z: -260 },
+      { r: 11, h: 14, x: -50,  z: -120 },
+      { r: 13, h: 16, x: -65,  z: -180 },
+      { r: 12, h: 15, x: -58,  z: -340 },
+      { r: 14, h: 17, x: -75,  z: -140 },
+    ];
+    for (const cfg of brMtConfigs) {
+      const geo = new THREE.ConeGeometry(cfg.r, cfg.h, 6 + ((cfg.r > 20) ? 2 : 0));
+      const col = new THREE.Color(brMtColors[(cfg.r * 7 + cfg.h) % brMtColors.length]);
+      const mt = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
+        color: col, roughness: 0.85, flatShading: true,
+      }));
+      mt.position.set(cfg.x, cfg.h / 2 - 3, cfg.z);
+      this.scene.add(mt);
+      this.themeObjects.push(mt);
+      this.background.push(mt);
+    }
 
     if (!this.modelsReady) return;
 
     // All buildings removed for performance
 
-    // ── Palms between buildings → midground ──
-    for (let i = 0; i < 4; i++) {
-      const x = -(RH + 4 + Math.random() * 4);
-      this._placeModel(MODEL_URLS.palmTree, x, 0, -i * 40 - Math.random() * 15,
-        Math.random() * Math.PI * 2, 0.8 + Math.random() * 0.4, 'mg');
+    // ── Palms lining the left side of the road ──
+    for (let i = 0; i < 22; i++) {
+      const x = -(RH + 3 + Math.random() * 15);
+      this._placeModel(MODEL_URLS.palmTree, x, 0, -i * 15 - Math.random() * 10,
+        Math.random() * Math.PI * 2, 0.6 + Math.random() * 0.6, 'mg');
     }
 
     // ══════════════════════════════════════════
@@ -937,6 +928,20 @@ export class Environment {
   _buildPeru() {
     const RH = ROAD_WIDTH / 2;
 
+    // ── Machu Picchu backdrop (fixed horizon — never scrolls) ──
+    const mpTex = new THREE.TextureLoader().load(asset('machu-pichu.webp'));
+    mpTex.colorSpace = THREE.SRGBColorSpace;
+    const mpMat = new THREE.MeshBasicMaterial({
+      map: mpTex, transparent: true, opacity: 0.55,
+      depthWrite: false, side: THREE.FrontSide, fog: false,
+    });
+    const mpPlane = new THREE.Mesh(new THREE.PlaneGeometry(280, 80), mpMat);
+    mpPlane.position.set(0, 22, -380);
+    mpPlane.renderOrder = -1; // render behind everything
+    this.scene.add(mpPlane);
+    this.themeObjects.push(mpPlane);
+    // NOT added to any parallax layer — stays fixed on the horizon
+
     // ── Valley ground (warm green) ──
     const valleyMat = new THREE.MeshStandardMaterial({ color: 0x5a7a40, roughness: 0.9 });
     for (const side of [-1, 1]) {
@@ -999,6 +1004,31 @@ export class Environment {
         this.themeObjects.push(ridge);
         this.background.push(ridge);
       }
+    }
+
+    // ── Big flanking mountain ranges (both sides, background) ──
+    const flankConfigs = [
+      // Left side — pushed far from road
+      { r: 35, h: 65, x: -110, z: -120 },
+      { r: 30, h: 58, x: -125, z: -200 },
+      { r: 40, h: 70, x: -105, z: -320 },
+      { r: 28, h: 50, x: -140, z: -160 },
+      { r: 32, h: 55, x: -115, z: -260 },
+      // Right side — pushed far from road
+      { r: 34, h: 62, x: 115,  z: -140 },
+      { r: 38, h: 68, x: 105,  z: -230 },
+      { r: 30, h: 55, x: 130,  z: -300 },
+      { r: 26, h: 48, x: 120,  z: -180 },
+      { r: 36, h: 60, x: 110,  z: -350 },
+    ];
+    for (const cfg of flankConfigs) {
+      const mt = this._createAndeanMountain(cfg.r, cfg.h);
+      mt.position.set(cfg.x, cfg.h / 2 - 4, cfg.z);
+      const dist = Math.abs(cfg.z) / 400;
+      mt.material.color.lerp(new THREE.Color(0x9aaabb), dist * 0.3);
+      this.scene.add(mt);
+      this.themeObjects.push(mt);
+      this.background.push(mt);
     }
 
     // ── Mist layers ──
