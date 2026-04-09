@@ -135,6 +135,7 @@ export const ROAD_SURFACE_COLORS = {
   peru:     0xa3a3ab,   // neutral light gray
   shanghai: 0x2a2a2e,   // black asphalt — Chinese city road
   delhi:    0x9a9a9e,   // warm gray — dusty Indian highway
+  momo:     0xa8a8b0,   // cool gray — snowy road
 };
 
 // Colors
@@ -433,6 +434,41 @@ export const MAP_THEMES = [
     stars: false,
     shadow: { far: 55, size: 20 },
     colorGrade: { saturation: 1.08, contrast: 1.02, brightness: 1.0 },
+  },
+  {
+    id: 'momo',
+    name: "Momo's World",
+    description: 'A whimsical Pomeranian fantasy land',
+    subtitle: "Momo's\nWorld",
+    city: "Momo's World",
+    flag: asset('maps/momo-world.webp'),
+    features: ['Giant Pomeranian head', 'Toy village', 'Golden sunset'],
+    sky: {
+      turbidity: 4,
+      rayleigh: 2.2,
+      mieCoefficient: 0.018,
+      mieDirectionalG: 0.82,
+      sunElevation: 10,
+      sunAzimuth: 220,
+      exposure: 0.75,
+    },
+    clouds: {
+      coverage: 0.35,
+      density: 0.3,
+      scale: 0.00025,
+      speed: 0.00012,
+      elevation: 0.45,
+    },
+    fog: 0xddccbb,
+    fogDensity: 0.003,
+    ground: 0xe8e0d8,
+    ambientColor: 0xffddcc,
+    ambientIntensity: 0.6,
+    dirColor: 0xffcc77,
+    dirIntensity: 1.5,
+    stars: false,
+    shadow: { far: 55, size: 20 },
+    colorGrade: { saturation: 1.1, contrast: 1.0, brightness: 1.05 },
   },
 ];
 

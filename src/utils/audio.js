@@ -14,6 +14,7 @@ const MUSIC_TRACKS = {
   peru:      'frankfurt.mp3',
   shanghai:  null, // procedural — generated via Web Audio
   delhi:     null, // procedural — generated via Web Audio
+  momo:      null, // procedural — generated via Web Audio
   qualified: 'qualified.mp3',
 };
 
@@ -31,12 +32,14 @@ export function playMusic(key) {
   if (musicEl && !musicEl.paused && musicEl._trackKey === key) return;
   if (_delhiSource && key === 'delhi') return;
   if (_shanghaiSource && key === 'shanghai') return;
+  if (_momoSource && key === 'momo') return;
 
   _stopMusic();
 
   // Procedural tracks
   if (key === 'delhi') { _playDelhiMusic(); return; }
   if (key === 'shanghai') { _playShanghaiMusic(); return; }
+  if (key === 'momo') { _playMomoMusic(); return; }
 
   const file = MUSIC_TRACKS[key];
   if (!file) return;
@@ -72,6 +75,7 @@ function _stopMusic() {
   }
   _stopDelhiMusic();
   _stopShanghaiMusic();
+  _stopMomoMusic();
 }
 
 // ═══════════════════════════════════════════════
@@ -498,6 +502,204 @@ function _stopShanghaiMusic() {
   if (_shanghaiGain) {
     _shanghaiGain.disconnect();
     _shanghaiGain = null;
+  }
+}
+
+// ═══════════════════════════════════════════════
+//  MOMO'S WORLD — Whimsical sunset lullaby racing loop
+//  Celesta melody, music box plucks, soft pads, playful percussion
+// ═══════════════════════════════════════════════
+let _momoSource = null;
+let _momoGain = null;
+let _momoBuffer = null;
+
+function _generateMomoBuffer() {
+  const c = getCtx();
+  const BPM = 128;
+  const beatSec = 60 / BPM;
+  const beats = 16;
+  const duration = beats * beatSec;
+  const sr = c.sampleRate;
+  const len = Math.ceil(duration * sr);
+  const buf = c.createBuffer(2, len, sr);
+  const L = buf.getChannelData(0);
+  const R = buf.getChannelData(1);
+
+  const write = (ch, startSec, freq, durSec, vol, type, attack, decay) => {
+    const s = Math.floor(startSec * sr);
+    const e = Math.min(s + Math.floor(durSec * sr), len);
+    const aLen = Math.floor(attack * sr);
+    const dStart = e - Math.floor(decay * sr);
+    for (let i = s; i < e; i++) {
+      const t = (i - s) / sr;
+      let sample;
+      if (type === 'sin') sample = Math.sin(2 * Math.PI * freq * t);
+      else if (type === 'saw') sample = 2 * ((freq * t) % 1) - 1;
+      else if (type === 'sq') sample = Math.sin(2 * Math.PI * freq * t) > 0 ? 1 : -1;
+      else if (type === 'tri') sample = 2 * Math.abs(2 * ((freq * t) % 1) - 1) - 1;
+      else if (type === 'noise') sample = Math.random() * 2 - 1;
+      else sample = Math.sin(2 * Math.PI * freq * t);
+      let env = 1;
+      if (i - s < aLen) env = (i - s) / aLen;
+      if (i > dStart) env *= (e - i) / (e - dStart);
+      sample *= vol * env;
+      if (ch === 0 || ch === 2) L[i % len] += sample;
+      if (ch === 1 || ch === 2) R[i % len] += sample;
+    }
+  };
+
+  // F major / D minor pentatonic — warm, playful, sunset feel
+  // F4=349.2, G4=392, A4=440, C5=523.3, D5=587.3, F5=698.5
+
+  // ── KICK — soft, bouncy ──
+  const kickBeats = [0, 2, 4, 6, 8, 10, 12, 14];
+  for (const b of kickBeats) {
+    const t = b * beatSec;
+    write(2, t, 60, 0.12, 0.35, 'sin', 0.002, 0.10);
+    write(2, t, 120, 0.025, 0.2, 'sin', 0.001, 0.02);
+  }
+
+  // ── HI-HAT — light taps, 8th notes ──
+  for (let b = 0; b < beats * 2; b++) {
+    const t = b * beatSec / 2;
+    const v = b % 2 === 0 ? 0.06 : 0.035;
+    write(2, t, 9000, 0.015, v, 'noise', 0.001, 0.012);
+  }
+
+  // ── CLAP — soft on 2 and 6 (playful) ──
+  for (const b of [2, 6, 10, 14]) {
+    const t = b * beatSec;
+    write(2, t, 2500, 0.03, 0.12, 'noise', 0.001, 0.025);
+  }
+
+  // ── BASS — warm bouncy line ──
+  //          F3    F3    A3    F3    C4    C4    A3    G3
+  //          F3    F3    A3    G3    F3    A3    C4    G3
+  const bassNotes = [
+    174.6, 174.6, 220, 174.6, 261.6, 261.6, 220, 196,
+    174.6, 174.6, 220, 196, 174.6, 220, 261.6, 196,
+  ];
+  for (let b = 0; b < beats; b++) {
+    const t = b * beatSec;
+    write(2, t, bassNotes[b], beatSec * 0.7, 0.22, 'tri', 0.008, 0.10);
+    write(2, t, bassNotes[b] / 2, beatSec * 0.5, 0.15, 'sin', 0.008, 0.10);
+  }
+
+  // ── CELESTA / MUSIC BOX — bright, twinkling melody ──
+  const celestaNotes = [
+    { b: 0, note: 698.5 },     // F5
+    { b: 0.5, note: 784 },     // G5
+    { b: 1, note: 880 },       // A5
+    { b: 1.75, note: 1046.5 }, // C6
+    { b: 2.5, note: 880 },     // A5
+    { b: 3, note: 784 },       // G5
+    { b: 3.5, note: 698.5 },   // F5
+    { b: 4, note: 1046.5 },    // C6
+    { b: 4.5, note: 1174.7 },  // D6
+    { b: 5, note: 1046.5 },    // C6
+    { b: 5.75, note: 880 },    // A5
+    { b: 6.5, note: 784 },     // G5
+    { b: 7, note: 880 },       // A5
+    { b: 7.5, note: 698.5 },   // F5
+    // Second phrase (response — higher register)
+    { b: 8, note: 880 },       // A5
+    { b: 8.5, note: 1046.5 },  // C6
+    { b: 9, note: 1174.7 },    // D6
+    { b: 9.75, note: 1396.9 }, // F6
+    { b: 10.5, note: 1174.7 }, // D6
+    { b: 11, note: 1046.5 },   // C6
+    { b: 11.5, note: 880 },    // A5
+    { b: 12, note: 1046.5 },   // C6
+    { b: 12.5, note: 880 },    // A5
+    { b: 13, note: 784 },      // G5
+    { b: 13.75, note: 698.5 }, // F5
+    { b: 14.5, note: 784 },    // G5
+    { b: 15, note: 880 },      // A5
+    { b: 15.5, note: 698.5 },  // F5 (pickup)
+  ];
+  for (const cn of celestaNotes) {
+    const t = cn.b * beatSec;
+    // Bright bell-like tone (sin + octave harmonic)
+    write(2, t, cn.note, 0.18, 0.14, 'sin', 0.002, 0.16);
+    write(2, t, cn.note * 2, 0.10, 0.04, 'sin', 0.001, 0.09);
+    // Soft shimmer (detuned)
+    write(2, t, cn.note * 1.003, 0.12, 0.03, 'sin', 0.003, 0.10);
+  }
+
+  // ── PAD — warm sustained chord (F major → Dm) ──
+  const padChords = [
+    { b: 0, notes: [349.2, 440, 523.3], dur: 4 },   // F major
+    { b: 4, notes: [261.6, 329.6, 392], dur: 4 },    // C major
+    { b: 8, notes: [293.7, 349.2, 440], dur: 4 },    // Dm
+    { b: 12, notes: [261.6, 329.6, 392], dur: 4 },   // C major
+  ];
+  for (const pc of padChords) {
+    const t = pc.b * beatSec;
+    for (const n of pc.notes) {
+      write(2, t, n, pc.dur * beatSec, 0.06, 'sin', 0.15, 0.3);
+      write(2, t, n * 0.998, pc.dur * beatSec, 0.03, 'sin', 0.15, 0.3);
+    }
+  }
+
+  // ── XYLOPHONE ACCENTS — playful pings ──
+  const xyloBeats = [1, 3, 5, 7, 9, 11, 13, 15];
+  const xyloNotes = [880, 1046.5, 784, 698.5, 1174.7, 880, 1046.5, 698.5];
+  for (let i = 0; i < xyloBeats.length; i++) {
+    const t = (xyloBeats[i] + 0.5) * beatSec;
+    write(i % 2 === 0 ? 0 : 1, t, xyloNotes[i], 0.08, 0.08, 'tri', 0.001, 0.07);
+  }
+
+  // ── CHIME — gentle wind chime on beats 0 and 8 ──
+  for (const b of [0, 8]) {
+    const t = b * beatSec;
+    write(2, t, 2093, 0.3, 0.04, 'sin', 0.005, 0.28);
+    write(2, t + 0.05, 2637, 0.25, 0.03, 'sin', 0.005, 0.23);
+    write(2, t + 0.1, 3136, 0.2, 0.02, 'sin', 0.005, 0.18);
+  }
+
+  // ── BARK — tiny playful yelp on beat 4 and 12 ──
+  for (const b of [4, 12]) {
+    const t = b * beatSec;
+    write(2, t, 800, 0.04, 0.08, 'sq', 0.002, 0.03);
+    write(2, t + 0.04, 1000, 0.03, 0.06, 'sq', 0.002, 0.025);
+  }
+
+  // Normalize
+  let maxL = 0, maxR = 0;
+  for (let i = 0; i < len; i++) {
+    if (Math.abs(L[i]) > maxL) maxL = Math.abs(L[i]);
+    if (Math.abs(R[i]) > maxR) maxR = Math.abs(R[i]);
+  }
+  const peak = Math.max(maxL, maxR, 0.01);
+  const norm = 0.85 / peak;
+  for (let i = 0; i < len; i++) { L[i] *= norm; R[i] *= norm; }
+
+  return buf;
+}
+
+function _playMomoMusic() {
+  _stopMomoMusic();
+  const c = getCtx();
+  if (!_momoBuffer) _momoBuffer = _generateMomoBuffer();
+  _momoGain = c.createGain();
+  _momoGain.gain.value = 0.45;
+  _momoGain.connect(c.destination);
+  _momoSource = c.createBufferSource();
+  _momoSource.buffer = _momoBuffer;
+  _momoSource.loop = true;
+  _momoSource.connect(_momoGain);
+  _momoSource.start();
+}
+
+function _stopMomoMusic() {
+  if (_momoSource) {
+    try { _momoSource.stop(); } catch (_) {}
+    _momoSource.disconnect();
+    _momoSource = null;
+  }
+  if (_momoGain) {
+    _momoGain.disconnect();
+    _momoGain = null;
   }
 }
 

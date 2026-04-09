@@ -128,6 +128,10 @@ export const MODEL_URLS = {
   // Racing
   tires: asset('models/racing/tires.glb'),
   raceBarrier: asset('models/racing/barrier.glb'),
+  // Momo's World (CC0 / CC-BY — poly.pizza)
+  snowman: asset('models/momo/snowman.glb'),
+  candyCane: asset('models/momo/candycane.glb'),
+  bone: asset('models/momo/bone.glb'),
   // Player vehicles (FBX)
   vehicleEthan: asset('models/vehicles/fbx/ethan.FBX'),
   vehicleKate: asset('models/vehicles/fbx/kate.fbx'),
@@ -155,6 +159,10 @@ MODEL_HEIGHTS[MODEL_URLS.mailbox] = 0.9;
 MODEL_HEIGHTS[MODEL_URLS.trashcan] = 0.8;
 MODEL_HEIGHTS[MODEL_URLS.tires] = 0.8;
 MODEL_HEIGHTS[MODEL_URLS.raceBarrier] = 0.9;
+// Momo props
+MODEL_HEIGHTS[MODEL_URLS.snowman] = 2.0;
+MODEL_HEIGHTS[MODEL_URLS.candyCane] = 1.5;
+MODEL_HEIGHTS[MODEL_URLS.bone] = 0.4;
 
 // Player vehicles (FBX)
 MODEL_HEIGHTS[MODEL_URLS.vehicleEthan] = 1.8;     // Sonata Pantera

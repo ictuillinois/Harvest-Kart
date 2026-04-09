@@ -2,8 +2,8 @@ import { MAP_THEMES } from '../utils/constants.js';
 import { gameRoot, asset } from '../utils/base.js';
 import { fadeIn, fadeOut } from '../utils/transition.js';
 
-// Display order: Peru, USA, Brazil, Shanghai, Delhi  (theme indices 2, 1, 0, 3, 4)
-const DISPLAY_ORDER = [2, 1, 0, 3, 4];
+// Display order: Peru, USA, Brazil, Shanghai, Delhi, Momo's World  (theme indices 2, 1, 0, 3, 4, 5)
+const DISPLAY_ORDER = [2, 1, 0, 3, 4, 5];
 
 const MAP_IMAGES = {
   peru:   'maps/peru.webp',
@@ -11,6 +11,7 @@ const MAP_IMAGES = {
   brazil:   'maps/rio-de-janeiro.webp',
   shanghai: 'maps/shanghai.webp',
   delhi:    'maps/delhi.webp',
+  momo:     'maps/momo-world.webp',
 };
 
 const MAP_ICONS = {
@@ -19,6 +20,7 @@ const MAP_ICONS = {
   brazil:   '&#127796;',  // palm tree
   shanghai: '&#127983;',  // cityscape tower
   delhi:    '&#127965;',  // classical building
+  momo:     '&#128054;',  // dog face
 };
 
 export class MapSelect {
@@ -26,7 +28,7 @@ export class MapSelect {
     this.el = document.createElement('div');
     this.el.id = 'map-select';
 
-    const accents = { brazil: '#ffaa44', usa: '#7788ff', peru: '#55cc66', shanghai: '#ff4466', delhi: '#ff9933' };
+    const accents = { brazil: '#ffaa44', usa: '#7788ff', peru: '#55cc66', shanghai: '#ff4466', delhi: '#ff9933', momo: '#ffcc66' };
 
     const cards = DISPLAY_ORDER.map((themeIdx, cardIdx) => {
       const m = MAP_THEMES[themeIdx];
@@ -157,7 +159,7 @@ export class MapSelect {
         margin: 0 auto;
       }
 
-      /* ── Card — 3 per row, 2 centered on second row ── */
+      /* ── Card — 3 per row ── */
       .ms-card {
         cursor: pointer; user-select: none;
         width: clamp(160px, 20vw, 380px);

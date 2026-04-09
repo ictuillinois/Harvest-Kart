@@ -88,6 +88,10 @@ export class Environment {
       this._buildDelhiSky();
       this.sunDirection.set(-0.3, 0.2, -0.8).normalize();
       this.renderer.toneMappingExposure = 1.0;
+    } else if (theme.id === 'momo') {
+      this._buildMomoSky();
+      this.sunDirection.set(-0.4, 0.3, -0.7).normalize();
+      this.renderer.toneMappingExposure = 1.1;
     } else {
       this.sky = new Sky();
       this.sky.scale.setScalar(10000);
@@ -152,6 +156,9 @@ export class Environment {
     } else if (theme.id === 'delhi') {
       this.hemiLight = new THREE.HemisphereLight(0xcc9966, 0x664433, 0.5);
       this.dirLight.position.set(-25, 15, -80);
+    } else if (theme.id === 'momo') {
+      this.hemiLight = new THREE.HemisphereLight(0xeeddcc, 0xccbbaa, 0.7);
+      this.dirLight.position.set(-20, 25, -60);
     } else {
       this.hemiLight = new THREE.HemisphereLight(theme.dirColor, theme.ground, 0.5);
     }
@@ -201,6 +208,7 @@ export class Environment {
       case 'peru': this._buildPeru(); break;
       case 'shanghai': this._buildShanghai(); break;
       case 'delhi': this._buildDelhi(); break;
+      case 'momo': this._buildMomo(); break;
     }
 
     // ICT billboards along the road (all maps)
@@ -2400,6 +2408,422 @@ export class Environment {
   }
 
   // =====================================================================
+  //  MOMO SKY — golden sunset over snowy landscape
+  // =====================================================================
+  _buildMomoSky() {
+    const skyGeo = new THREE.SphereGeometry(500, 32, 16);
+    const skyMat = new THREE.ShaderMaterial({
+      side: THREE.BackSide,
+      depthWrite: false,
+      uniforms: {},
+      vertexShader: `
+        varying vec3 vWorldPos;
+        void main() {
+          vWorldPos = (modelMatrix * vec4(position, 1.0)).xyz;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        varying vec3 vWorldPos;
+        void main() {
+          float h = normalize(vWorldPos).y;
+          vec3 zenith  = vec3(0.30, 0.30, 0.55);   // cool blue-violet
+          vec3 upper   = vec3(0.50, 0.45, 0.65);   // lavender
+          vec3 mid     = vec3(0.85, 0.60, 0.50);   // warm peach
+          vec3 lower   = vec3(1.00, 0.78, 0.45);   // golden amber
+          vec3 horizon = vec3(1.00, 0.88, 0.60);   // bright warm gold
+
+          vec3 col;
+          if (h > 0.5) col = mix(upper, zenith, (h - 0.5) / 0.5);
+          else if (h > 0.25) col = mix(mid, upper, (h - 0.25) / 0.25);
+          else if (h > 0.08) col = mix(lower, mid, (h - 0.08) / 0.17);
+          else if (h > 0.0) col = mix(horizon, lower, h / 0.08);
+          else col = horizon;
+
+          gl_FragColor = vec4(col, 1.0);
+        }
+      `,
+    });
+    this.sky = new THREE.Mesh(skyGeo, skyMat);
+    this.scene.add(this.sky);
+
+    // Fluffy sunset clouds
+    const cloudTex = this._makeCloudTexture();
+    const tints = [0xffddcc, 0xffccaa, 0xffeedd];
+    for (let i = 0; i < 3; i++) {
+      const w = 40 + Math.random() * 50;
+      const h = 8 + Math.random() * 8;
+      const cloudMat = new THREE.MeshBasicMaterial({
+        map: cloudTex, transparent: true,
+        opacity: 0.4 + Math.random() * 0.2,
+        depthWrite: false, side: THREE.DoubleSide,
+        color: tints[i],
+      });
+      const cloud = new THREE.Mesh(new THREE.PlaneGeometry(w, h), cloudMat);
+      cloud.position.set(
+        -80 + Math.random() * 160,
+        35 + Math.random() * 25,
+        -130 - Math.random() * 170,
+      );
+      cloud.lookAt(0, cloud.position.y, 0);
+      this.scene.add(cloud);
+      this.themeObjects.push(cloud);
+      this.background.push(cloud);
+    }
+  }
+
+  // =====================================================================
+  //  MOMO'S WORLD — Pomeranian fantasy village at sunset
+  // =====================================================================
+  _buildMomo() {
+    const RH = ROAD_WIDTH / 2;
+
+    // ── Shared materials ──
+    const snowMat = new THREE.MeshStandardMaterial({ color: 0xf8f4f0, roughness: 0.85 });
+    const goldMat = new THREE.MeshStandardMaterial({
+      color: 0xffcc44, roughness: 0.4, metalness: 0.3,
+      emissive: 0xffaa22, emissiveIntensity: 0.15,
+    });
+    const poleMat = new THREE.MeshStandardMaterial({ color: 0xeeeeff, roughness: 0.4, metalness: 0.3 });
+
+    // ══════════════════════════════════════════
+    //  MOMO BACKDROP — fixed high on horizon
+    // ══════════════════════════════════════════
+    const bdTex = new THREE.TextureLoader().load(asset('maps/momo-back.webp'));
+    bdTex.colorSpace = THREE.SRGBColorSpace;
+    const bdMat = new THREE.MeshBasicMaterial({
+      map: bdTex, transparent: true, opacity: 0.65,
+      depthWrite: false, side: THREE.FrontSide, fog: false,
+    });
+    const bdPlane = new THREE.Mesh(new THREE.PlaneGeometry(700, 250), bdMat);
+    bdPlane.position.set(0, 80, -390);
+    bdPlane.renderOrder = -1;
+    this.scene.add(bdPlane);
+    this.themeObjects.push(bdPlane);
+
+    // ══════════════════════════════════════════
+    //  SNOWY GROUND — bright white roadsides
+    // ══════════════════════════════════════════
+    const snowGroundMat = new THREE.MeshStandardMaterial({
+      color: 0xf8f4f0, roughness: 0.85, emissive: 0xffeedd, emissiveIntensity: 0.06,
+    });
+    for (const side of [-1, 1]) {
+      const snow = new THREE.Mesh(new THREE.PlaneGeometry(80, 600), snowGroundMat);
+      snow.rotation.x = -Math.PI / 2;
+      snow.position.set(side * (RH + 30), -0.04, -150);
+      this.scene.add(snow);
+      this.themeObjects.push(snow);
+    }
+
+    // ── Dense snow drifts along road edges ──
+    const driftGeo = new THREE.SphereGeometry(1.5, 6, 4);
+    for (let i = 0; i < 12; i++) {
+      const side = i % 2 === 0 ? -1 : 1;
+      const drift = new THREE.Mesh(driftGeo, snowMat);
+      drift.scale.set(1.2 + Math.random() * 2, 0.35, 0.8 + Math.random() * 1.2);
+      drift.position.set(
+        side * (RH + 1.0 + Math.random() * 2.5),
+        0.12,
+        -i * 26 - Math.random() * 12,
+      );
+      this.scene.add(drift);
+      this.themeObjects.push(drift);
+      this.foreground.push(drift);
+    }
+
+    // ══════════════════════════════════════════
+    //  WHITE TREES — palm trees + procedural banyan/park trees (all white/frosted)
+    // ══════════════════════════════════════════
+
+    // ── White palm trees (GLTF, both sides, midground) ──
+    if (this.modelsReady) {
+      for (let i = 0; i < 6; i++) {
+        const side = i % 2 === 0 ? -1 : 1;
+        const x = side * (RH + 12 + Math.random() * 10);
+        const model = getModel(MODEL_URLS.palmTree);
+        model.position.set(x, model.position.y, -i * 50 - 20 - Math.random() * 20);
+        model.rotation.y = Math.random() * Math.PI * 2;
+        model.scale.multiplyScalar(0.8 + Math.random() * 0.3);
+        // Tint all meshes white/frosty
+        model.traverse(node => {
+          if (node.isMesh && node.material) {
+            node.material = node.material.clone();
+            node.material.color.set(0xf0eae5);
+            if (node.material.emissive) {
+              node.material.emissive.set(0xffeedd);
+              node.material.emissiveIntensity = 0.05;
+            }
+          }
+        });
+        this.scene.add(model);
+        this.themeObjects.push(model);
+        this.midground.push(model);
+      }
+    }
+
+    // ── White procedural trees (banyan-style, both sides) ──
+    const whiteTrunkMat = new THREE.MeshStandardMaterial({ color: 0xeee8e2, roughness: 0.85 });
+    const whiteLeafMat = new THREE.MeshStandardMaterial({
+      color: 0xf5f0ec, roughness: 0.75, emissive: 0xffeedd, emissiveIntensity: 0.05,
+    });
+    for (let i = 0; i < 6; i++) {
+      const side = i % 2 === 0 ? -1 : 1;
+      const tg = new THREE.Group();
+      const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.4, 3.5, 6), whiteTrunkMat);
+      trunk.position.y = 1.75;
+      tg.add(trunk);
+      const canopy = new THREE.Mesh(new THREE.SphereGeometry(2.5, 6, 5), whiteLeafMat);
+      canopy.position.y = 4.5;
+      canopy.scale.set(1.2, 0.65, 1.2);
+      tg.add(canopy);
+      // Snow clump on top
+      const snowTop = new THREE.Mesh(new THREE.SphereGeometry(1.8, 5, 4), snowMat);
+      snowTop.position.y = 5.2;
+      snowTop.scale.set(1.0, 0.4, 1.0);
+      tg.add(snowTop);
+      tg.position.set(side * (RH + 6 + Math.random() * 12), 0, -i * 48 - 15 - Math.random() * 15);
+      this.scene.add(tg);
+      this.themeObjects.push(tg);
+      this.midground.push(tg);
+    }
+
+    // ══════════════════════════════════════════
+    //  BUILDINGS — reuse Chicago building system with snow caps
+    // ══════════════════════════════════════════
+    const texPool = this._buildWindowTexPool();
+    for (const side of [-1, 1]) {
+      let z = 5;
+      while (z > -320) {
+        const w = 4 + Math.random() * 6;
+        const h = 4 + Math.random() * 10;
+        const d = 3 + Math.random() * 4;
+        const gap = 4 + Math.random() * 6;
+
+        const bldg = this._createChicagoBuilding(w, h, d, texPool);
+        bldg.position.x = side * (RH + 8 + d / 2 + Math.random() * 4);
+        bldg.position.z = z - w / 2;
+        this.scene.add(bldg);
+        this.themeObjects.push(bldg);
+        this.midground.push(bldg);
+
+        // Snow cap on each building roof
+        const cap = new THREE.Mesh(new THREE.BoxGeometry(w + 0.4, 0.3, d + 0.4), snowMat);
+        cap.position.set(bldg.position.x, h + 0.15, bldg.position.z);
+        this.scene.add(cap);
+        this.themeObjects.push(cap);
+        this.midground.push(cap);
+
+        z -= w + gap;
+      }
+    }
+
+    // ══════════════════════════════════════════
+    //  MOMO'S WORLD FRAMES — simple white rectangle frame with neon banner
+    // ══════════════════════════════════════════
+    const arcCanvas = document.createElement('canvas');
+    arcCanvas.width = 512; arcCanvas.height = 128;
+    const aC = arcCanvas.getContext('2d');
+    aC.fillStyle = '#ffffff';
+    aC.fillRect(0, 0, 512, 128);
+    // Neon magenta text with glow
+    aC.shadowColor = '#ff22aa';
+    aC.shadowBlur = 20;
+    aC.fillStyle = '#ff22aa';
+    aC.font = 'bold 54px Arial, sans-serif';
+    aC.textAlign = 'center';
+    aC.textBaseline = 'middle';
+    aC.fillText("MOMO'S WORLD", 256, 64);
+    aC.shadowBlur = 8;
+    aC.fillStyle = '#ff66bb';
+    aC.fillText("MOMO'S WORLD", 256, 64);
+    const arcBannerTex = new THREE.CanvasTexture(arcCanvas);
+    const arcBannerMat = new THREE.MeshBasicMaterial({ map: arcBannerTex });
+    const fW = ROAD_WIDTH + 2, fH = 7;
+    const frameMat = new THREE.MeshStandardMaterial({
+      color: 0xffffff, roughness: 0.25, metalness: 0.3,
+      emissive: 0xffaacc, emissiveIntensity: 0.12,
+    });
+
+    for (let i = 0; i < 2; i++) {
+      const ag = new THREE.Group();
+      // Merge 2 pillars + top beam + bottom beam into 1 mesh
+      const pL = new THREE.BoxGeometry(0.4, fH, 0.4);
+      pL.translate(-fW / 2, fH / 2, 0);
+      const pR = new THREE.BoxGeometry(0.4, fH, 0.4);
+      pR.translate(fW / 2, fH / 2, 0);
+      const topB = new THREE.BoxGeometry(fW + 0.4, 0.4, 0.4);
+      topB.translate(0, fH, 0);
+      const botB = new THREE.BoxGeometry(fW + 0.4, 0.3, 0.4);
+      botB.translate(0, fH - 1.8, 0);
+      const frame = new THREE.Mesh(
+        mergeGeometries([pL, pR, topB, botB], false), frameMat);
+      ag.add(frame);
+      // Banner centered in the frame opening
+      const banner = new THREE.Mesh(new THREE.PlaneGeometry(fW * 0.72, 1.4), arcBannerMat);
+      banner.position.set(0, fH - 0.8, 0.25);
+      ag.add(banner);
+      ag.position.set(0, 0, -i * 150 - 50);
+      this.scene.add(ag);
+      this.themeObjects.push(ag);
+      this.foreground.push(ag);
+    }
+
+    // ══════════════════════════════════════════
+    //  MOMO SIGN BILLBOARDS — large, dense, 6 along the road
+    // ══════════════════════════════════════════
+    const loader = new THREE.TextureLoader();
+    const momoSignTexs = [
+      loader.load(asset('maps/momo-sign1.webp')),
+      loader.load(asset('maps/momo-sign2.webp')),
+    ];
+    momoSignTexs.forEach(t => { t.colorSpace = THREE.SRGBColorSpace; });
+    const panelBackMat = new THREE.MeshBasicMaterial({ color: 0xffeeff });
+    const postH = 8, pW = 7, pH = 5;
+
+    for (let i = 0; i < 6; i++) {
+      const side = i % 2 === 0 ? 1 : -1;
+      const sg = new THREE.Group();
+      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, postH, 6), poleMat);
+      post.position.y = postH / 2;
+      sg.add(post);
+      const panelBack = new THREE.Mesh(new THREE.BoxGeometry(pW + 0.5, pH + 0.5, 0.1), panelBackMat);
+      panelBack.position.set(0, postH + pH / 2, 0);
+      sg.add(panelBack);
+      const signPlane = new THREE.Mesh(new THREE.PlaneGeometry(pW, pH),
+        new THREE.MeshBasicMaterial({ map: momoSignTexs[i % 2], transparent: true }));
+      signPlane.position.set(0, postH + pH / 2, 0.08);
+      sg.add(signPlane);
+      sg.position.set(side * (RH + 4 + Math.random() * 2), 0, -i * 50 - 20);
+      sg.rotation.y = side > 0 ? -0.15 : 0.15;
+      this.scene.add(sg);
+      this.themeObjects.push(sg);
+      this.midground.push(sg);
+    }
+
+    // ══════════════════════════════════════════
+    //  3D MODELS — dense roadside props
+    // ══════════════════════════════════════════
+    if (this.modelsReady) {
+      // Snowmen — frequent along road
+      for (let i = 0; i < 5; i++) {
+        const side = i % 2 === 0 ? -1 : 1;
+        this._placeModel(MODEL_URLS.snowman,
+          side * (RH + 2.5 + Math.random() * 5), 0, -i * 60 - 25,
+          Math.random() * Math.PI * 2, 0.8 + Math.random() * 0.4, 'fg');
+      }
+      // Candy canes — line the road edges
+      for (let i = 0; i < 6; i++) {
+        const side = i % 2 === 0 ? 1 : -1;
+        this._placeModel(MODEL_URLS.candyCane,
+          side * (RH + 1.2), 0, -i * 50 - 15,
+          0, 0.7 + Math.random() * 0.4, 'fg');
+      }
+      // Bones — scattered in snow
+      for (let i = 0; i < 4; i++) {
+        const side = i % 2 === 0 ? -1 : 1;
+        this._placeModel(MODEL_URLS.bone,
+          side * (RH + 3 + Math.random() * 8), 0, -i * 70 - 40,
+          Math.random() * Math.PI, 1.0 + Math.random() * 0.5, 'fg');
+      }
+      // Benches — cozy roadside seating
+      this._scatterProps([MODEL_URLS.bench], 3, [2, 4], 100, 'fg');
+    }
+
+    // ══════════════════════════════════════════
+    //  COLORFUL BALLS — toy balls in snow
+    // ══════════════════════════════════════════
+    const ballColors = [0xff4466, 0x44aaff, 0xffcc22, 0x66dd66, 0xff8844, 0xcc66ff];
+    const ballMats = ballColors.map(c => new THREE.MeshBasicMaterial({ color: c }));
+    const ballGeo = new THREE.SphereGeometry(0.4, 6, 5);
+    for (let i = 0; i < 6; i++) {
+      const side = i % 2 === 0 ? -1 : 1;
+      const ball = new THREE.Mesh(ballGeo, ballMats[i]);
+      ball.position.set(side * (RH + 1.5 + Math.random() * 6), 0.4, -i * 45 - 20);
+      this.scene.add(ball);
+      this.themeObjects.push(ball);
+      this.foreground.push(ball);
+    }
+
+    // ══════════════════════════════════════════
+    //  GLASS JARS (2 groups)
+    // ══════════════════════════════════════════
+    const glassMat = new THREE.MeshStandardMaterial({
+      color: 0xeeffff, roughness: 0.1, metalness: 0.1, transparent: true, opacity: 0.35,
+    });
+    const jarGeo = new THREE.CylinderGeometry(2.5, 2.2, 6, 8);
+    const lidGeo = new THREE.CylinderGeometry(2.8, 2.8, 0.5, 8);
+    const fillMat = new THREE.MeshStandardMaterial({ color: 0xeeddcc, roughness: 0.75 });
+
+    for (const sx of [-1, 1]) {
+      const jg = new THREE.Group();
+      const jar = new THREE.Mesh(jarGeo, glassMat);
+      jar.position.y = 3;
+      jg.add(jar);
+      const lid = new THREE.Mesh(lidGeo, goldMat);
+      lid.position.y = 6.25;
+      jg.add(lid);
+      const fill = new THREE.Mesh(new THREE.CylinderGeometry(2.0, 1.8, 4, 8), fillMat);
+      fill.position.y = 2.5;
+      jg.add(fill);
+      jg.position.set(sx * (RH + 6), 0, -120);
+      this.scene.add(jg);
+      this.themeObjects.push(jg);
+      this.midground.push(jg);
+    }
+
+    // ══════════════════════════════════════════
+    //  GLOWING BLUE ARROW MARKERS (8 meshes, denser)
+    // ══════════════════════════════════════════
+    const arrowMat = new THREE.MeshBasicMaterial({ color: 0x44aaff, transparent: true, opacity: 0.8 });
+    const arrowShape = new THREE.Shape();
+    arrowShape.moveTo(0, 0.6); arrowShape.lineTo(0.4, 0); arrowShape.lineTo(0.15, 0);
+    arrowShape.lineTo(0.15, -0.6); arrowShape.lineTo(-0.15, -0.6); arrowShape.lineTo(-0.15, 0);
+    arrowShape.lineTo(-0.4, 0); arrowShape.closePath();
+    const arrowGeo = new THREE.ShapeGeometry(arrowShape);
+    for (let i = 0; i < 8; i++) {
+      const side = i % 2 === 0 ? 1 : -1;
+      const arrow = new THREE.Mesh(arrowGeo, arrowMat);
+      arrow.position.set(side * (RH + 0.8), 0.05, -i * 38 - 10);
+      arrow.rotation.x = -Math.PI / 2;
+      arrow.rotation.z = Math.PI;
+      this.scene.add(arrow);
+      this.themeObjects.push(arrow);
+      this.foreground.push(arrow);
+    }
+
+    // ══════════════════════════════════════════
+    //  LOW FLUFFY CLOUDS — misty ground fog
+    // ══════════════════════════════════════════
+    const cloudTex = this._makeCloudTexture();
+    const lowCloudMat = new THREE.MeshBasicMaterial({
+      map: cloudTex, transparent: true, opacity: 0.25,
+      depthWrite: false, side: THREE.DoubleSide, color: 0xfff5ee,
+    });
+    for (let i = 0; i < 4; i++) {
+      const side = i % 2 === 0 ? -1 : 1;
+      const lc = new THREE.Mesh(new THREE.PlaneGeometry(14 + Math.random() * 10, 5), lowCloudMat);
+      lc.position.set(side * (RH + 18 + Math.random() * 12), 4 + Math.random() * 4, -i * 80 - 40);
+      lc.lookAt(0, lc.position.y, 0);
+      this.scene.add(lc);
+      this.themeObjects.push(lc);
+      this.midground.push(lc);
+    }
+
+    // ── Ground-level mist patches ──
+    const mistMat = new THREE.MeshBasicMaterial({
+      color: 0xfff8f2, transparent: true, opacity: 0.15, depthWrite: false, side: THREE.DoubleSide,
+    });
+    for (let i = 0; i < 3; i++) {
+      const mist = new THREE.Mesh(new THREE.PlaneGeometry(40, 6), mistMat);
+      mist.position.set(0, 1.5, -i * 100 - 50);
+      mist.lookAt(0, mist.position.y, 0);
+      this.scene.add(mist);
+      this.themeObjects.push(mist);
+      this.foreground.push(mist);
+    }
+  }
+
+  // =====================================================================
   //  BILLBOARDS — ICT logo signs along the road
   // =====================================================================
 
@@ -2427,6 +2851,7 @@ export class Environment {
       peru:     { postColor: 0x7a6b50, postRoughness: 0.9,  frameColor: 0x5a4a3a, frameRoughness: 0.8, postWidth: 0.30, postDepth: 0.30, panelBack: 0x5a4a32, roadOffset: 4 },
       shanghai: { postColor: 0x555566, postRoughness: 0.15, frameColor: 0x444455, frameRoughness: 0.1, postWidth: 0.12, postDepth: 0.12, panelBack: 0x333344, roadOffset: 2 },
       delhi:    { postColor: 0x8b6914, postRoughness: 0.80, frameColor: 0x7a5a2a, frameRoughness: 0.7, postWidth: 0.22, postDepth: 0.22, panelBack: 0x5a4020, roadOffset: 3 },
+      momo:     { postColor: 0xeeeeee, postRoughness: 0.40, frameColor: 0xffffff, frameRoughness: 0.3, postWidth: 0.18, postDepth: 0.18, panelBack: 0xffeeff, roadOffset: 3 },
     };
     const s = styles[style] || styles.usa;
     const isMetal = style === 'usa';
