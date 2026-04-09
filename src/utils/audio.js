@@ -1030,20 +1030,20 @@ export function playMapSelect() {
 // =================================================================
 
 const ENG_BASE     = 45;     // fundamental idle Hz (deep V8)
-const ENG_IDLE_VOL = 0.07;   // master gain at idle — audible presence without overpowering music
-const ENG_MAX_VOL  = 0.28;   // master gain at max rev — punchy at speed (~44% of music volume)
-const ENG_FILT_LO  = 220;    // lowpass cutoff at idle (dark muffled rumble)
-const ENG_FILT_HI  = 3400;   // cutoff at max (bright snarl, more aggression)
+const ENG_IDLE_VOL = 0.11;   // master gain at idle — strong rumble presence
+const ENG_MAX_VOL  = 0.40;   // master gain at max rev — punchy, commanding at speed
+const ENG_FILT_LO  = 240;    // lowpass cutoff at idle (dark muffled rumble)
+const ENG_FILT_HI  = 4200;   // cutoff at max (bright aggressive snarl)
 const ENG_SMOOTH   = 0.035;  // param smoothing time-constant (s) — snappier for gear shifts
 const ENG_FREQ_MUL = 3.0;    // frequency range: 1× → 4.0× (wider for dramatic gear drops)
 
 // Oscillator bank: [waveform, harmonic, gain@idle, gain@max]
 const OSC_DEFS = [
-  { type: 'sawtooth', h: 1, gIdle: 0.30, gMax: 0.44 },  // fundamental rumble — wider dynamic swing
-  { type: 'square',   h: 2, gIdle: 0.18, gMax: 0.35 },  // exhaust body — swells into growl
-  { type: 'sawtooth', h: 4, gIdle: 0.04, gMax: 0.24 },  // firing-frequency chug — barely there at idle
-  { type: 'sine',     h: 3, gIdle: 0.03, gMax: 0.14 },  // midrange growl — more body at speed
-  { type: 'triangle', h: 6, gIdle: 0.00, gMax: 0.08 },  // high-harmonic snarl (rasp near redline)
+  { type: 'sawtooth', h: 1, gIdle: 0.34, gMax: 0.50 },  // fundamental rumble — beefy presence
+  { type: 'square',   h: 2, gIdle: 0.22, gMax: 0.40 },  // exhaust body — thick growl
+  { type: 'sawtooth', h: 4, gIdle: 0.05, gMax: 0.28 },  // firing-frequency chug — punchy at speed
+  { type: 'sine',     h: 3, gIdle: 0.04, gMax: 0.18 },  // midrange growl — fills the spectrum
+  { type: 'triangle', h: 6, gIdle: 0.00, gMax: 0.10 },  // high-harmonic snarl (rasp near redline)
 ];
 
 let _eOscs = [];          // { osc, gain, lfoScale, def }
@@ -1056,6 +1056,10 @@ let _eLope = null;         // idle-lope gain modulation
 let _eLopeGain = null;
 let _eLopeDepth = null;    // gain node between lope and master for depth control
 let _eRunning = false;
+let _turboWhine = null;       // sustained turbo whine oscillator
+let _turboWhineGain = null;
+let _turboWhineFilter = null;
+let _turboBoostActive = false;
 
 function _makeDistortionCurve(k) {
   const n = 256, curve = new Float32Array(n);
@@ -1181,6 +1185,11 @@ export function stopEngine() {
   if (_eDistort)  { _eDistort.disconnect(); _eDistort = null; }
   if (_eFilter)   { _eFilter.disconnect(); _eFilter = null; }
   if (_eMaster)   { _eMaster.disconnect(); _eMaster = null; }
+  // Clean up turbo whine if running
+  if (_turboWhine) { try { _turboWhine.stop(); } catch (_) {} _turboWhine.disconnect(); _turboWhine = null; }
+  if (_turboWhineFilter) { _turboWhineFilter.disconnect(); _turboWhineFilter = null; }
+  if (_turboWhineGain) { _turboWhineGain.disconnect(); _turboWhineGain = null; }
+  _turboBoostActive = false;
   _eRunning = false;
 }
 
@@ -1204,12 +1213,14 @@ export function updateEngine(rpm) {
     e.gain.gain.setTargetAtTime(tgtGain, t, ENG_SMOOTH);
   }
 
-  // Filter opens with speed
-  const fCut = ENG_FILT_LO + (ENG_FILT_HI - ENG_FILT_LO) * s;
+  // Filter opens with speed (+ extra brightness during turbo)
+  const turboFilterBoost = _turboBoostActive ? 800 : 0;
+  const fCut = ENG_FILT_LO + (ENG_FILT_HI - ENG_FILT_LO) * s + turboFilterBoost;
   _eFilter.frequency.setTargetAtTime(fCut, t, ENG_SMOOTH);
 
-  // Master volume
-  const vol = ENG_IDLE_VOL + (ENG_MAX_VOL - ENG_IDLE_VOL) * s;
+  // Master volume (+ 25% boost during turbo)
+  const turboGainMul = _turboBoostActive ? 1.25 : 1.0;
+  const vol = (ENG_IDLE_VOL + (ENG_MAX_VOL - ENG_IDLE_VOL) * s) * turboGainMul;
   _eMaster.gain.setTargetAtTime(vol, t, ENG_SMOOTH);
 
   // Pitch vibrato: slightly faster at speed
@@ -1257,8 +1268,8 @@ export function playGearShift(isUpshift, gear = 0) {
     clunkBP.frequency.value = 500 + gearFrac * 500; // 500-1000Hz, wider low end
     clunkBP.Q.value = 2.5;
     const clunkGain = c.createGain();
-    clunkGain.gain.setValueAtTime(0.16 + gearFrac * 0.06, t + 0.008);
-    clunkGain.gain.exponentialRampToValueAtTime(0.001, t + 0.05);
+    clunkGain.gain.setValueAtTime(0.22 + gearFrac * 0.08, t + 0.008);
+    clunkGain.gain.exponentialRampToValueAtTime(0.001, t + 0.055);
     clunk.connect(clunkBP).connect(clunkGain).connect(out);
     clunk.start(t + 0.008);
 
@@ -1274,7 +1285,7 @@ export function playGearShift(isUpshift, gear = 0) {
     whooshHP.frequency.value = 1800 + gearFrac * 2200; // wider range, more audible in low gears
     whooshHP.Q.value = 0.7;
     const whooshGain = c.createGain();
-    whooshGain.gain.setValueAtTime(0.08 + gearFrac * 0.06, t + 0.015);
+    whooshGain.gain.setValueAtTime(0.12 + gearFrac * 0.08, t + 0.015);
     whooshGain.gain.exponentialRampToValueAtTime(0.001, t + 0.015 + whooshLen);
     whoosh.connect(whooshHP).connect(whooshGain).connect(out);
     whoosh.start(t + 0.015);
@@ -1285,8 +1296,8 @@ export function playGearShift(isUpshift, gear = 0) {
     thump.frequency.setValueAtTime(55 + gear * 12, t + 0.008);
     thump.frequency.exponentialRampToValueAtTime(30, t + 0.07);
     const thumpGain = c.createGain();
-    thumpGain.gain.setValueAtTime(0.12, t + 0.008);
-    thumpGain.gain.exponentialRampToValueAtTime(0.001, t + 0.08);
+    thumpGain.gain.setValueAtTime(0.18, t + 0.008);
+    thumpGain.gain.exponentialRampToValueAtTime(0.001, t + 0.09);
     thump.connect(thumpGain).connect(out);
     thump.start(t + 0.008);
     thump.stop(t + 0.10);
@@ -1329,8 +1340,8 @@ export function playGearShift(isUpshift, gear = 0) {
       popBP.frequency.value = 350 + Math.random() * 650;
       popBP.Q.value = 2.5 + Math.random();
       const popGain = c.createGain();
-      popGain.gain.setValueAtTime(0.10 + Math.random() * 0.06, t + popDelay);
-      popGain.gain.exponentialRampToValueAtTime(0.001, t + popDelay + 0.025);
+      popGain.gain.setValueAtTime(0.14 + Math.random() * 0.08, t + popDelay);
+      popGain.gain.exponentialRampToValueAtTime(0.001, t + popDelay + 0.03);
       pop.connect(popBP).connect(popGain).connect(out);
       pop.start(t + popDelay);
     }
@@ -1343,8 +1354,8 @@ export function playGearShift(isUpshift, gear = 0) {
     const barkDist = c.createWaveShaper();
     barkDist.curve = _makeDistortionCurve(8);
     const barkGain = c.createGain();
-    barkGain.gain.setValueAtTime(0.10, t + 0.02);
-    barkGain.gain.exponentialRampToValueAtTime(0.001, t + 0.08);
+    barkGain.gain.setValueAtTime(0.16, t + 0.02);
+    barkGain.gain.exponentialRampToValueAtTime(0.001, t + 0.09);
     bark.connect(barkDist).connect(barkGain).connect(out);
     bark.start(t + 0.02);
     bark.stop(t + 0.10);
@@ -1543,8 +1554,8 @@ export function playTurboBoost() {
   whooshBP.Q.value = 1.5;
   const whooshG = c.createGain();
   whooshG.gain.setValueAtTime(0, t);
-  whooshG.gain.linearRampToValueAtTime(0.15, t + 0.08);
-  whooshG.gain.setValueAtTime(0.15, t + 0.25);
+  whooshG.gain.linearRampToValueAtTime(0.20, t + 0.08);
+  whooshG.gain.setValueAtTime(0.20, t + 0.25);
   whooshG.gain.exponentialRampToValueAtTime(0.001, t + 0.8);
   noise.connect(whooshBP).connect(whooshG).connect(out);
   noise.start(t);
@@ -1558,8 +1569,8 @@ export function playTurboBoost() {
   whistle.frequency.exponentialRampToValueAtTime(1800, t + 1.0);
   const whistleG = c.createGain();
   whistleG.gain.setValueAtTime(0, t);
-  whistleG.gain.linearRampToValueAtTime(0.08, t + 0.1);
-  whistleG.gain.setValueAtTime(0.08, t + 0.4);
+  whistleG.gain.linearRampToValueAtTime(0.12, t + 0.1);
+  whistleG.gain.setValueAtTime(0.12, t + 0.4);
   whistleG.gain.exponentialRampToValueAtTime(0.001, t + 1.2);
   whistle.connect(whistleG).connect(out);
   whistle.start(t);
@@ -1598,6 +1609,56 @@ export function playTurboBoost() {
   flutter.stop(t + 1.0);
 }
 
+/** Start sustained turbo engine boost — whine + engine intensity for duration of turbo */
+export function startTurboEngine() {
+  if (!_eRunning) return;
+  _turboBoostActive = true;
+  const c = getCtx();
+  const t = c.currentTime;
+  const out = getMaster();
+
+  // Sustained supercharger whine — rising pitch that settles
+  _turboWhine = c.createOscillator();
+  _turboWhine.type = 'sawtooth';
+  _turboWhine.frequency.setValueAtTime(800, t);
+  _turboWhine.frequency.linearRampToValueAtTime(1500, t + 0.6);
+  _turboWhine.frequency.setTargetAtTime(1300, t + 0.6, 0.5);
+
+  _turboWhineFilter = c.createBiquadFilter();
+  _turboWhineFilter.type = 'bandpass';
+  _turboWhineFilter.frequency.value = 1200;
+  _turboWhineFilter.Q.value = 4;
+
+  _turboWhineGain = c.createGain();
+  _turboWhineGain.gain.setValueAtTime(0, t);
+  _turboWhineGain.gain.linearRampToValueAtTime(0.045, t + 0.4);
+
+  _turboWhine.connect(_turboWhineFilter).connect(_turboWhineGain).connect(out);
+  _turboWhine.start(t);
+}
+
+/** Stop sustained turbo engine boost — fade out whine, restore normal engine */
+export function stopTurboEngine() {
+  _turboBoostActive = false;
+  if (_turboWhine) {
+    const c = getCtx();
+    const t = c.currentTime;
+    _turboWhineGain.gain.cancelScheduledValues(t);
+    _turboWhineGain.gain.setValueAtTime(_turboWhineGain.gain.value, t);
+    _turboWhineGain.gain.setTargetAtTime(0, t, 0.12);
+    const whine = _turboWhine;
+    const whineF = _turboWhineFilter;
+    const whineG = _turboWhineGain;
+    setTimeout(() => {
+      try { whine.stop(); } catch (_) {}
+      whine.disconnect(); whineF.disconnect(); whineG.disconnect();
+    }, 600);
+    _turboWhine = null;
+    _turboWhineFilter = null;
+    _turboWhineGain = null;
+  }
+}
+
 /** Exhaust overrun pop — crackle during deceleration / engine braking */
 export function playOverrunPop() {
   const c = getCtx();
@@ -1620,8 +1681,8 @@ export function playOverrunPop() {
     bp.Q.value = 2 + Math.random() * 2;
 
     const g = c.createGain();
-    g.gain.setValueAtTime(0.08 + Math.random() * 0.06, t + delay);
-    g.gain.exponentialRampToValueAtTime(0.001, t + delay + 0.035);
+    g.gain.setValueAtTime(0.14 + Math.random() * 0.10, t + delay);
+    g.gain.exponentialRampToValueAtTime(0.001, t + delay + 0.04);
 
     pop.connect(bp).connect(g).connect(out);
     pop.start(t + delay);
@@ -1643,8 +1704,8 @@ export function playAccelSurge() {
   hp.frequency.setValueAtTime(1200, t);
   hp.frequency.exponentialRampToValueAtTime(3000, t + 0.08);
   const nG = c.createGain();
-  nG.gain.setValueAtTime(0.06, t);
-  nG.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+  nG.gain.setValueAtTime(0.11, t);
+  nG.gain.exponentialRampToValueAtTime(0.001, t + 0.14);
   noise.connect(hp).connect(nG).connect(out);
   noise.start(t);
 
@@ -1656,11 +1717,11 @@ export function playAccelSurge() {
   const pDist = c.createWaveShaper();
   pDist.curve = _makeDistortionCurve(6);
   const pG = c.createGain();
-  pG.gain.setValueAtTime(0.08, t);
-  pG.gain.exponentialRampToValueAtTime(0.001, t + 0.10);
+  pG.gain.setValueAtTime(0.14, t);
+  pG.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
   punch.connect(pDist).connect(pG).connect(out);
   punch.start(t);
-  punch.stop(t + 0.12);
+  punch.stop(t + 0.14);
 }
 
 /** Haptic feedback (mobile vibration) */

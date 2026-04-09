@@ -2,10 +2,14 @@ const DURATION = 380; // ms — fast enough to feel snappy, slow enough to read 
 
 /**
  * Fade an element in. Sets display, forces a reflow, then transitions opacity 0 → 1.
+ * Cancels any pending fadeOut timeout on the same element.
  * @param {HTMLElement} el
  * @param {string} [display='flex']
  */
 export function fadeIn(el, display = 'flex') {
+  // Cancel any pending fadeOut that would clobber this fadeIn
+  if (el._fadeOutTimer) { clearTimeout(el._fadeOutTimer); el._fadeOutTimer = null; }
+  el.style.pointerEvents = '';
   el.style.transition = '';
   el.style.opacity = '0';
   el.style.display = display;
@@ -25,10 +29,12 @@ export function fadeOut(el) {
     el.style.display = 'none';
     return;
   }
+  if (el._fadeOutTimer) { clearTimeout(el._fadeOutTimer); el._fadeOutTimer = null; }
   el.style.pointerEvents = 'none';
   el.style.transition = `opacity ${DURATION}ms ease`;
   el.style.opacity = '0';
-  setTimeout(() => {
+  el._fadeOutTimer = setTimeout(() => {
+    el._fadeOutTimer = null;
     el.style.display = 'none';
     el.style.transition = '';
     el.style.opacity = '';

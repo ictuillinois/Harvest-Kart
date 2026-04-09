@@ -1034,6 +1034,16 @@ export class HUD {
       }
 
       /* ══════════════════════════════════════════
+         NON-4K SCREENS (17" laptops, 23" monitors)
+         Scale down minimap, avatar, tachometer, speedometer to 75%
+         ══════════════════════════════════════════ */
+      @media (max-width: 2400px) {
+        .hud-tl { transform: scale(0.75); transform-origin: top left; }
+        .hud-bl { transform: scale(0.75); transform-origin: bottom left; }
+        .hud-br { transform: scale(0.75); transform-origin: bottom right; }
+      }
+
+      /* ══════════════════════════════════════════
          COMPACT VIEWPORT
          ══════════════════════════════════════════ */
       @media (max-height: 380px) {

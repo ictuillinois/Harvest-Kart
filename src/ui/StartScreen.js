@@ -462,9 +462,10 @@ export class StartScreen {
     };
     window.addEventListener('keydown', this._keyHandler);
 
-    // Gamepad polling — only respond to newly pressed buttons (edge detection)
+    // Gamepad polling — respond to newly pressed buttons OR hat switch D-pad
     this._gamepadPoll = null;
     this._prevBtnState = new Map(); // track previous pressed state per button
+    this._prevHatActive = false;    // track hat switch (G920 D-pad on axes[9])
     const pollGamepad = () => {
       if (this._started || this.el.style.display === 'none') {
         this._gamepadPoll = null;
@@ -473,13 +474,19 @@ export class StartScreen {
       const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
       for (const gp of gamepads) {
         if (!gp) continue;
+        // Buttons (A, B, X, Y, bumpers, etc.)
         for (let i = 0; i < gp.buttons.length; i++) {
           const key = gp.index + ':' + i;
           const wasPressed = this._prevBtnState.get(key) || false;
           const isPressed = gp.buttons[i].pressed;
           this._prevBtnState.set(key, isPressed);
-          // Only trigger on rising edge (newly pressed, not held)
-          if (isPressed && !wasPressed) { triggerStart(); return; }
+          if (isPressed && !wasPressed) { triggerStart(); if (this._started) return; }
+        }
+        // Hat switch D-pad (G920: axes[9], center > 1.1, any direction < 1.1)
+        if (gp.axes.length >= 10) {
+          const hatActive = gp.axes[9] < 1.1;
+          if (hatActive && !this._prevHatActive) { triggerStart(); this._prevHatActive = true; if (this._started) return; }
+          this._prevHatActive = hatActive;
         }
       }
       this._gamepadPoll = requestAnimationFrame(pollGamepad);
@@ -494,16 +501,16 @@ export class StartScreen {
     this._started = false;
     this._inputLocked = true;
     this._prevBtnState.clear();
+    this._prevHatActive = false;
     this._promptEl.style.opacity = '0';
 
-    // Unlock input and reveal prompt after 1 second
+    // Unlock input and reveal prompt after 2 seconds
     clearTimeout(this._unlockTimer);
     this._unlockTimer = setTimeout(() => {
       this._inputLocked = false;
       this._promptEl.style.opacity = '1';
-    }, 1000);
+    }, 2000);
 
-    if (this._startGamepadPoll) this._startGamepadPoll();
     if (longFade) {
       this.el.style.transition = '';
       this.el.style.opacity = '0';
@@ -514,6 +521,26 @@ export class StartScreen {
     } else {
       fadeIn(this.el);
     }
+    // Start gamepad polling AFTER display is set to 'flex'
+    // Clear stale rAF ID so _startGamepadPoll knows to start fresh
+    this._gamepadPoll = null;
+    if (this._startGamepadPoll) this._startGamepadPoll();
   }
+  /** Re-lock input for 2 seconds (called after intro finishes or on return to home). */
+  relockInput() {
+    this._inputLocked = true;
+    this._prevBtnState.clear();
+    this._prevHatActive = false;
+    this._promptEl.style.opacity = '0';
+    clearTimeout(this._unlockTimer);
+    this._unlockTimer = setTimeout(() => {
+      this._inputLocked = false;
+      this._promptEl.style.opacity = '1';
+    }, 2000);
+    // Restart gamepad polling fresh
+    this._gamepadPoll = null;
+    if (this._startGamepadPoll) this._startGamepadPoll();
+  }
+
   hide() { fadeOut(this.el); }
 }

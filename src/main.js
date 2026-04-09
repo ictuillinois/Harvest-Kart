@@ -26,7 +26,7 @@ import { CompletionSequence } from './game/CompletionSequence.js';
 import { AMBIENT_MULTIPLIERS } from './game/LampPost.js';
 
 import { setupControls } from './utils/controls.js';
-import { playPlateHit, playLampLit, playComboBreak, playWinFanfare, playLaneSwitch, haptic, playMusic, stopMusic, startEngineIdle, stopEngine, updateEngine, playGearShift, playCountdownTone, playCountdownRev, playFinalPowerOn, playStartPress, playDriverSelect, playMapSelect, playTurboBoost, preWarmEngine, preWarmPlateAudio, setVolume, playOverrunPop, playAccelSurge } from './utils/audio.js';
+import { playPlateHit, playLampLit, playComboBreak, playWinFanfare, playLaneSwitch, haptic, playMusic, stopMusic, startEngineIdle, stopEngine, updateEngine, playGearShift, playCountdownTone, playCountdownRev, playFinalPowerOn, playStartPress, playDriverSelect, playMapSelect, playTurboBoost, startTurboEngine, stopTurboEngine, preWarmEngine, preWarmPlateAudio, setVolume, playOverrunPop, playAccelSurge } from './utils/audio.js';
 import { gameRoot } from './utils/base.js';
 import {
   MIN_SPEED_MPH, MAX_SPEED_MPH, STARTING_SPEED_MPH, SCROLL_FACTOR,
@@ -202,6 +202,7 @@ function goHome() {
   if (raceStart) { raceStart.cancel(); raceStart = null; }
   if (completionSeq) { completionSeq.cancel(); completionSeq = null; }
   stopEngine();
+  stopTurboEngine();
   controls.unlock();
   removeKartLights();
   removeStartLine();
@@ -1096,6 +1097,7 @@ gameState.on('lampLit', ({ lampPostsLit }) => {
       // Speed ramps up gradually in the game loop (5 MPH/sec)
       kart.startTurboFlame();
       playTurboBoost();
+      startTurboEngine();
       haptic(50);
       hud.showTurboToast('⚡ TURBO BOOST ⚡');
     }
@@ -1162,18 +1164,25 @@ function animate() {
         ? activePhysics.topSpeed + (activePhysics.turboBoost || TURBO_BOOST_MPH)
         : activePhysics.topSpeed;
 
+      // Analog pedal amounts (0-1): proportional for wheel, 1.0 for keyboard
+      const gasAmt = controls.gasAmount();
+      const brakeAmt = controls.brakeAmount();
+
       if (turboActive) {
         // During turbo: ramp speed up at 5 MPH/sec toward boosted ceiling
         gameState.speed = Math.min(gameState.speed + 5 * delta, effectiveTopSpeed);
       } else if (gameState.speed > activePhysics.topSpeed) {
         // Post-turbo bleed-down: don't accelerate, just let bleed handle it
-      } else if (controls.isPedalDown()) {
+      } else if (gasAmt > 0 && brakeAmt === 0) {
+        // Acceleration — proportional to gas pedal pressure
         if (shiftCooldown <= 0) {
-          gameState.speed = Math.min(gameState.speed + activePhysics.gearAccel[currentGear] * delta, effectiveTopSpeed);
+          gameState.speed = Math.min(gameState.speed + activePhysics.gearAccel[currentGear] * gasAmt * delta, effectiveTopSpeed);
         }
-      } else if (controls.isBrakeDown()) {
-        gameState.speed = Math.max(gameState.speed - activePhysics.decelRate * 2.5 * delta, 0);
+      } else if (brakeAmt > 0) {
+        // Braking — proportional: light tap = 1.5x decel, full stomp = 5x decel
+        gameState.speed = Math.max(gameState.speed - activePhysics.decelRate * (1.5 + brakeAmt * 3.5) * delta, 0);
       } else {
+        // Coast deceleration (no input)
         gameState.speed = Math.max(gameState.speed - activePhysics.decelRate * delta, 0);
       }
       shiftCooldown = Math.max(0, shiftCooldown - delta);
@@ -1184,6 +1193,7 @@ function animate() {
         if (turboTimer <= 0) {
           turboActive = false;
           kart.stopTurboFlame();
+          stopTurboEngine();
         }
       }
       // After turbo ends, gradually bleed speed back to normal top speed at 2 MPH/sec
@@ -1209,7 +1219,8 @@ function animate() {
       // ── Deceleration overrun pops ──
       _popCooldown = Math.max(0, _popCooldown - delta);
       if (!turboActive && _prevFrameSpeed > gameState.speed && gameState.speed > 20 && _popCooldown <= 0) {
-        const chance = controls.isBrakeDown() ? 0.06 : 0.025;
+        // More pops with harder braking
+        const chance = 0.025 + brakeAmt * 0.06;
         if (Math.random() < chance) {
           playOverrunPop();
           _popCooldown = 0.25 + Math.random() * 0.35;
@@ -1217,7 +1228,7 @@ function animate() {
       }
 
       // ── Throttle pickup surge ──
-      const pedalNow = controls.isPedalDown();
+      const pedalNow = gasAmt > 0;
       if (pedalNow && !_wasPedalDown && gameState.speed > 15) {
         playAccelSurge();
       }
@@ -1315,5 +1326,6 @@ playMusic('menu');
   renderer.domElement.style.opacity = '';
   startScreen.show();
   await intro.run();
-  // Start screen is already visible — nothing more to do.
+  // Intro finished — re-lock input so HOME screen shows for 2s before accepting input
+  startScreen.relockInput();
 })();

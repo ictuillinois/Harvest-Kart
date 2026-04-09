@@ -145,7 +145,7 @@ function createPlate() {
 }
 
 // ── Tier-aware minimum gap between plates ──
-const MIN_GAPS = [38, 38, 25]; // Tier 0: 1.5x, Tier 1: 1.5x, Tier 2: 1x
+const MIN_GAPS = [54, 47, 31]; // Tier 0: 1.75x, Tier 1: 1.5x, Tier 2: 1x (base +25%)
 
 export class Plate {
   constructor(scene) {
@@ -168,12 +168,9 @@ export class Plate {
     const plate = this.plates.find(p => !p.userData.active);
     if (!plate) return;
 
-    // On-the-fly lane selection — tier-aware
+    // On-the-fly lane selection — adjacent lanes only (max 1 lane separation)
     let options = [0, 1, 2].filter(l => l !== this._lastLane);
-    if (this._tier === 0) {
-      // Tier 0: adjacent lanes only (max 1 lane separation)
-      options = options.filter(l => Math.abs(l - this._lastLane) <= 1);
-    }
+    options = options.filter(l => Math.abs(l - this._lastLane) <= 1);
     const laneIdx = options[Math.floor(Math.random() * options.length)];
     this._lastLane = laneIdx;
 

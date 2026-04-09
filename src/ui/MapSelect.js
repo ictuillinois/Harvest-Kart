@@ -437,18 +437,31 @@ export class MapSelect {
       const gps = navigator.getGamepads ? navigator.getGamepads() : [];
       for (const gp of gps) {
         if (!gp) continue;
+        const isHatWheel = gp.axes.length >= 10;
         const ax = gp.axes[0] || 0;
-        const ay = gp.axes[1] || 0;
+        // G920: axes[1] is gas pedal (rest=1.0), NOT left stick Y — ignore it
+        const ay = isHatWheel ? 0 : (gp.axes[1] || 0);
         const cols = 3;
         let idx = this._focusIdx;
-        // Analog stick OR D-pad for navigation
-        if (ax > 0.5 || gp.buttons[15]?.pressed) idx = Math.min(idx + 1, this._cardEls.length - 1);
-        else if (ax < -0.5 || gp.buttons[14]?.pressed) idx = Math.max(idx - 1, 0);
-        else if (ay > 0.5 || gp.buttons[13]?.pressed) idx = Math.min(idx + cols, this._cardEls.length - 1);
-        else if (ay < -0.5 || gp.buttons[12]?.pressed) idx = Math.max(idx - cols, 0);
+
+        // ── Hat switch D-pad (G920: axes[9]) ──
+        let hatL = false, hatR = false, hatU = false, hatD = false;
+        if (isHatWheel && gp.axes[9] < 1.1) {
+          const hat = gp.axes[9];
+          hatL = hat > 0.30 && hat < 1.05;
+          hatR = hat > -0.80 && hat < -0.05;
+          hatU = hat < -0.65 || hat > 0.90;
+          hatD = hat > -0.20 && hat < 0.55;
+        }
+
+        // Analog stick, D-pad buttons (standard), OR hat switch (G920)
+        if (ax > 0.5 || gp.buttons[15]?.pressed || hatR) idx = Math.min(idx + 1, this._cardEls.length - 1);
+        else if (ax < -0.5 || gp.buttons[14]?.pressed || hatL) idx = Math.max(idx - 1, 0);
+        else if (ay > 0.5 || gp.buttons[13]?.pressed || hatD) idx = Math.min(idx + cols, this._cardEls.length - 1);
+        else if (ay < -0.5 || gp.buttons[12]?.pressed || hatU) idx = Math.max(idx - cols, 0);
         if (idx !== this._focusIdx) { this._setFocus(idx); this._gpCooldown = 12; return; }
-        // A button = confirm
-        if (gp.buttons[0]?.pressed) {
+        // A (0), X (2), Y (3), Xbox/Menu (10) = confirm
+        if (gp.buttons[0]?.pressed || gp.buttons[2]?.pressed || gp.buttons[3]?.pressed || gp.buttons[10]?.pressed) {
           this._gpCooldown = 30;
           const card = this._cardEls[this._focusIdx];
           this._selectCard(card, parseInt(card.dataset.index));

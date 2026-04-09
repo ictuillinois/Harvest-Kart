@@ -289,16 +289,26 @@ export function setupControls(onSwitch, onRelease) {
 
   // =================================================================
   //  Gamepad / Racing Wheel — polled each frame
-  //  Supports standard gamepads AND Logitech steering wheels (G29/G920/G923).
-  //  Steering wheel: axes[0] = steering, axes[1..3] = pedals (rest ~1.0, pressed ~-1.0)
-  //  Standard pad:   axes[0] = left stick X, axes[1] = left stick Y (up = -1)
+  //  Supports standard gamepads AND Logitech steering wheels (G920/G29/G923).
+  //
+  //  G920 non-standard mapping (10 axes):
+  //    axes[0] = steering, axes[1] = gas, axes[2] = brake, axes[5] = clutch
+  //    axes[9] = D-pad hat switch (-1.0=U, -0.43=R, 0.14=D, 0.71=L, >1.1=center)
+  //    Start = button 10
+  //
+  //  Standard gamepad (2-4 axes):
+  //    axes[0] = left stick X, axes[1] = left stick Y
+  //    D-pad = buttons 12-15, Start = button 9
   // =================================================================
   const GP_STEER_DEADZONE = 0.15;
-  const GP_GAS_THRESHOLD = -0.3; // axis below this = gas pressed
+  const GP_PEDAL_THRESHOLD = -0.3; // pedal axis below this = pressed (boolean)
+  const GP_PEDAL_DEADZONE = 0.9;   // axis above this = pedal fully released
   let _gpLeftHeld = false;
   let _gpRightHeld = false;
   let _gpPedalDown = false;
   let _gpBrakeDown = false;
+  let _gpGasAmount = 0;   // 0.0 (released) to 1.0 (fully pressed)
+  let _gpBrakeAmount = 0; // 0.0 (released) to 1.0 (fully pressed)
 
   // Edge-detected buttons (true for one frame on rising edge)
   let _prevStart = false, _prevB = false;
@@ -309,6 +319,8 @@ export function setupControls(onSwitch, onRelease) {
     let steer = 0;
     let gas = false;
     let brake = false;
+    let gasAmt = 0;   // analog gas 0-1
+    let brakeAmt = 0; // analog brake 0-1
     let startNow = false, bNow = false;
 
     for (const gp of gamepads) {
@@ -318,25 +330,52 @@ export function setupControls(onSwitch, onRelease) {
       const ax0 = gp.axes[0] || 0;
       if (Math.abs(ax0) > Math.abs(steer)) steer = ax0;
 
-      // ── D-pad: buttons 14 (left) / 15 (right) on standard pads ──
-      if (gp.buttons[14]?.pressed) steer = -1;
-      if (gp.buttons[15]?.pressed) steer = 1;
+      // ── Detect G920-style wheel: 10+ axes with hat switch on axes[9] ──
+      const isHatWheel = gp.axes.length >= 10;
 
-      // ── Pedals: discriminate racing wheel (4+ axes) vs standard gamepad ──
-      if (gp.axes.length >= 4) {
-        // Racing wheel: axes[2] = gas, axes[3] = brake (rest ~1.0, pressed ~-1.0)
-        if (gp.axes[2] < GP_GAS_THRESHOLD) gas = true;
-        if (gp.axes[3] < GP_GAS_THRESHOLD) brake = true;
+      if (isHatWheel) {
+        // ── D-pad via hat switch axis (axes[9]) ──
+        const hat = gp.axes[9];
+        if (hat < 1.1) { // hat active (not centered)
+          // Left: 0.71, Down-Left: 0.43, Up-Left: 1.0
+          if (hat > 0.30 && hat < 1.05) steer = -1;
+          // Right: -0.43, Up-Right: -0.71, Down-Right: -0.14
+          if (hat > -0.80 && hat < -0.05) steer = 1;
+          // Up: -1.0, Up-Right, Up-Left → gas (matches ArrowUp on keyboard)
+          if (hat < -0.65 || hat > 0.90) gas = true;
+        }
+        // ── Pedals: axes[1] = gas, axes[2] = brake (analog: 1.0=released, -1.0=fully pressed) ──
+        const rawGas = gp.axes[1];
+        const rawBrk = gp.axes[2];
+        if (rawGas < GP_PEDAL_DEADZONE) {
+          gasAmt = Math.max(gasAmt, Math.min(1, (GP_PEDAL_DEADZONE - rawGas) / (GP_PEDAL_DEADZONE + 1)));
+          gas = true;
+        }
+        if (rawBrk < GP_PEDAL_DEADZONE) {
+          brakeAmt = Math.max(brakeAmt, Math.min(1, (GP_PEDAL_DEADZONE - rawBrk) / (GP_PEDAL_DEADZONE + 1)));
+          brake = true;
+        }
+      } else if (gp.axes.length >= 4) {
+        // Standard racing wheel (4 axes): axes[2] = gas, axes[3] = brake
+        if (gp.axes[2] < GP_PEDAL_THRESHOLD) { gas = true; gasAmt = 1; }
+        if (gp.axes[3] < GP_PEDAL_THRESHOLD) { brake = true; brakeAmt = 1; }
       } else {
-        // Standard gamepad: axes[1] < -0.3 = left stick pushed up → gas
-        if (gp.axes[1] != null && gp.axes[1] < GP_GAS_THRESHOLD) gas = true;
+        // Standard gamepad: axes[1] < threshold = left stick pushed up → gas
+        if (gp.axes[1] != null && gp.axes[1] < GP_PEDAL_THRESHOLD) { gas = true; gasAmt = 1; }
       }
 
-      // ── Gas buttons: RT (7), A (0), d-pad up (12) ──
-      if (gp.buttons[7]?.pressed || gp.buttons[0]?.pressed || gp.buttons[12]?.pressed) gas = true;
+      // ── D-pad buttons (standard gamepads only) ──
+      if (!isHatWheel) {
+        if (gp.buttons[14]?.pressed) steer = -1;
+        if (gp.buttons[15]?.pressed) steer = 1;
+        if (gp.buttons[12]?.pressed) gas = true;
+      }
 
-      // ── Start (9) and B (1) buttons ──
-      if (gp.buttons[9]?.pressed) startNow = true;
+      // ── Gas buttons: RT (7), A (0) ──
+      if (gp.buttons[7]?.pressed || gp.buttons[0]?.pressed) gas = true;
+
+      // ── Start (9 standard, 10 G920) and B (1) buttons ──
+      if (gp.buttons[9]?.pressed || gp.buttons[10]?.pressed) startNow = true;
       if (gp.buttons[1]?.pressed) bNow = true;
     }
 
@@ -346,6 +385,8 @@ export function setupControls(onSwitch, onRelease) {
     _gpRightHeld = steer > GP_STEER_DEADZONE;
     _gpPedalDown = gas;
     _gpBrakeDown = brake;
+    _gpGasAmount = gasAmt;
+    _gpBrakeAmount = brakeAmt;
 
     // Edge detection for Start and B buttons
     _startJustPressed = startNow && !_prevStart;
@@ -370,6 +411,8 @@ export function setupControls(onSwitch, onRelease) {
     hideButtons() { container.style.display = 'none'; },
     isPedalDown() { return !_locked && (_pedalDown || _gpPedalDown); },
     isBrakeDown() { return !_locked && _gpBrakeDown; },
+    gasAmount()   { return _locked ? 0 : (_pedalDown ? 1 : _gpGasAmount); },
+    brakeAmount() { return _locked ? 0 : _gpBrakeAmount; },
     isLeftHeld()  { return !_locked && (_leftHeld || _gpLeftHeld); },
     isRightHeld() { return !_locked && (_rightHeld || _gpRightHeld); },
     consumeStartPress() { if (_startJustPressed) { _startJustPressed = false; return true; } return false; },

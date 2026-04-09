@@ -1,5 +1,22 @@
 import { asset } from '../utils/base.js';
 
+// Sector bounding boxes in SVG coords (for zoom viewBox)
+const SECTOR_BOUNDS = [
+  { x: 0, y: 0, w: 166, h: 185 },    // Sector 0: top-left
+  { x: 194, y: 0, w: 166, h: 185 },   // Sector 1: top-right
+  { x: 0, y: 214, w: 166, h: 186 },   // Sector 2: bottom-left
+  { x: 194, y: 214, w: 166, h: 186 }, // Sector 3: bottom-right
+];
+
+// Navigation grid: 2 cols, 3 rows (sectors 0-3 in rows 0-1, HOME in row 2)
+const NAV = {
+  0: { right: 1, down: 2 },
+  1: { left: 0, down: 3 },
+  2: { right: 3, up: 0, down: 4 },
+  3: { left: 2, up: 1, down: 4 },
+  4: { up: 2 }, // HOME — up goes to bottom-left sector
+};
+
 export class RewardScreen {
   constructor(onHome) {
     this.el = document.createElement('div');
@@ -47,7 +64,6 @@ export class RewardScreen {
                 <!-- SECTOR 1: top-left -->
                 <g class="rw-sector-group" data-sector="0">
                   <rect class="rw-sector" x="8" y="8" width="150" height="170" rx="6"/>
-                  <!-- Buildings -->
                   <rect x="25" y="30" width="22" height="32" rx="2" class="rw-building"/>
                   <rect x="55" y="22" width="18" height="40" rx="2" class="rw-building"/>
                   <rect x="80" y="35" width="28" height="26" rx="2" class="rw-building"/>
@@ -56,7 +72,6 @@ export class RewardScreen {
                   <rect x="115" y="40" width="24" height="36" rx="2" class="rw-building"/>
                   <rect x="40" y="130" width="30" height="25" rx="2" class="rw-building"/>
                   <rect x="95" y="125" width="26" height="28" rx="2" class="rw-building"/>
-                  <!-- Lamp posts -->
                   <circle cx="50" cy="65" r="3" class="rw-lamp"/>
                   <circle cx="110" cy="100" r="3" class="rw-lamp"/>
                   <circle cx="70" cy="155" r="3" class="rw-lamp"/>
@@ -119,6 +134,11 @@ export class RewardScreen {
                 <circle cx="180" cy="200" r="2" fill="#22ffaa" opacity="0.6"/>
               </svg>
             </div>
+            <div class="rw-hint">
+              <span class="rw-hint-key">&#9664; &#9654; &#9650; &#9660;</span> Navigate
+              <span class="rw-hint-sep">|</span>
+              <span class="rw-hint-key">A / X / Y</span> Select
+            </div>
           </div>
 
           <!-- RIGHT: Character panel -->
@@ -144,6 +164,15 @@ export class RewardScreen {
           <span>HOME</span>
           <span class="rw-btn-arrow">&#8594;</span>
         </button>
+      </div>
+
+      <!-- Sector zoom overlay -->
+      <div class="rw-zoom-overlay" id="rw-zoom-overlay">
+        <div class="rw-zoom-content">
+          <div class="rw-zoom-frame" id="rw-zoom-frame"></div>
+          <div class="rw-zoom-label">See the mini-scale map!</div>
+          <div class="rw-zoom-prompt">PRESS ANY BUTTON</div>
+        </div>
       </div>
     `;
 
@@ -185,10 +214,6 @@ export class RewardScreen {
       @keyframes rwPulseGlow {
         0%, 100% { box-shadow: 0 0 8px rgba(34,255,170,0.2), inset 0 0 8px rgba(34,255,170,0.05); }
         50%      { box-shadow: 0 0 20px rgba(34,255,170,0.45), inset 0 0 14px rgba(34,255,170,0.1); }
-      }
-      @keyframes rwLampPulse {
-        0%, 100% { r: 3; opacity: 0.7; }
-        50%      { r: 5; opacity: 1; }
       }
 
       /* ═══ LAYOUT ═══ */
@@ -246,7 +271,14 @@ export class RewardScreen {
         cursor: pointer;
         transition: fill 0.5s, stroke 0.5s, filter 0.5s;
       }
-      .rw-sector:hover { fill: #102a1c; stroke: #22ffaa; }
+
+      /* Sector focus highlight (keyboard/gamepad) */
+      .rw-sector-group.focused .rw-sector {
+        fill: #102a1c;
+        stroke: #22ffaa;
+        stroke-width: 2.5;
+        filter: url(#sectorGlow);
+      }
 
       /* Sector lit state */
       .rw-sector-group.lit .rw-sector {
@@ -298,6 +330,20 @@ export class RewardScreen {
         transition: fill 0.5s;
       }
 
+      /* ═══ HINT BAR ═══ */
+      .rw-hint {
+        margin-top: clamp(8px, 1vh, 14px);
+        font-family: 'Orbitron', sans-serif;
+        font-size: clamp(7px, 0.7vw, 12px);
+        font-weight: 500;
+        color: rgba(255,255,255,0.25);
+        letter-spacing: 1.5px;
+        display: flex; align-items: center; justify-content: center;
+        gap: clamp(6px, 0.6vw, 12px);
+      }
+      .rw-hint-key { color: rgba(34,255,170,0.5); font-weight: 700; }
+      .rw-hint-sep { color: rgba(255,255,255,0.1); }
+
       /* ═══ RIGHT: CHARACTER ═══ */
       .rw-char-panel {
         flex: 0 0 auto;
@@ -306,7 +352,6 @@ export class RewardScreen {
         animation: rwSlideUp 0.55s ease-out 0.25s both;
       }
 
-      /* Dialog bubble */
       .rw-dialog {
         width: 100%;
         display: flex; flex-direction: column; align-items: center;
@@ -337,7 +382,6 @@ export class RewardScreen {
         background: linear-gradient(to bottom, rgba(34,255,170,0.4), transparent);
       }
 
-      /* Portrait */
       .rw-portrait {
         position: relative;
         width: clamp(225px, 30vw, 425px);
@@ -346,10 +390,7 @@ export class RewardScreen {
         margin-bottom: clamp(14px, 2vh, 24px);
         animation: rwSlideUp 0.55s ease-out 0.4s both;
       }
-      .rw-portrait-img {
-        width: 100%; height: auto;
-        display: block;
-      }
+      .rw-portrait-img { width: 100%; height: auto; display: block; }
       .rw-portrait-border {
         position: absolute; inset: 0;
         border: 2.5px solid rgba(34,255,170,0.4);
@@ -358,7 +399,6 @@ export class RewardScreen {
         box-shadow: inset 0 0 24px rgba(0,0,0,0.4), 0 8px 36px rgba(0,0,0,0.5);
       }
 
-      /* Character info */
       .rw-char-info {
         display: flex; flex-direction: column; align-items: center;
         gap: clamp(3px, 0.5vh, 8px);
@@ -367,8 +407,7 @@ export class RewardScreen {
       .rw-name {
         font-family: 'Orbitron', sans-serif;
         font-size: clamp(18px, 2.2vw, 35px);
-        font-weight: 900;
-        color: #fff;
+        font-weight: 900; color: #fff;
         letter-spacing: 2px;
         text-shadow: 0 0 12px rgba(34,255,170,0.25);
       }
@@ -376,9 +415,7 @@ export class RewardScreen {
         font-family: 'Segoe UI', Tahoma, sans-serif;
         font-size: clamp(12px, 1.5vw, 22px);
         color: rgba(255,255,255,0.45);
-        text-align: center;
-        line-height: 1.4;
-        max-width: 90%;
+        text-align: center; line-height: 1.4; max-width: 90%;
       }
 
       /* ═══ HOME BUTTON ═══ */
@@ -399,14 +436,60 @@ export class RewardScreen {
         animation: rwSlideUp 0.55s ease-out 0.65s both;
         outline: none;
       }
-      .rw-home-btn:hover {
-        background: #22ffaa; color: #0a1a10;
-        box-shadow: 0 0 36px rgba(34,255,170,0.4);
+      .rw-home-btn:hover, .rw-home-btn.focused {
+        background: rgba(34,255,170,0.15);
+        box-shadow: 0 0 36px rgba(34,255,170,0.3);
         transform: translateY(-2px);
       }
       .rw-home-btn:active { transform: scale(0.97); }
       .rw-btn-arrow { font-size: 1.3em; transition: transform 0.3s; }
-      .rw-home-btn:hover .rw-btn-arrow { transform: translateX(5px); }
+      .rw-home-btn:hover .rw-btn-arrow, .rw-home-btn.focused .rw-btn-arrow { transform: translateX(5px); }
+
+      /* ═══ ZOOM OVERLAY ═══ */
+      .rw-zoom-overlay {
+        position: absolute; inset: 0; z-index: 10;
+        display: none; align-items: center; justify-content: center;
+        background: rgba(0,0,0,0.85);
+        backdrop-filter: blur(12px);
+        animation: rwZoomIn 0.4s ease-out both;
+      }
+      @keyframes rwZoomIn {
+        from { opacity: 0; }
+        to   { opacity: 1; }
+      }
+      .rw-zoom-content {
+        display: flex; flex-direction: column; align-items: center;
+        gap: clamp(20px, 3vh, 40px);
+        animation: rwPopIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.1s both;
+      }
+      .rw-zoom-frame {
+        width: clamp(300px, 45vw, 700px);
+        border-radius: clamp(14px, 1.8vw, 28px);
+        border: 2.5px solid rgba(34,255,170,0.4);
+        background: rgba(4,10,6,0.8);
+        padding: clamp(16px, 2vw, 32px);
+        box-shadow: 0 0 40px rgba(34,255,170,0.15), 0 8px 40px rgba(0,0,0,0.6);
+      }
+      .rw-zoom-frame svg { width: 100%; display: block; }
+      .rw-zoom-label {
+        font-family: 'Orbitron', sans-serif;
+        font-size: clamp(18px, 2.8vw, 44px);
+        font-weight: 900; color: #fff;
+        letter-spacing: clamp(3px, 0.5vw, 8px);
+        text-shadow: 0 0 20px rgba(34,255,170,0.3);
+        text-align: center;
+      }
+      .rw-zoom-prompt {
+        font-family: 'Orbitron', sans-serif;
+        font-size: clamp(10px, 1.4vw, 22px);
+        font-weight: 700; color: rgba(255,255,255,0.6);
+        letter-spacing: clamp(2px, 0.4vw, 6px);
+        animation: rwFlash 2s ease-in-out infinite;
+      }
+      @keyframes rwFlash {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.3; }
+      }
 
       /* ═══ RESPONSIVE ═══ */
       @media (max-width: 950px) {
@@ -414,67 +497,176 @@ export class RewardScreen {
         .rw-char-panel { width: 95%; max-width: 500px; }
         .rw-map-panel { max-width: 98%; }
         .rw-portrait { width: clamp(180px, 45vw, 320px); }
+        .rw-hint { display: none; }
       }
     `;
     document.head.appendChild(style);
     document.body.appendChild(this.el);
 
-    // Sector click — toggle lit state on the group
-    this.el.querySelectorAll('.rw-sector-group').forEach(group => {
-      group.addEventListener('click', () => group.classList.toggle('lit'));
+    this._onHome = onHome;
+    this._focusIdx = 0;
+    this._mode = 'main'; // 'main' or 'zoom'
+    this._sectorEls = [...this.el.querySelectorAll('.rw-sector-group')];
+    this._homeBtn = this.el.querySelector('#rw-home-btn');
+    this._zoomOverlay = this.el.querySelector('#rw-zoom-overlay');
+    this._zoomFrame = this.el.querySelector('#rw-zoom-frame');
+    this._gpCooldown = 0;
+    this._gpPoll = null;
+
+    // Click on sectors
+    this._sectorEls.forEach((group, i) => {
+      group.style.cursor = 'pointer';
+      group.addEventListener('click', () => {
+        if (this._mode !== 'main') return;
+        this._selectSector(i);
+      });
     });
 
-    // Home button
-    this._onHome = onHome;
-    this._dismissed = false;
-    this.el.querySelector('#rw-home-btn').addEventListener('click', () => this._triggerHome());
+    // Click HOME
+    this._homeBtn.addEventListener('click', () => {
+      if (this._mode === 'main') this._onHome();
+    });
   }
 
-  _triggerHome() {
-    if (this._dismissed) return;
-    this._dismissed = true;
-    this._removeInputListeners();
-    this._onHome();
+  _setFocus(idx) {
+    this._focusIdx = idx;
+    this._sectorEls.forEach(g => g.classList.remove('focused'));
+    this._homeBtn.classList.remove('focused');
+    if (idx < 4) this._sectorEls[idx].classList.add('focused');
+    else this._homeBtn.classList.add('focused');
   }
 
-  _addInputListeners() {
-    this._dismissed = false;
-    // Keyboard — any key triggers home
-    this._keyH = () => {
-      if (this.el.style.display === 'none' || this._dismissed) return;
-      this._triggerHome();
+  _selectSector(idx) {
+    // Light up the sector
+    this._sectorEls[idx].classList.add('lit');
+    // Show zoom overlay
+    this._mode = 'zoom';
+    const b = SECTOR_BOUNDS[idx];
+    const pad = 10;
+    const svgSrc = this.el.querySelector('.rw-town').outerHTML
+      .replace('viewBox="0 0 360 400"', `viewBox="${b.x - pad} ${b.y - pad} ${b.w + pad * 2} ${b.h + pad * 2}"`);
+    this._zoomFrame.innerHTML = svgSrc;
+    this._zoomOverlay.style.display = 'flex';
+    // Delay zoom input to prevent instant dismiss
+    this._zoomInputReady = false;
+    this._gpPrevZoom = new Map();
+    setTimeout(() => { this._zoomInputReady = true; }, 800);
+  }
+
+  _closeZoom() {
+    this._mode = 'main';
+    this._zoomOverlay.style.display = 'none';
+    this._zoomFrame.innerHTML = '';
+  }
+
+  _navigate(dir) {
+    const next = NAV[this._focusIdx]?.[dir];
+    if (next !== undefined) this._setFocus(next);
+  }
+
+  _confirm() {
+    if (this._focusIdx < 4) {
+      this._selectSector(this._focusIdx);
+    } else {
+      this._onHome();
+    }
+  }
+
+  _startInput() {
+    // Keyboard
+    this._keyH = (e) => {
+      if (this.el.style.display === 'none') return;
+      if (this._mode === 'zoom') {
+        if (this._zoomInputReady) this._closeZoom();
+        return;
+      }
+      if (e.key === 'ArrowRight') this._navigate('right');
+      else if (e.key === 'ArrowLeft') this._navigate('left');
+      else if (e.key === 'ArrowDown') this._navigate('down');
+      else if (e.key === 'ArrowUp') this._navigate('up');
+      else if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); this._confirm(); }
     };
     window.addEventListener('keydown', this._keyH);
-    // Gamepad / racing wheel — poll for any newly pressed button
-    this._gpPrevBtn = new Map();
-    const pollGP = () => {
-      if (this._dismissed || this.el.style.display === 'none') { this._gpPoll = null; return; }
-      this._gpPoll = requestAnimationFrame(pollGP);
+
+    // Gamepad polling
+    this._gpCooldown = 0;
+    const poll = () => {
+      this._gpPoll = requestAnimationFrame(poll);
+      if (this.el.style.display === 'none') return;
+      if (this._gpCooldown > 0) { this._gpCooldown--; return; }
+
       const gps = navigator.getGamepads ? navigator.getGamepads() : [];
       for (const gp of gps) {
         if (!gp) continue;
-        for (let i = 0; i < gp.buttons.length; i++) {
-          const key = gp.index + ':' + i;
-          const was = this._gpPrevBtn.get(key) || false;
-          const now = gp.buttons[i].pressed;
-          this._gpPrevBtn.set(key, now);
-          if (now && !was) { this._triggerHome(); return; }
+
+        // In zoom mode: any button press returns to main
+        if (this._mode === 'zoom') {
+          if (!this._zoomInputReady) continue;
+          for (let i = 0; i < gp.buttons.length; i++) {
+            const key = gp.index + ':' + i;
+            const was = this._gpPrevZoom.get(key) || false;
+            const now = gp.buttons[i].pressed;
+            this._gpPrevZoom.set(key, now);
+            if (now && !was) { this._closeZoom(); this._gpCooldown = 15; return; }
+          }
+          // Hat switch in zoom mode
+          const isHW = gp.axes.length >= 10;
+          if (isHW) {
+            const hat = gp.axes[9];
+            const active = hat < 1.1;
+            const wasHat = this._gpPrevZoom.get('hat') || false;
+            this._gpPrevZoom.set('hat', active);
+            if (active && !wasHat) { this._closeZoom(); this._gpCooldown = 15; return; }
+          }
+          continue;
+        }
+
+        // Main mode: navigation + confirm
+        const isHatWheel = gp.axes.length >= 10;
+        const ax = gp.axes[0] || 0;
+        const ay = isHatWheel ? 0 : (gp.axes[1] || 0);
+
+        let hatL = false, hatR = false, hatU = false, hatD = false;
+        if (isHatWheel && gp.axes[9] < 1.1) {
+          const hat = gp.axes[9];
+          hatL = hat > 0.30 && hat < 1.05;
+          hatR = hat > -0.80 && hat < -0.05;
+          hatU = hat < -0.65 || hat > 0.90;
+          hatD = hat > -0.20 && hat < 0.55;
+        }
+
+        let moved = false;
+        if (ax > 0.5 || gp.buttons[15]?.pressed || hatR) { this._navigate('right'); moved = true; }
+        else if (ax < -0.5 || gp.buttons[14]?.pressed || hatL) { this._navigate('left'); moved = true; }
+        else if (ay > 0.5 || gp.buttons[13]?.pressed || hatD) { this._navigate('down'); moved = true; }
+        else if (ay < -0.5 || gp.buttons[12]?.pressed || hatU) { this._navigate('up'); moved = true; }
+        if (moved) { this._gpCooldown = 12; return; }
+
+        // A (0), X (2), Y (3), Xbox/Menu (10) = confirm
+        if (gp.buttons[0]?.pressed || gp.buttons[2]?.pressed || gp.buttons[3]?.pressed || gp.buttons[10]?.pressed) {
+          this._gpCooldown = 30;
+          this._confirm();
+          return;
         }
       }
     };
-    this._gpPoll = requestAnimationFrame(pollGP);
+    this._gpPoll = requestAnimationFrame(poll);
   }
 
-  _removeInputListeners() {
+  _stopInput() {
     if (this._keyH) { window.removeEventListener('keydown', this._keyH); this._keyH = null; }
     if (this._gpPoll) { cancelAnimationFrame(this._gpPoll); this._gpPoll = null; }
   }
 
   show() {
     this.el.style.display = 'flex';
+    this._mode = 'main';
+    this._zoomOverlay.style.display = 'none';
 
     // Reset sectors
-    this.el.querySelectorAll('.rw-sector-group').forEach(g => g.classList.remove('lit'));
+    this._sectorEls.forEach(g => g.classList.remove('lit', 'focused'));
+    this._homeBtn.classList.remove('focused');
+    this._setFocus(0);
 
     // Spawn floating particles
     const container = this.el.querySelector('#rw-particles');
@@ -492,12 +684,12 @@ export class RewardScreen {
       container.appendChild(p);
     }
 
-    // Delay input listeners so animations don't get skipped by stray input
-    setTimeout(() => this._addInputListeners(), 1200);
+    // Delay input to prevent stray presses
+    setTimeout(() => this._startInput(), 1200);
   }
 
   hide() {
-    this._removeInputListeners();
+    this._stopInput();
     this.el.style.display = 'none';
   }
 }
