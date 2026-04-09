@@ -425,7 +425,49 @@ export class RewardScreen {
     });
 
     // Home button
-    this.el.querySelector('#rw-home-btn').addEventListener('click', () => onHome());
+    this._onHome = onHome;
+    this._dismissed = false;
+    this.el.querySelector('#rw-home-btn').addEventListener('click', () => this._triggerHome());
+  }
+
+  _triggerHome() {
+    if (this._dismissed) return;
+    this._dismissed = true;
+    this._removeInputListeners();
+    this._onHome();
+  }
+
+  _addInputListeners() {
+    this._dismissed = false;
+    // Keyboard — any key triggers home
+    this._keyH = () => {
+      if (this.el.style.display === 'none' || this._dismissed) return;
+      this._triggerHome();
+    };
+    window.addEventListener('keydown', this._keyH);
+    // Gamepad / racing wheel — poll for any newly pressed button
+    this._gpPrevBtn = new Map();
+    const pollGP = () => {
+      if (this._dismissed || this.el.style.display === 'none') { this._gpPoll = null; return; }
+      this._gpPoll = requestAnimationFrame(pollGP);
+      const gps = navigator.getGamepads ? navigator.getGamepads() : [];
+      for (const gp of gps) {
+        if (!gp) continue;
+        for (let i = 0; i < gp.buttons.length; i++) {
+          const key = gp.index + ':' + i;
+          const was = this._gpPrevBtn.get(key) || false;
+          const now = gp.buttons[i].pressed;
+          this._gpPrevBtn.set(key, now);
+          if (now && !was) { this._triggerHome(); return; }
+        }
+      }
+    };
+    this._gpPoll = requestAnimationFrame(pollGP);
+  }
+
+  _removeInputListeners() {
+    if (this._keyH) { window.removeEventListener('keydown', this._keyH); this._keyH = null; }
+    if (this._gpPoll) { cancelAnimationFrame(this._gpPoll); this._gpPoll = null; }
   }
 
   show() {
@@ -449,9 +491,13 @@ export class RewardScreen {
       p.style.height = s + 'px';
       container.appendChild(p);
     }
+
+    // Delay input listeners so animations don't get skipped by stray input
+    setTimeout(() => this._addInputListeners(), 1200);
   }
 
   hide() {
+    this._removeInputListeners();
     this.el.style.display = 'none';
   }
 }

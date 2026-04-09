@@ -322,11 +322,30 @@ export class WinScreen {
     window.addEventListener('keydown', this._keyH);
     // Use pointerup (not pointerdown) so a tap doesn't accidentally fire during the reveal animation
     window.addEventListener('pointerup', this._ptrH);
+    // Gamepad / racing wheel — poll for any newly pressed button
+    this._gpPrevBtn = new Map();
+    const pollGP = () => {
+      if (this._continued || this.el.style.display === 'none') { this._gpPoll = null; return; }
+      this._gpPoll = requestAnimationFrame(pollGP);
+      const gps = navigator.getGamepads ? navigator.getGamepads() : [];
+      for (const gp of gps) {
+        if (!gp) continue;
+        for (let i = 0; i < gp.buttons.length; i++) {
+          const key = gp.index + ':' + i;
+          const was = this._gpPrevBtn.get(key) || false;
+          const now = gp.buttons[i].pressed;
+          this._gpPrevBtn.set(key, now);
+          if (now && !was) { this._triggerContinue(); return; }
+        }
+      }
+    };
+    this._gpPoll = requestAnimationFrame(pollGP);
   }
 
   _removeInputListeners() {
     if (this._keyH) { window.removeEventListener('keydown', this._keyH); this._keyH = null; }
     if (this._ptrH) { window.removeEventListener('pointerup', this._ptrH); this._ptrH = null; }
+    if (this._gpPoll) { cancelAnimationFrame(this._gpPoll); this._gpPoll = null; }
   }
 
   show(platesHit, score = 0, maxCombo = 0, elapsed = 0, driver = null) {

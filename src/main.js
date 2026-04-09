@@ -725,13 +725,35 @@ const mapSelect = new MapSelect(
     const startPrompt = loadingOverlay.querySelector('#lo-start-prompt');
     if (startPrompt) startPrompt.classList.add('visible');
     await new Promise(resolve => {
+      let done = false;
       const go = () => {
+        if (done) return;
+        done = true;
         window.removeEventListener('keydown', go);
         window.removeEventListener('pointerdown', go);
+        cancelAnimationFrame(gpPoll);
         resolve();
       };
       window.addEventListener('keydown', go, { once: false });
       window.addEventListener('pointerdown', go, { once: false });
+      // Gamepad / racing wheel support — poll for any newly pressed button
+      const prevBtn = new Map();
+      let gpPoll;
+      const pollGP = () => {
+        gpPoll = requestAnimationFrame(pollGP);
+        const gps = navigator.getGamepads ? navigator.getGamepads() : [];
+        for (const gp of gps) {
+          if (!gp) continue;
+          for (let i = 0; i < gp.buttons.length; i++) {
+            const key = gp.index + ':' + i;
+            const was = prevBtn.get(key) || false;
+            const now = gp.buttons[i].pressed;
+            prevBtn.set(key, now);
+            if (now && !was) { go(); return; }
+          }
+        }
+      };
+      gpPoll = requestAnimationFrame(pollGP);
     });
     if (startPrompt) startPrompt.classList.remove('visible');
 
