@@ -2,8 +2,8 @@ import { asset } from '../utils/base.js';
 
 // Sector bounding boxes in SVG coords (for zoom viewBox)
 const SECTOR_BOUNDS = [
-  { x: 0, y: 0, w: 360, h: 185 },    // Sector 0: NORTH (top half)
-  { x: 0, y: 214, w: 360, h: 186 },   // Sector 1: SOUTH (bottom half)
+  { x: 0, y: 0, w: 360, h: 200 },    // Sector 0: NORTH (top half)
+  { x: 0, y: 195, w: 360, h: 205 },   // Sector 1: SOUTH (bottom half)
 ];
 
 // Navigation grid: 1 col, 3 rows (North, South, HOME)
@@ -48,72 +48,207 @@ export class RewardScreen {
                 <!-- Base ground -->
                 <rect width="360" height="400" fill="#080e0b" rx="10"/>
 
-                <!-- Main road (horizontal divider) -->
-                <rect x="0" y="185" width="360" height="30" fill="url(#roadGrad)"/>
-                <!-- Road center line -->
-                <line x1="0" y1="200" x2="360" y2="200" stroke="#2a4a38" stroke-width="1" stroke-dasharray="8,6"/>
+                <!-- ═══════════════════════════════════════
+                     FULL STREET GRID (single unified map)
+                     Road layout derived from Section.png
+                     3 horizontal + 3 vertical roads = 4×4 block grid
+                     ═══════════════════════════════════════ -->
 
-                <!-- NORTH SECTOR -->
+                <!-- HORIZONTAL ROADS -->
+                <!-- Main Road (top, wide) -->
+                <rect x="0" y="50" width="360" height="18" fill="url(#roadGrad)"/>
+                <line x1="0" y1="59" x2="360" y2="59" stroke="#2a4a38" stroke-width="0.8" stroke-dasharray="6,5"/>
+                <text x="180" y="56" fill="#2a4a38" font-size="6" font-family="Orbitron,sans-serif" text-anchor="middle" opacity="0.7">MAIN ROAD</text>
+                <!-- 2nd horizontal road -->
+                <rect x="8" y="155" width="344" height="14" fill="url(#roadGrad)"/>
+                <line x1="8" y1="162" x2="352" y2="162" stroke="#2a4a38" stroke-width="0.6" stroke-dasharray="5,4"/>
+                <!-- 3rd horizontal road -->
+                <rect x="8" y="258" width="290" height="14" fill="url(#roadGrad)"/>
+                <line x1="8" y1="265" x2="298" y2="265" stroke="#2a4a38" stroke-width="0.6" stroke-dasharray="5,4"/>
+                <!-- Bottom horizontal road (partial, left side) -->
+                <rect x="8" y="345" width="200" height="12" fill="url(#roadGrad)"/>
+                <line x1="8" y1="351" x2="208" y2="351" stroke="#2a4a38" stroke-width="0.6" stroke-dasharray="5,4"/>
+
+                <!-- VERTICAL ROADS -->
+                <!-- V-road 1 -->
+                <rect x="76" y="5" width="14" height="390" fill="url(#roadGrad)"/>
+                <line x1="83" y1="5" x2="83" y2="395" stroke="#2a4a38" stroke-width="0.6" stroke-dasharray="5,4"/>
+                <!-- V-road 2 -->
+                <rect x="170" y="5" width="14" height="356" fill="url(#roadGrad)"/>
+                <line x1="177" y1="5" x2="177" y2="361" stroke="#2a4a38" stroke-width="0.6" stroke-dasharray="5,4"/>
+                <!-- V-road 3 -->
+                <rect x="270" y="5" width="14" height="267" fill="url(#roadGrad)"/>
+                <line x1="277" y1="5" x2="277" y2="272" stroke="#2a4a38" stroke-width="0.6" stroke-dasharray="5,4"/>
+
+                <!-- Curved road (bottom-right, continues from V-road 3 / 3rd H-road junction) -->
+                <path d="M 298 265 Q 325 275 340 300 Q 350 330 348 395" fill="none" stroke="#1e2e28" stroke-width="14" stroke-linecap="round"/>
+                <path d="M 298 265 Q 325 275 340 300 Q 350 330 348 395" fill="none" stroke="#2a4a38" stroke-width="0.6" stroke-dasharray="5,4" stroke-linecap="round"/>
+
+                <!-- CROSSWALKS at key intersections -->
+                <g stroke="#1a3020" stroke-width="1.5" opacity="0.5">
+                  <!-- Main Road × V-roads -->
+                  <line x1="78" y1="50" x2="88" y2="50"/><line x1="78" y1="53" x2="88" y2="53"/><line x1="78" y1="65" x2="88" y2="65"/><line x1="78" y1="68" x2="88" y2="68"/>
+                  <line x1="172" y1="50" x2="182" y2="50"/><line x1="172" y1="53" x2="182" y2="53"/><line x1="172" y1="65" x2="182" y2="65"/><line x1="172" y1="68" x2="182" y2="68"/>
+                  <line x1="272" y1="50" x2="282" y2="50"/><line x1="272" y1="53" x2="282" y2="53"/><line x1="272" y1="65" x2="282" y2="65"/><line x1="272" y1="68" x2="282" y2="68"/>
+                  <!-- 2nd H-road × V-roads -->
+                  <line x1="78" y1="155" x2="88" y2="155"/><line x1="78" y1="158" x2="88" y2="158"/><line x1="78" y1="166" x2="88" y2="166"/><line x1="78" y1="169" x2="88" y2="169"/>
+                  <line x1="172" y1="155" x2="182" y2="155"/><line x1="172" y1="158" x2="182" y2="158"/><line x1="172" y1="166" x2="182" y2="166"/><line x1="172" y1="169" x2="182" y2="169"/>
+                  <line x1="272" y1="155" x2="282" y2="155"/><line x1="272" y1="158" x2="282" y2="158"/><line x1="272" y1="166" x2="282" y2="166"/><line x1="272" y1="169" x2="282" y2="169"/>
+                  <!-- 3rd H-road × V-roads -->
+                  <line x1="78" y1="258" x2="88" y2="258"/><line x1="78" y1="261" x2="88" y2="261"/><line x1="78" y1="269" x2="88" y2="269"/><line x1="78" y1="272" x2="88" y2="272"/>
+                  <line x1="172" y1="258" x2="182" y2="258"/><line x1="172" y1="261" x2="182" y2="261"/><line x1="172" y1="269" x2="182" y2="269"/><line x1="172" y1="272" x2="182" y2="272"/>
+                  <!-- Bottom H-road × V-roads -->
+                  <line x1="78" y1="345" x2="88" y2="345"/><line x1="78" y1="348" x2="88" y2="348"/><line x1="78" y1="354" x2="88" y2="354"/><line x1="78" y1="357" x2="88" y2="357"/>
+                  <line x1="172" y1="345" x2="182" y2="345"/><line x1="172" y1="348" x2="182" y2="348"/><line x1="172" y1="354" x2="182" y2="354"/><line x1="172" y1="357" x2="182" y2="357"/>
+                </g>
+
+                <!-- ═══════════════════════════════════════
+                     NORTH SECTOR (top half: y=0 to y=200)
+                     ═══════════════════════════════════════ -->
                 <g class="rw-sector-group" data-sector="0">
-                  <rect class="rw-sector" x="8" y="8" width="344" height="170" rx="6"/>
-                  <rect x="25" y="30" width="22" height="32" rx="2" class="rw-building"/>
-                  <rect x="55" y="22" width="18" height="40" rx="2" class="rw-building"/>
-                  <rect x="80" y="35" width="28" height="26" rx="2" class="rw-building"/>
-                  <rect x="130" y="28" width="24" height="36" rx="2" class="rw-building"/>
-                  <rect x="30" y="85" width="35" height="22" rx="2" class="rw-building"/>
-                  <rect x="80" y="80" width="20" height="30" rx="2" class="rw-building"/>
-                  <rect x="115" y="90" width="24" height="24" rx="2" class="rw-building"/>
-                  <rect x="40" y="130" width="30" height="25" rx="2" class="rw-building"/>
-                  <rect x="95" y="125" width="26" height="28" rx="2" class="rw-building"/>
-                  <rect x="220" y="25" width="26" height="35" rx="2" class="rw-building"/>
-                  <rect x="260" y="30" width="20" height="28" rx="2" class="rw-building"/>
-                  <rect x="295" y="20" width="30" height="42" rx="2" class="rw-building"/>
-                  <rect x="215" y="82" width="32" height="24" rx="2" class="rw-building"/>
-                  <rect x="260" y="78" width="22" height="32" rx="2" class="rw-building"/>
-                  <rect x="300" y="85" width="28" height="25" rx="2" class="rw-building"/>
-                  <rect x="225" y="128" width="28" height="30" rx="2" class="rw-building"/>
-                  <rect x="280" y="130" width="34" height="24" rx="2" class="rw-building"/>
-                  <circle cx="50" cy="65" r="3" class="rw-lamp"/>
-                  <circle cx="110" cy="100" r="3" class="rw-lamp"/>
-                  <circle cx="70" cy="155" r="3" class="rw-lamp"/>
-                  <circle cx="250" cy="60" r="3" class="rw-lamp"/>
-                  <circle cx="310" cy="110" r="3" class="rw-lamp"/>
-                  <circle cx="240" cy="148" r="3" class="rw-lamp"/>
-                  <text x="180" y="100" class="rw-sector-num">NORTH</text>
+                  <rect class="rw-sector" x="0" y="0" width="360" height="200" rx="6"/>
+
+                  <!-- Row A: top strip above Main Road (y 8–48) -->
+                  <rect x="14" y="12" width="24" height="14" rx="2" class="rw-building"/>
+                  <rect x="42" y="10" width="28" height="16" rx="2" class="rw-building"/>
+                  <rect x="14" y="30" width="20" height="16" rx="2" class="rw-building"/>
+                  <rect x="40" y="32" width="30" height="14" rx="2" class="rw-building"/>
+                  <rect x="94" y="12" width="32" height="14" rx="2" class="rw-building"/>
+                  <rect x="132" y="10" width="30" height="16" rx="2" class="rw-building"/>
+                  <rect x="96" y="30" width="28" height="16" rx="2" class="rw-building"/>
+                  <rect x="130" y="32" width="34" height="14" rx="2" class="rw-building"/>
+                  <rect x="188" y="12" width="34" height="14" rx="2" class="rw-building"/>
+                  <rect x="228" y="10" width="36" height="16" rx="2" class="rw-building"/>
+                  <rect x="190" y="30" width="30" height="16" rx="2" class="rw-building"/>
+                  <rect x="226" y="32" width="38" height="14" rx="2" class="rw-building"/>
+                  <!-- Top-right park -->
+                  <rect x="290" y="10" width="56" height="36" rx="4" fill="#0a2818" stroke="#1a4830" stroke-width="0.8"/>
+                  <circle cx="306" cy="22" r="5" fill="#0e3020" stroke="#1a4830" stroke-width="0.5"/>
+                  <circle cx="320" cy="32" r="6" fill="#0e3020" stroke="#1a4830" stroke-width="0.5"/>
+                  <circle cx="335" cy="20" r="4" fill="#0e3020" stroke="#1a4830" stroke-width="0.5"/>
+
+                  <!-- Row B: between Main Road and 2nd H-road (y 70–153) -->
+                  <!-- Col 0 (x 10–74) -->
+                  <rect x="14" y="74" width="24" height="16" rx="2" class="rw-building"/>
+                  <rect x="42" y="72" width="28" height="20" rx="2" class="rw-building"/>
+                  <rect x="16" y="96" width="20" height="18" rx="2" class="rw-building"/>
+                  <rect x="40" y="98" width="30" height="16" rx="2" class="rw-building"/>
+                  <!-- Envelope/mail building -->
+                  <rect x="16" y="120" width="26" height="26" rx="2" class="rw-building"/>
+                  <line x1="16" y1="120" x2="29" y2="133" stroke="#1a3528" stroke-width="0.4"/>
+                  <line x1="42" y1="120" x2="29" y2="133" stroke="#1a3528" stroke-width="0.4"/>
+                  <rect x="46" y="122" width="24" height="24" rx="2" class="rw-building"/>
+                  <!-- Col 1 (x 92–168) -->
+                  <rect x="96" y="74" width="28" height="16" rx="2" class="rw-building"/>
+                  <rect x="130" y="72" width="32" height="18" rx="2" class="rw-building"/>
+                  <rect x="98" y="96" width="24" height="18" rx="2" class="rw-building"/>
+                  <rect x="128" y="98" width="34" height="16" rx="2" class="rw-building"/>
+                  <rect x="96" y="120" width="26" height="28" rx="2" class="rw-building"/>
+                  <rect x="128" y="122" width="30" height="26" rx="2" class="rw-building"/>
+                  <!-- Col 2 (x 186–268) -->
+                  <rect x="190" y="74" width="30" height="16" rx="2" class="rw-building"/>
+                  <rect x="226" y="72" width="36" height="18" rx="2" class="rw-building"/>
+                  <rect x="192" y="96" width="26" height="18" rx="2" class="rw-building"/>
+                  <rect x="224" y="98" width="38" height="16" rx="2" class="rw-building"/>
+                  <rect x="190" y="120" width="28" height="28" rx="2" class="rw-building"/>
+                  <rect x="224" y="122" width="36" height="26" rx="2" class="rw-building"/>
+                  <!-- Col 3 (x 286–350) -->
+                  <rect x="290" y="74" width="26" height="16" rx="2" class="rw-building"/>
+                  <rect x="322" y="72" width="24" height="18" rx="2" class="rw-building"/>
+                  <rect x="292" y="98" width="22" height="18" rx="2" class="rw-building"/>
+                  <rect x="320" y="96" width="26" height="20" rx="2" class="rw-building"/>
+                  <rect x="290" y="122" width="24" height="26" rx="2" class="rw-building"/>
+                  <rect x="320" y="124" width="26" height="24" rx="2" class="rw-building"/>
+
+                  <!-- Lamps (at intersections) -->
+                  <circle cx="83" cy="59" r="3" class="rw-lamp"/>
+                  <circle cx="177" cy="59" r="3" class="rw-lamp"/>
+                  <circle cx="277" cy="59" r="3" class="rw-lamp"/>
+                  <circle cx="83" cy="162" r="3" class="rw-lamp"/>
+                  <circle cx="177" cy="162" r="3" class="rw-lamp"/>
+                  <circle cx="277" cy="162" r="3" class="rw-lamp"/>
+
+                  <text x="180" y="118" class="rw-sector-num">NORTH</text>
                 </g>
 
-                <!-- SOUTH SECTOR -->
+                <!-- ═══════════════════════════════════════
+                     SOUTH SECTOR (bottom half: y=200 to y=400)
+                     ═══════════════════════════════════════ -->
                 <g class="rw-sector-group" data-sector="1">
-                  <rect class="rw-sector" x="8" y="222" width="344" height="170" rx="6"/>
-                  <rect x="22" y="240" width="24" height="30" rx="2" class="rw-building"/>
-                  <rect x="58" y="235" width="20" height="38" rx="2" class="rw-building"/>
-                  <rect x="90" y="242" width="30" height="26" rx="2" class="rw-building"/>
-                  <rect x="135" y="238" width="22" height="32" rx="2" class="rw-building"/>
-                  <rect x="25" y="295" width="34" height="22" rx="2" class="rw-building"/>
-                  <rect x="72" y="290" width="22" height="30" rx="2" class="rw-building"/>
-                  <rect x="110" y="288" width="26" height="28" rx="2" class="rw-building"/>
-                  <rect x="35" y="342" width="28" height="32" rx="2" class="rw-building"/>
-                  <rect x="85" y="345" width="32" height="26" rx="2" class="rw-building"/>
-                  <rect x="218" y="238" width="28" height="34" rx="2" class="rw-building"/>
-                  <rect x="260" y="240" width="22" height="28" rx="2" class="rw-building"/>
-                  <rect x="298" y="235" width="26" height="36" rx="2" class="rw-building"/>
-                  <rect x="215" y="296" width="30" height="24" rx="2" class="rw-building"/>
-                  <rect x="258" y="292" width="24" height="30" rx="2" class="rw-building"/>
-                  <rect x="300" y="295" width="28" height="26" rx="2" class="rw-building"/>
-                  <rect x="222" y="348" width="32" height="28" rx="2" class="rw-building"/>
-                  <rect x="275" y="342" width="28" height="32" rx="2" class="rw-building"/>
-                  <circle cx="48" cy="275" r="3" class="rw-lamp"/>
-                  <circle cx="105" cy="325" r="3" class="rw-lamp"/>
-                  <circle cx="55" cy="370" r="3" class="rw-lamp"/>
-                  <circle cx="245" cy="270" r="3" class="rw-lamp"/>
-                  <circle cx="315" cy="320" r="3" class="rw-lamp"/>
-                  <circle cx="250" cy="365" r="3" class="rw-lamp"/>
-                  <text x="180" y="320" class="rw-sector-num">SOUTH</text>
-                </g>
+                  <rect class="rw-sector" x="0" y="200" width="360" height="200" rx="6"/>
 
-                <!-- Center road lamp cluster -->
-                <circle cx="180" cy="200" r="5" fill="#1a3a2a" stroke="#22ffaa" stroke-width="1.5"/>
-                <circle cx="180" cy="200" r="2" fill="#22ffaa" opacity="0.6"/>
+                  <!-- Row C: between 2nd and 3rd H-roads (y 171–256) -->
+                  <!-- Col 0 -->
+                  <rect x="14" y="175" width="24" height="18" rx="2" class="rw-building"/>
+                  <rect x="42" y="173" width="28" height="22" rx="2" class="rw-building"/>
+                  <rect x="16" y="200" width="22" height="20" rx="2" class="rw-building"/>
+                  <rect x="42" y="202" width="28" height="18" rx="2" class="rw-building"/>
+                  <rect x="14" y="228" width="26" height="24" rx="2" class="rw-building"/>
+                  <rect x="44" y="230" width="26" height="22" rx="2" class="rw-building"/>
+                  <!-- Col 1 -->
+                  <rect x="96" y="175" width="28" height="18" rx="2" class="rw-building"/>
+                  <rect x="130" y="173" width="32" height="22" rx="2" class="rw-building"/>
+                  <rect x="98" y="200" width="24" height="20" rx="2" class="rw-building"/>
+                  <rect x="128" y="202" width="34" height="18" rx="2" class="rw-building"/>
+                  <rect x="96" y="228" width="26" height="24" rx="2" class="rw-building"/>
+                  <rect x="128" y="230" width="34" height="22" rx="2" class="rw-building"/>
+                  <!-- Col 2 — sports field -->
+                  <rect x="190" y="175" width="72" height="40" rx="2" fill="#0a2818" stroke="#1a4830" stroke-width="0.8"/>
+                  <rect x="196" y="179" width="60" height="32" rx="1" fill="none" stroke="#1a4830" stroke-width="0.5"/>
+                  <line x1="226" y1="179" x2="226" y2="211" stroke="#1a4830" stroke-width="0.5"/>
+                  <rect x="192" y="222" width="30" height="18" rx="2" class="rw-building"/>
+                  <rect x="228" y="224" width="34" height="16" rx="2" class="rw-building"/>
+                  <rect x="190" y="244" width="26" height="8" rx="2" class="rw-building"/>
+                  <!-- Col 3 -->
+                  <rect x="290" y="175" width="24" height="18" rx="2" class="rw-building"/>
+                  <rect x="320" y="173" width="26" height="22" rx="2" class="rw-building"/>
+                  <rect x="292" y="200" width="22" height="20" rx="2" class="rw-building"/>
+                  <rect x="320" y="202" width="26" height="18" rx="2" class="rw-building"/>
+                  <rect x="290" y="228" width="22" height="24" rx="2" class="rw-building"/>
+                  <rect x="318" y="230" width="28" height="22" rx="2" class="rw-building"/>
+
+                  <!-- Row D: below 3rd H-road (y 274–395) -->
+                  <!-- Col 0 -->
+                  <rect x="14" y="278" width="24" height="20" rx="2" class="rw-building"/>
+                  <rect x="42" y="276" width="28" height="24" rx="2" class="rw-building"/>
+                  <rect x="16" y="306" width="22" height="18" rx="2" class="rw-building"/>
+                  <rect x="42" y="308" width="28" height="16" rx="2" class="rw-building"/>
+                  <!-- Orange art / park (bottom-left) -->
+                  <rect x="12" y="360" width="30" height="30" rx="3" fill="#0a2818" stroke="#1a4830" stroke-width="0.8"/>
+                  <polygon points="20,384 27,366 34,384" fill="#1a3020" stroke="#22553a" stroke-width="0.5"/>
+                  <polygon points="30,384 37,370 44,384" fill="#14281e" stroke="#22553a" stroke-width="0.5" transform="translate(-5,-2)"/>
+                  <rect x="46" y="362" width="24" height="20" rx="2" class="rw-building"/>
+                  <!-- Col 1 -->
+                  <rect x="96" y="278" width="28" height="20" rx="2" class="rw-building"/>
+                  <rect x="130" y="276" width="32" height="22" rx="2" class="rw-building"/>
+                  <rect x="98" y="306" width="24" height="18" rx="2" class="rw-building"/>
+                  <rect x="128" y="308" width="34" height="16" rx="2" class="rw-building"/>
+                  <!-- White building + cherry trees -->
+                  <rect x="96" y="362" width="32" height="28" rx="2" class="rw-building"/>
+                  <circle cx="140" cy="370" r="6" fill="#1a2028" stroke="#2a3848" stroke-width="0.5"/>
+                  <circle cx="152" cy="378" r="5" fill="#1a2028" stroke="#2a3848" stroke-width="0.5"/>
+                  <!-- Col 2 -->
+                  <rect x="192" y="278" width="28" height="20" rx="2" class="rw-building"/>
+                  <rect x="226" y="276" width="34" height="22" rx="2" class="rw-building"/>
+                  <rect x="194" y="306" width="24" height="18" rx="2" class="rw-building"/>
+                  <!-- Bottom-right park -->
+                  <rect x="302" y="300" width="44" height="40" rx="4" fill="#0a2818" stroke="#1a4830" stroke-width="0.8"/>
+                  <circle cx="316" cy="314" r="5" fill="#0e3020" stroke="#1a4830" stroke-width="0.5"/>
+                  <circle cx="332" cy="326" r="6" fill="#0e3020" stroke="#1a4830" stroke-width="0.5"/>
+                  <rect x="306" y="350" width="36" height="36" rx="4" fill="#0a2818" stroke="#1a4830" stroke-width="0.8"/>
+                  <circle cx="318" cy="362" r="5" fill="#0e3020" stroke="#1a4830" stroke-width="0.5"/>
+                  <circle cx="334" cy="374" r="6" fill="#0e3020" stroke="#1a4830" stroke-width="0.5"/>
+
+                  <!-- Lamps -->
+                  <circle cx="83" cy="265" r="3" class="rw-lamp"/>
+                  <circle cx="177" cy="265" r="3" class="rw-lamp"/>
+                  <circle cx="83" cy="351" r="3" class="rw-lamp"/>
+                  <circle cx="177" cy="351" r="3" class="rw-lamp"/>
+                  <circle cx="277" cy="265" r="3" class="rw-lamp"/>
+                  <circle cx="340" cy="345" r="3" class="rw-lamp"/>
+
+                  <text x="150" y="310" class="rw-sector-num">SOUTH</text>
+                </g>
               </svg>
             </div>
             <div class="rw-hint">
@@ -257,18 +392,18 @@ export class RewardScreen {
       }
       .rw-town { width: 100%; height: 100%; display: block; }
 
-      /* Sector base */
+      /* Sector base — transparent, roads show through */
       .rw-sector {
-        fill: #0c1a14;
-        stroke: #162a20;
-        stroke-width: 1.2;
+        fill: transparent;
+        stroke: transparent;
+        stroke-width: 2;
         cursor: pointer;
-        transition: fill 0.5s, stroke 0.5s, filter 0.5s;
+        transition: fill 0.4s, stroke 0.4s, filter 0.4s;
       }
 
-      /* Sector focus highlight (keyboard/gamepad) */
+      /* Sector focus highlight — vivid dark green overlay */
       .rw-sector-group.focused .rw-sector {
-        fill: #102a1c;
+        fill: rgba(10, 60, 35, 0.55);
         stroke: #22ffaa;
         stroke-width: 2.5;
         filter: url(#sectorGlow);
@@ -276,7 +411,7 @@ export class RewardScreen {
 
       /* Sector lit state */
       .rw-sector-group.lit .rw-sector {
-        fill: #0e3020;
+        fill: rgba(14, 48, 32, 0.35);
         stroke: #22ffaa;
         stroke-width: 2;
         filter: url(#sectorGlow);
