@@ -21,6 +21,7 @@ export class Environment {
     this.hemiLight = null;
     this.ground = null;
     this.starField = null;
+    this.snowParticles = null;
     this.currentTheme = null;
     this.modelsReady = false;
     this.water = null;
@@ -60,6 +61,12 @@ export class Environment {
     if (this.hemiLight) this.scene.remove(this.hemiLight);
     if (this.ground) this.scene.remove(this.ground);
     if (this.starField) { this.scene.remove(this.starField); this.starField = null; }
+    if (this.snowParticles) {
+      this.scene.remove(this.snowParticles);
+      this.snowParticles.geometry.dispose();
+      this.snowParticles.material.dispose();
+      this.snowParticles = null;
+    }
     if (this.water) { this.scene.remove(this.water); this.water = null; }
 
     const theme = MAP_THEMES[themeIndex] || MAP_THEMES[0];
@@ -210,6 +217,9 @@ export class Environment {
       case 'delhi': this._buildDelhi(); break;
       case 'momo': this._buildMomo(); break;
     }
+
+    // Highway safety message signs (all maps except Momo)
+    if (theme.id !== 'momo') this._buildHighwaySigns();
 
     // ICT billboards along the road (all maps)
     this._buildBillboards(theme.id);
@@ -2480,10 +2490,6 @@ export class Environment {
 
     // ── Shared materials ──
     const snowMat = new THREE.MeshStandardMaterial({ color: 0xf8f4f0, roughness: 0.85 });
-    const goldMat = new THREE.MeshStandardMaterial({
-      color: 0xffcc44, roughness: 0.4, metalness: 0.3,
-      emissive: 0xffaa22, emissiveIntensity: 0.15,
-    });
     const poleMat = new THREE.MeshStandardMaterial({ color: 0xeeeeff, roughness: 0.4, metalness: 0.3 });
 
     // ══════════════════════════════════════════
@@ -2517,14 +2523,14 @@ export class Environment {
 
     // ── Dense snow drifts along road edges ──
     const driftGeo = new THREE.SphereGeometry(1.5, 6, 4);
-    for (let i = 0; i < 12; i++) {
+    for (let i = 0; i < 20; i++) {
       const side = i % 2 === 0 ? -1 : 1;
       const drift = new THREE.Mesh(driftGeo, snowMat);
-      drift.scale.set(1.2 + Math.random() * 2, 0.35, 0.8 + Math.random() * 1.2);
+      drift.scale.set(1.2 + Math.random() * 2.8, 0.3 + Math.random() * 0.15, 0.8 + Math.random() * 1.5);
       drift.position.set(
-        side * (RH + 1.0 + Math.random() * 2.5),
+        side * (RH + 0.8 + Math.random() * 3),
         0.12,
-        -i * 26 - Math.random() * 12,
+        -i * 19 - Math.random() * 8,
       );
       this.scene.add(drift);
       this.themeObjects.push(drift);
@@ -2618,50 +2624,192 @@ export class Environment {
     }
 
     // ══════════════════════════════════════════
-    //  MOMO'S WORLD FRAMES — simple white rectangle frame with neon banner
+    //  MOMO'S WORLD GATE — polished archway with banner, lights & snow
     // ══════════════════════════════════════════
-    const arcCanvas = document.createElement('canvas');
-    arcCanvas.width = 512; arcCanvas.height = 128;
-    const aC = arcCanvas.getContext('2d');
-    aC.fillStyle = '#ffffff';
-    aC.fillRect(0, 0, 512, 128);
-    // Neon magenta text with glow
-    aC.shadowColor = '#ff22aa';
-    aC.shadowBlur = 20;
-    aC.fillStyle = '#ff22aa';
-    aC.font = 'bold 54px Arial, sans-serif';
-    aC.textAlign = 'center';
-    aC.textBaseline = 'middle';
-    aC.fillText("MOMO'S WORLD", 256, 64);
-    aC.shadowBlur = 8;
-    aC.fillStyle = '#ff66bb';
-    aC.fillText("MOMO'S WORLD", 256, 64);
-    const arcBannerTex = new THREE.CanvasTexture(arcCanvas);
-    const arcBannerMat = new THREE.MeshBasicMaterial({ map: arcBannerTex });
-    const fW = ROAD_WIDTH + 2, fH = 7;
-    const frameMat = new THREE.MeshStandardMaterial({
-      color: 0xffffff, roughness: 0.25, metalness: 0.3,
-      emissive: 0xffaacc, emissiveIntensity: 0.12,
+
+    // ── High-res banner canvas ──
+    const bannerCvs = document.createElement('canvas');
+    bannerCvs.width = 1024; bannerCvs.height = 256;
+    const bC = bannerCvs.getContext('2d');
+
+    // Gradient background: deep warm charcoal → rich burgundy
+    const bgGrad = bC.createLinearGradient(0, 0, 1024, 0);
+    bgGrad.addColorStop(0, '#1a0a12');
+    bgGrad.addColorStop(0.3, '#2d1018');
+    bgGrad.addColorStop(0.5, '#3a1420');
+    bgGrad.addColorStop(0.7, '#2d1018');
+    bgGrad.addColorStop(1, '#1a0a12');
+    bC.fillStyle = bgGrad;
+    bC.fillRect(0, 0, 1024, 256);
+
+    // Decorative gold border — outer
+    bC.strokeStyle = '#d4a044';
+    bC.lineWidth = 6;
+    bC.strokeRect(12, 12, 1000, 232);
+    // Inner border — thinner accent
+    bC.strokeStyle = '#ffcc66';
+    bC.lineWidth = 2;
+    bC.strokeRect(22, 22, 980, 212);
+
+    // Corner ornaments — small gold diamonds
+    const drawDiamond = (cx, cy, s) => {
+      bC.beginPath();
+      bC.moveTo(cx, cy - s); bC.lineTo(cx + s, cy);
+      bC.lineTo(cx, cy + s); bC.lineTo(cx - s, cy);
+      bC.closePath(); bC.fill();
+    };
+    bC.fillStyle = '#d4a044';
+    for (const [cx, cy] of [[30, 30], [994, 30], [30, 226], [994, 226]]) drawDiamond(cx, cy, 10);
+
+    // Paw print decorations flanking the text
+    const drawPaw = (cx, cy, scale) => {
+      bC.fillStyle = '#ffcc66';
+      // Pad
+      bC.beginPath();
+      bC.ellipse(cx, cy + 4 * scale, 8 * scale, 6 * scale, 0, 0, Math.PI * 2);
+      bC.fill();
+      // Toes
+      const toes = [[-6, -6], [0, -9], [6, -6]];
+      for (const [tx, ty] of toes) {
+        bC.beginPath();
+        bC.arc(cx + tx * scale, cy + ty * scale, 3.5 * scale, 0, Math.PI * 2);
+        bC.fill();
+      }
+    };
+    drawPaw(90, 128, 2.2);
+    drawPaw(934, 128, 2.2);
+
+    // Main title — layered glow for depth
+    bC.textAlign = 'center';
+    bC.textBaseline = 'middle';
+
+    // Outer glow
+    bC.shadowColor = '#ff2288';
+    bC.shadowBlur = 40;
+    bC.fillStyle = '#ff2288';
+    bC.font = 'bold 72px "Georgia", serif';
+    bC.fillText("MOMO'S WORLD", 512, 118);
+
+    // Mid glow
+    bC.shadowColor = '#ff66aa';
+    bC.shadowBlur = 20;
+    bC.fillStyle = '#ff88cc';
+    bC.fillText("MOMO'S WORLD", 512, 118);
+
+    // Sharp text on top
+    bC.shadowColor = '#ffffff';
+    bC.shadowBlur = 6;
+    bC.fillStyle = '#ffeef5';
+    bC.fillText("MOMO'S WORLD", 512, 118);
+
+    // Subtitle line
+    bC.shadowBlur = 0;
+    bC.font = 'italic 22px "Georgia", serif';
+    bC.fillStyle = '#d4a044';
+    bC.fillText('— Energy Harvesting Edition —', 512, 175);
+
+    // Thin gold separator lines above & below title
+    bC.strokeStyle = '#d4a044';
+    bC.lineWidth = 1;
+    bC.beginPath(); bC.moveTo(180, 72); bC.lineTo(844, 72); bC.stroke();
+    bC.beginPath(); bC.moveTo(250, 195); bC.lineTo(774, 195); bC.stroke();
+
+    const bannerTex = new THREE.CanvasTexture(bannerCvs);
+    const bannerMat = new THREE.MeshBasicMaterial({ map: bannerTex });
+
+    // ── Gate materials ──
+    const fW = ROAD_WIDTH + 2, fH = 8;
+    const gatePillarMat = new THREE.MeshStandardMaterial({
+      color: 0x1a1a22, roughness: 0.12, metalness: 0.9,
     });
+    const gateAccentMat = new THREE.MeshStandardMaterial({
+      color: 0xd4a044, roughness: 0.3, metalness: 0.7,
+      emissive: 0xffaa22, emissiveIntensity: 0.08,
+    });
+    const gateSnowMat = new THREE.MeshStandardMaterial({ color: 0xf8f4f0, roughness: 0.85 });
 
     for (let i = 0; i < 2; i++) {
       const ag = new THREE.Group();
-      // Merge 2 pillars + top beam + bottom beam into 1 mesh
-      const pL = new THREE.BoxGeometry(0.4, fH, 0.4);
-      pL.translate(-fW / 2, fH / 2, 0);
-      const pR = new THREE.BoxGeometry(0.4, fH, 0.4);
-      pR.translate(fW / 2, fH / 2, 0);
-      const topB = new THREE.BoxGeometry(fW + 0.4, 0.4, 0.4);
-      topB.translate(0, fH, 0);
-      const botB = new THREE.BoxGeometry(fW + 0.4, 0.3, 0.4);
-      botB.translate(0, fH - 1.8, 0);
-      const frame = new THREE.Mesh(
-        mergeGeometries([pL, pR, topB, botB], false), frameMat);
-      ag.add(frame);
-      // Banner centered in the frame opening
-      const banner = new THREE.Mesh(new THREE.PlaneGeometry(fW * 0.72, 1.4), arcBannerMat);
-      banner.position.set(0, fH - 0.8, 0.25);
-      ag.add(banner);
+
+      // ── Pillar bases (wider pedestals) ──
+      const baseL = new THREE.BoxGeometry(1.0, 0.5, 1.0);
+      baseL.translate(-fW / 2, 0.25, 0);
+      const baseR = new THREE.BoxGeometry(1.0, 0.5, 1.0);
+      baseR.translate(fW / 2, 0.25, 0);
+
+      // ── Main pillars ──
+      const pillarL = new THREE.BoxGeometry(0.55, fH - 0.5, 0.55);
+      pillarL.translate(-fW / 2, fH / 2 + 0.25, 0);
+      const pillarR = new THREE.BoxGeometry(0.55, fH - 0.5, 0.55);
+      pillarR.translate(fW / 2, fH / 2 + 0.25, 0);
+
+      // ── Pillar caps ──
+      const capL = new THREE.BoxGeometry(0.75, 0.3, 0.75);
+      capL.translate(-fW / 2, fH + 0.15, 0);
+      const capR = new THREE.BoxGeometry(0.75, 0.3, 0.75);
+      capR.translate(fW / 2, fH + 0.15, 0);
+
+      // ── Top beam (header) — thicker, substantial ──
+      const topBeam = new THREE.BoxGeometry(fW + 0.8, 0.6, 0.6);
+      topBeam.translate(0, fH + 0.6, 0);
+
+      // ── Bottom beam ──
+      const botBeam = new THREE.BoxGeometry(fW + 0.6, 0.25, 0.4);
+      botBeam.translate(0, fH - 2.2, 0);
+
+      const gateMesh = new THREE.Mesh(
+        mergeGeometries([baseL, baseR, pillarL, pillarR, capL, capR, topBeam, botBeam], false),
+        gatePillarMat,
+      );
+      ag.add(gateMesh);
+
+      // ── Gold accent trim strips on pillars ──
+      const trimGeos = [];
+      for (const sx of [-1, 1]) {
+        // Vertical gold inlay on pillar face
+        const strip = new THREE.BoxGeometry(0.08, fH - 1, 0.58);
+        strip.translate(sx * fW / 2, fH / 2 + 0.5, 0);
+        trimGeos.push(strip);
+        // Horizontal ring near top
+        const ring = new THREE.BoxGeometry(0.6, 0.1, 0.6);
+        ring.translate(sx * fW / 2, fH - 0.5, 0);
+        trimGeos.push(ring);
+        // Horizontal ring near base
+        const ringB = new THREE.BoxGeometry(0.6, 0.1, 0.6);
+        ringB.translate(sx * fW / 2, 0.6, 0);
+        trimGeos.push(ringB);
+      }
+      // Top beam gold accent strip
+      const topTrim = new THREE.BoxGeometry(fW + 0.85, 0.08, 0.65);
+      topTrim.translate(0, fH + 0.92, 0);
+      trimGeos.push(topTrim);
+      const accentMesh = new THREE.Mesh(mergeGeometries(trimGeos, false), gateAccentMat);
+      ag.add(accentMesh);
+
+      // ── Snow caps on top beam and pillar caps ──
+      const snowGeos = [];
+      const snowTop = new THREE.BoxGeometry(fW + 1.2, 0.2, 0.9);
+      snowTop.translate(0, fH + 1.0, 0);
+      snowGeos.push(snowTop);
+      for (const sx of [-1, 1]) {
+        const capSnow = new THREE.SphereGeometry(0.5, 5, 3);
+        capSnow.scale(1.0, 0.35, 1.0);
+        capSnow.translate(sx * fW / 2, fH + 0.4, 0);
+        snowGeos.push(capSnow);
+      }
+      const snowMesh = new THREE.Mesh(mergeGeometries(snowGeos, false), gateSnowMat);
+      ag.add(snowMesh);
+
+      // ── Banner — centered in the frame opening ──
+      const bannerPlane = new THREE.Mesh(new THREE.PlaneGeometry(fW * 0.78, 2.0), bannerMat);
+      bannerPlane.position.set(0, fH - 1.0, 0.32);
+      ag.add(bannerPlane);
+
+      // ── Warm glow light inside the gate ──
+      const glow = new THREE.PointLight(0xffaa66, 2.5, 18, 1.5);
+      glow.position.set(0, fH - 0.5, 0.5);
+      ag.add(glow);
+
       ag.position.set(0, 0, -i * 150 - 50);
       this.scene.add(ag);
       this.themeObjects.push(ag);
@@ -2669,60 +2817,212 @@ export class Environment {
     }
 
     // ══════════════════════════════════════════
-    //  MOMO SIGN BILLBOARDS — large, dense, 6 along the road
+    //  MOMO BILLBOARDS — 36 billboards, 17 images, 3 shapes (rect/square/hex)
     // ══════════════════════════════════════════
-    const loader = new THREE.TextureLoader();
-    const momoSignTexs = [
-      loader.load(asset('maps/momo-sign1.webp')),
-      loader.load(asset('maps/momo-sign2.webp')),
-    ];
-    momoSignTexs.forEach(t => { t.colorSpace = THREE.SRGBColorSpace; });
-    const panelBackMat = new THREE.MeshBasicMaterial({ color: 0xffeeff });
-    const postH = 8, pW = 7, pH = 5;
 
-    for (let i = 0; i < 6; i++) {
-      const side = i % 2 === 0 ? 1 : -1;
-      const sg = new THREE.Group();
-      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, postH, 6), poleMat);
-      post.position.y = postH / 2;
-      sg.add(post);
-      const panelBack = new THREE.Mesh(new THREE.BoxGeometry(pW + 0.5, pH + 0.5, 0.1), panelBackMat);
-      panelBack.position.set(0, postH + pH / 2, 0);
-      sg.add(panelBack);
-      const signPlane = new THREE.Mesh(new THREE.PlaneGeometry(pW, pH),
-        new THREE.MeshBasicMaterial({ map: momoSignTexs[i % 2], transparent: true }));
-      signPlane.position.set(0, postH + pH / 2, 0.08);
-      sg.add(signPlane);
-      sg.position.set(side * (RH + 4 + Math.random() * 2), 0, -i * 50 - 20);
-      sg.rotation.y = side > 0 ? -0.15 : 0.15;
-      this.scene.add(sg);
-      this.themeObjects.push(sg);
-      this.midground.push(sg);
+    // Cache textures statically (survives map rebuilds, same pattern as _bbTextures)
+    if (!Environment._momoTextures) {
+      const loader = new THREE.TextureLoader();
+      const keys = 'abcdefghijklmnopq'.split('');
+      Environment._momoTextures = keys.map(k => {
+        const t = loader.load(asset(`maps/momo/momo-${k}.webp`));
+        t.colorSpace = THREE.SRGBColorSpace;
+        return t;
+      });
+    }
+    const momoTexs = Environment._momoTextures;
+
+    // Shared billboard materials — dark metallic + gold accent (matches gate style)
+    const bbFrameMat = new THREE.MeshStandardMaterial({
+      color: 0x1a1a22, roughness: 0.12, metalness: 0.9,
+    });
+    const bbAccentMat = new THREE.MeshStandardMaterial({
+      color: 0xd4a044, roughness: 0.3, metalness: 0.7,
+      emissive: 0xffaa22, emissiveIntensity: 0.08,
+    });
+    const bbBackMat = new THREE.MeshBasicMaterial({ color: 0x1a0a12 });
+    const bbBackDblMat = new THREE.MeshBasicMaterial({ color: 0x1a0a12, side: THREE.DoubleSide });
+    const bbSnowMat = new THREE.MeshStandardMaterial({ color: 0xf8f4f0, roughness: 0.85 });
+
+    // Image aspect ratio ~768:975 = 0.787:1
+    const IMG_RATIO = 975 / 768;
+
+    // Rectangle sizes: [width, height]
+    const rectSizes = [
+      [3.5, 3.5 * IMG_RATIO],  // small
+      [5.0, 5.0 * IMG_RATIO],  // medium
+      [6.5, 6.5 * IMG_RATIO],  // large
+    ];
+    // Square sizes
+    const sqSizes = [3, 4.5, 6];
+    // Hex radii
+    const hexRadii = [1.8, 2.5, 3.2];
+
+    // Shared post geometry — thicker, square cross-section like gate pillars
+    const bbPostGeo = new THREE.BoxGeometry(0.3, 1, 0.3); // unit height, scaled per instance
+
+    // Pre-build shared geometries for each shape+size
+    // Each includes: frame (outermost), accent (gold trim), back, face, and snow cap
+    const rectGeos = rectSizes.map(([w, h]) => ({
+      frame: new THREE.BoxGeometry(w + 0.8, h + 0.8, 0.14),
+      accent: new THREE.BoxGeometry(w + 0.65, h + 0.65, 0.15),
+      back: new THREE.BoxGeometry(w + 0.4, h + 0.4, 0.1),
+      face: new THREE.PlaneGeometry(w, h),
+      snowW: w + 0.9,
+      h,
+    }));
+
+    // Square geometries with center-crop UVs
+    const sqGeos = sqSizes.map(s => {
+      const face = new THREE.PlaneGeometry(s, s);
+      const cropY = (1 - 768 / 975) / 2;
+      const uv = face.attributes.uv;
+      for (let i = 0; i < uv.count; i++) {
+        uv.setY(i, cropY + uv.getY(i) * (1 - 2 * cropY));
+      }
+      return {
+        frame: new THREE.BoxGeometry(s + 0.8, s + 0.8, 0.14),
+        accent: new THREE.BoxGeometry(s + 0.65, s + 0.65, 0.15),
+        back: new THREE.BoxGeometry(s + 0.4, s + 0.4, 0.1),
+        face,
+        snowW: s + 0.9,
+        h: s,
+      };
+    });
+
+    // Hexagon geometries
+    const hexGeos = hexRadii.map(r => ({
+      frame: new THREE.CircleGeometry(r + 0.45, 6),
+      accent: new THREE.CircleGeometry(r + 0.35, 6),
+      back: new THREE.CircleGeometry(r + 0.2, 6),
+      face: new THREE.CircleGeometry(r, 6),
+      snowW: (r + 0.5) * 2,
+      h: r * 2,
+    }));
+
+    // Shuffle texture order — Fisher-Yates (each image shown once = 17 billboards)
+    const texOrder = Array.from({ length: 17 }, (_, i) => i);
+    for (let i = texOrder.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [texOrder[i], texOrder[j]] = [texOrder[j], texOrder[i]];
+    }
+
+    // Shape types cycle: 0=rect, 1=square, 2=hex
+    const shapes = [rectGeos, sqGeos, hexGeos];
+    const shapeTypes = ['rect', 'square', 'hex'];
+
+    // Layer configs: 5 fg + 7 mg + 5 bg = 17 total
+    const layerConfigs = [
+      { count: 5, layer: 'fg', xMin: 2, xMax: 6, zSpacing: 72, postH: [6, 8], sizes: [0, 1] },
+      { count: 7, layer: 'mg', xMin: 8, xMax: 16, zSpacing: 52, postH: [7, 10], sizes: [1, 2] },
+      { count: 5, layer: 'bg', xMin: 20, xMax: 35, zSpacing: 72, postH: [10, 14], sizes: [2, 2] },
+    ];
+    const layerMap = { fg: this.foreground, mg: this.midground, bg: this.background };
+
+    // Shared pedestal geometry
+    const bbBaseGeo = new THREE.BoxGeometry(0.6, 0.35, 0.6);
+    const bbCapGeo = new THREE.BoxGeometry(0.45, 0.15, 0.45);
+    // Gold ring on post (reused per billboard)
+    const bbRingGeo = new THREE.BoxGeometry(0.38, 0.08, 0.38);
+
+    let texIdx = 0;
+    for (const L of layerConfigs) {
+      for (let i = 0; i < L.count; i++) {
+        const side = i % 2 === 0 ? 1 : -1;
+        const shapeIdx = texIdx % 3;
+        const sizeIdx = L.sizes[Math.floor(Math.random() * L.sizes.length)];
+        const geo = shapes[shapeIdx][sizeIdx];
+        const tex = momoTexs[texOrder[texIdx]];
+        const pH = L.postH[0] + Math.random() * (L.postH[1] - L.postH[0]);
+
+        const sg = new THREE.Group();
+        const isHex = shapeTypes[shapeIdx] === 'hex';
+        const panelY = pH + geo.h / 2;
+
+        // ── Pedestal base ──
+        const base = new THREE.Mesh(bbBaseGeo, bbFrameMat);
+        base.position.y = 0.175;
+        sg.add(base);
+
+        // ── Post (dark metallic pillar) ──
+        const post = new THREE.Mesh(bbPostGeo, bbFrameMat);
+        post.scale.y = pH - 0.35;
+        post.position.y = 0.35 + (pH - 0.35) / 2;
+        sg.add(post);
+
+        // ── Gold rings on post ──
+        const ringBot = new THREE.Mesh(bbRingGeo, bbAccentMat);
+        ringBot.position.y = 0.45;
+        sg.add(ringBot);
+        const ringTop = new THREE.Mesh(bbRingGeo, bbAccentMat);
+        ringTop.position.y = pH - 0.2;
+        sg.add(ringTop);
+
+        // ── Post cap ──
+        const cap = new THREE.Mesh(bbCapGeo, bbFrameMat);
+        cap.position.y = pH + 0.075;
+        sg.add(cap);
+
+        // ── Outer frame (dark metallic) ──
+        const frameMesh = new THREE.Mesh(geo.frame, bbFrameMat);
+        frameMesh.position.set(0, panelY, -0.06);
+        sg.add(frameMesh);
+
+        // ── Gold accent border ──
+        const accentMesh = new THREE.Mesh(geo.accent, bbAccentMat);
+        accentMesh.position.set(0, panelY, -0.02);
+        sg.add(accentMesh);
+
+        // ── Back panel (dark) ──
+        const bkMat = isHex ? bbBackDblMat : bbBackMat;
+        const back = new THREE.Mesh(geo.back, bkMat);
+        back.position.set(0, panelY, 0.02);
+        sg.add(back);
+
+        // ── Face with texture ──
+        const faceMat = new THREE.MeshBasicMaterial({ map: tex, transparent: true });
+        if (isHex) faceMat.side = THREE.DoubleSide;
+        const face = new THREE.Mesh(geo.face, faceMat);
+        face.position.set(0, panelY, 0.08);
+        sg.add(face);
+
+        // ── Snow cap on top of panel frame ──
+        const snowCapH = panelY + geo.h / 2;
+        if (!isHex) {
+          const snowCap = new THREE.Mesh(
+            new THREE.BoxGeometry(geo.snowW, 0.15, 0.3), bbSnowMat);
+          snowCap.position.set(0, snowCapH + 0.42, 0);
+          sg.add(snowCap);
+        } else {
+          const snowHex = new THREE.Mesh(
+            new THREE.SphereGeometry(geo.snowW * 0.35, 5, 3), bbSnowMat);
+          snowHex.scale.set(1.2, 0.25, 0.8);
+          snowHex.position.set(0, snowCapH + 0.35, 0);
+          sg.add(snowHex);
+        }
+
+        const x = side * (RH + L.xMin + Math.random() * (L.xMax - L.xMin));
+        const z = -i * L.zSpacing - 15 - Math.random() * L.zSpacing * 0.4;
+        sg.position.set(x, 0, z);
+        sg.rotation.y = (side > 0 ? -0.15 : 0.15) + (Math.random() - 0.5) * 0.1;
+
+        this.scene.add(sg);
+        this.themeObjects.push(sg);
+        layerMap[L.layer].push(sg);
+
+        texIdx++;
+      }
     }
 
     // ══════════════════════════════════════════
-    //  3D MODELS — dense roadside props
+    //  3D MODELS — dog bones + benches
     // ══════════════════════════════════════════
     if (this.modelsReady) {
-      // Snowmen — frequent along road
-      for (let i = 0; i < 5; i++) {
-        const side = i % 2 === 0 ? -1 : 1;
-        this._placeModel(MODEL_URLS.snowman,
-          side * (RH + 2.5 + Math.random() * 5), 0, -i * 60 - 25,
-          Math.random() * Math.PI * 2, 0.8 + Math.random() * 0.4, 'fg');
-      }
-      // Candy canes — line the road edges
+      // Bones — scattered in snow (thematic for Momo the dog)
       for (let i = 0; i < 6; i++) {
-        const side = i % 2 === 0 ? 1 : -1;
-        this._placeModel(MODEL_URLS.candyCane,
-          side * (RH + 1.2), 0, -i * 50 - 15,
-          0, 0.7 + Math.random() * 0.4, 'fg');
-      }
-      // Bones — scattered in snow
-      for (let i = 0; i < 4; i++) {
         const side = i % 2 === 0 ? -1 : 1;
         this._placeModel(MODEL_URLS.bone,
-          side * (RH + 3 + Math.random() * 8), 0, -i * 70 - 40,
+          side * (RH + 3 + Math.random() * 8), 0, -i * 55 - 30,
           Math.random() * Math.PI, 1.0 + Math.random() * 0.5, 'fg');
       }
       // Benches — cozy roadside seating
@@ -2730,49 +3030,7 @@ export class Environment {
     }
 
     // ══════════════════════════════════════════
-    //  COLORFUL BALLS — toy balls in snow
-    // ══════════════════════════════════════════
-    const ballColors = [0xff4466, 0x44aaff, 0xffcc22, 0x66dd66, 0xff8844, 0xcc66ff];
-    const ballMats = ballColors.map(c => new THREE.MeshBasicMaterial({ color: c }));
-    const ballGeo = new THREE.SphereGeometry(0.4, 6, 5);
-    for (let i = 0; i < 6; i++) {
-      const side = i % 2 === 0 ? -1 : 1;
-      const ball = new THREE.Mesh(ballGeo, ballMats[i]);
-      ball.position.set(side * (RH + 1.5 + Math.random() * 6), 0.4, -i * 45 - 20);
-      this.scene.add(ball);
-      this.themeObjects.push(ball);
-      this.foreground.push(ball);
-    }
-
-    // ══════════════════════════════════════════
-    //  GLASS JARS (2 groups)
-    // ══════════════════════════════════════════
-    const glassMat = new THREE.MeshStandardMaterial({
-      color: 0xeeffff, roughness: 0.1, metalness: 0.1, transparent: true, opacity: 0.35,
-    });
-    const jarGeo = new THREE.CylinderGeometry(2.5, 2.2, 6, 8);
-    const lidGeo = new THREE.CylinderGeometry(2.8, 2.8, 0.5, 8);
-    const fillMat = new THREE.MeshStandardMaterial({ color: 0xeeddcc, roughness: 0.75 });
-
-    for (const sx of [-1, 1]) {
-      const jg = new THREE.Group();
-      const jar = new THREE.Mesh(jarGeo, glassMat);
-      jar.position.y = 3;
-      jg.add(jar);
-      const lid = new THREE.Mesh(lidGeo, goldMat);
-      lid.position.y = 6.25;
-      jg.add(lid);
-      const fill = new THREE.Mesh(new THREE.CylinderGeometry(2.0, 1.8, 4, 8), fillMat);
-      fill.position.y = 2.5;
-      jg.add(fill);
-      jg.position.set(sx * (RH + 6), 0, -120);
-      this.scene.add(jg);
-      this.themeObjects.push(jg);
-      this.midground.push(jg);
-    }
-
-    // ══════════════════════════════════════════
-    //  GLOWING BLUE ARROW MARKERS (8 meshes, denser)
+    //  GLOWING BLUE ARROW MARKERS (8 meshes)
     // ══════════════════════════════════════════
     const arrowMat = new THREE.MeshBasicMaterial({ color: 0x44aaff, transparent: true, opacity: 0.8 });
     const arrowShape = new THREE.Shape();
@@ -2792,6 +3050,66 @@ export class Environment {
     }
 
     // ══════════════════════════════════════════
+    //  SNOW MOUNDS — midground fill between billboards
+    // ══════════════════════════════════════════
+    const moundGeo = new THREE.SphereGeometry(2, 6, 4);
+    for (let i = 0; i < 8; i++) {
+      const side = i % 2 === 0 ? -1 : 1;
+      const mound = new THREE.Mesh(moundGeo, snowMat);
+      mound.scale.set(1.5 + Math.random() * 2, 0.3, 1.2 + Math.random() * 1.5);
+      mound.position.set(
+        side * (RH + 10 + Math.random() * 8),
+        0.1,
+        -i * 45 - 25 - Math.random() * 15,
+      );
+      this.scene.add(mound);
+      this.themeObjects.push(mound);
+      this.midground.push(mound);
+    }
+
+    // ══════════════════════════════════════════
+    //  FALLING SNOW — Points-based particle system
+    // ══════════════════════════════════════════
+    {
+      const SNOW_COUNT = 900;
+      const positions = new Float32Array(SNOW_COUNT * 3);
+      const sizes = new Float32Array(SNOW_COUNT);
+      for (let i = 0; i < SNOW_COUNT; i++) {
+        positions[i * 3] = -50 + Math.random() * 100;       // X — wider spread
+        positions[i * 3 + 1] = Math.random() * 30;           // Y — taller column
+        positions[i * 3 + 2] = 50 - Math.random() * 380;     // Z
+        sizes[i] = 0.08 + Math.random() * 0.14;              // varied flake sizes
+      }
+      const snowGeo = new THREE.BufferGeometry();
+      snowGeo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+      const snowPtMat = new THREE.PointsMaterial({
+        color: 0xffffff, size: 0.18, transparent: true, opacity: 0.75,
+        depthWrite: false, sizeAttenuation: true,
+      });
+      this.snowParticles = new THREE.Points(snowGeo, snowPtMat);
+      this.scene.add(this.snowParticles);
+      this.themeObjects.push(this.snowParticles);
+    }
+
+    // ══════════════════════════════════════════
+    //  SNOW BANKS — larger snow piles along roadside
+    // ══════════════════════════════════════════
+    const bankGeo = new THREE.SphereGeometry(2.5, 7, 4);
+    for (let i = 0; i < 10; i++) {
+      const side = i % 2 === 0 ? -1 : 1;
+      const bank = new THREE.Mesh(bankGeo, snowMat);
+      bank.scale.set(2.0 + Math.random() * 3, 0.4 + Math.random() * 0.2, 1.5 + Math.random() * 2);
+      bank.position.set(
+        side * (RH + 4 + Math.random() * 5),
+        0.08,
+        -i * 36 - 10 - Math.random() * 10,
+      );
+      this.scene.add(bank);
+      this.themeObjects.push(bank);
+      this.foreground.push(bank);
+    }
+
+    // ══════════════════════════════════════════
     //  LOW FLUFFY CLOUDS — misty ground fog
     // ══════════════════════════════════════════
     const cloudTex = this._makeCloudTexture();
@@ -2799,27 +3117,186 @@ export class Environment {
       map: cloudTex, transparent: true, opacity: 0.25,
       depthWrite: false, side: THREE.DoubleSide, color: 0xfff5ee,
     });
-    for (let i = 0; i < 4; i++) {
+    for (let i = 0; i < 6; i++) {
       const side = i % 2 === 0 ? -1 : 1;
-      const lc = new THREE.Mesh(new THREE.PlaneGeometry(14 + Math.random() * 10, 5), lowCloudMat);
-      lc.position.set(side * (RH + 18 + Math.random() * 12), 4 + Math.random() * 4, -i * 80 - 40);
+      const lc = new THREE.Mesh(new THREE.PlaneGeometry(14 + Math.random() * 12, 5 + Math.random() * 3), lowCloudMat);
+      lc.position.set(side * (RH + 14 + Math.random() * 16), 3 + Math.random() * 5, -i * 60 - 30);
       lc.lookAt(0, lc.position.y, 0);
       this.scene.add(lc);
       this.themeObjects.push(lc);
       this.midground.push(lc);
     }
 
-    // ── Ground-level mist patches ──
+    // ── Ground-level mist patches — denser for snowy atmosphere ──
     const mistMat = new THREE.MeshBasicMaterial({
-      color: 0xfff8f2, transparent: true, opacity: 0.15, depthWrite: false, side: THREE.DoubleSide,
+      color: 0xfff8f2, transparent: true, opacity: 0.12, depthWrite: false, side: THREE.DoubleSide,
     });
-    for (let i = 0; i < 3; i++) {
-      const mist = new THREE.Mesh(new THREE.PlaneGeometry(40, 6), mistMat);
-      mist.position.set(0, 1.5, -i * 100 - 50);
+    for (let i = 0; i < 5; i++) {
+      const mist = new THREE.Mesh(new THREE.PlaneGeometry(45, 7), mistMat);
+      mist.position.set((Math.random() - 0.5) * 10, 1.2, -i * 75 - 30);
       mist.lookAt(0, mist.position.y, 0);
       this.scene.add(mist);
       this.themeObjects.push(mist);
       this.foreground.push(mist);
+    }
+  }
+
+  // =====================================================================
+  //  HIGHWAY SAFETY SIGNS — electronic message boards across the road
+  // =====================================================================
+
+  _buildHighwaySigns() {
+    const RH = ROAD_WIDTH / 2;
+    const fW = ROAD_WIDTH + 2;
+    const fH = 7.5;
+
+    // ── Sign messages with neon color themes ──
+    const signs = [
+      { msg: 'DRIVE SOBER OR\nGET PULLED OVER', color: '#ff3333', glow: '#ff4444', accent: '#ff6666', fontSize: 45 },
+      { msg: 'SLOW DOWN\nSAVE LIVES', color: '#33ff66', glow: '#44ff77', accent: '#88ffaa', fontSize: 54 },
+      { msg: 'OBEY THE SIGN OR\nPAY THE FINE', color: '#3388ff', glow: '#4499ff', accent: '#77bbff', fontSize: 45 },
+    ];
+
+    // ── Gate materials — dark metallic + gold accent ──
+    const signPillarMat = new THREE.MeshStandardMaterial({
+      color: 0x1a1a22, roughness: 0.12, metalness: 0.9,
+    });
+    const signAccentMat = new THREE.MeshStandardMaterial({
+      color: 0xd4a044, roughness: 0.3, metalness: 0.7,
+      emissive: 0xffaa22, emissiveIntensity: 0.08,
+    });
+
+    for (let si = 0; si < 3; si++) {
+      const s = signs[si];
+      const ag = new THREE.Group();
+
+      // ══════════════════════════════════════
+      //  Canvas banner — electronic highway sign aesthetic
+      // ══════════════════════════════════════
+      const cvs = document.createElement('canvas');
+      cvs.width = 1024; cvs.height = 256;
+      const ctx = cvs.getContext('2d');
+
+      // Pure black background (electronic sign)
+      ctx.fillStyle = '#000000';
+      ctx.fillRect(0, 0, 1024, 256);
+
+      // Subtle dot matrix grid pattern
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.03)';
+      for (let gx = 0; gx < 1024; gx += 8) {
+        for (let gy = 0; gy < 256; gy += 8) {
+          ctx.fillRect(gx, gy, 1, 1);
+        }
+      }
+
+      // Thin border — sign color
+      ctx.strokeStyle = s.color;
+      ctx.lineWidth = 3;
+      ctx.strokeRect(8, 8, 1008, 240);
+      // Inner accent border
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(14, 14, 996, 228);
+
+      // Message text — pixelated neon
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.font = `900 ${s.fontSize}px "Press Start 2P", monospace`;
+
+      const lines = s.msg.split('\n');
+      const lineH = s.fontSize + 14;
+      const totalH = lines.length * lineH;
+      const startY = 128 - totalH / 2 + lineH / 2;
+
+      for (let li = 0; li < lines.length; li++) {
+        const ly = startY + li * lineH;
+
+        // Outer glow
+        ctx.shadowColor = s.color;
+        ctx.shadowBlur = 35;
+        ctx.fillStyle = s.color;
+        ctx.fillText(lines[li], 512, ly);
+
+        // Mid glow
+        ctx.shadowColor = s.glow;
+        ctx.shadowBlur = 15;
+        ctx.fillStyle = s.glow;
+        ctx.fillText(lines[li], 512, ly);
+
+        // Sharp text
+        ctx.shadowColor = '#ffffff';
+        ctx.shadowBlur = 3;
+        ctx.fillStyle = s.accent;
+        ctx.fillText(lines[li], 512, ly);
+      }
+      ctx.shadowBlur = 0;
+
+      const bannerTex = new THREE.CanvasTexture(cvs);
+      const bannerMat = new THREE.MeshBasicMaterial({ map: bannerTex });
+
+      // ══════════════════════════════════════
+      //  Gate structure — dark metallic + gold trim
+      // ══════════════════════════════════════
+      const structGeos = [];
+      // Pillar bases
+      for (const sx of [-1, 1]) {
+        const base = new THREE.BoxGeometry(0.9, 0.45, 0.9);
+        base.translate(sx * fW / 2, 0.225, 0);
+        structGeos.push(base);
+      }
+      // Main pillars
+      for (const sx of [-1, 1]) {
+        const pillar = new THREE.BoxGeometry(0.5, fH - 0.45, 0.5);
+        pillar.translate(sx * fW / 2, fH / 2 + 0.225, 0);
+        structGeos.push(pillar);
+      }
+      // Pillar caps
+      for (const sx of [-1, 1]) {
+        const cap = new THREE.BoxGeometry(0.7, 0.25, 0.7);
+        cap.translate(sx * fW / 2, fH + 0.125, 0);
+        structGeos.push(cap);
+      }
+      // Top beam
+      const topBeam = new THREE.BoxGeometry(fW + 0.7, 0.5, 0.5);
+      topBeam.translate(0, fH + 0.5, 0);
+      structGeos.push(topBeam);
+      // Bottom beam
+      const botBeam = new THREE.BoxGeometry(fW + 0.5, 0.2, 0.35);
+      botBeam.translate(0, fH - 2.0, 0);
+      structGeos.push(botBeam);
+
+      const gateMesh = new THREE.Mesh(mergeGeometries(structGeos, false), signPillarMat);
+      ag.add(gateMesh);
+
+      // ── Gold accent trim ──
+      const trimGeos = [];
+      for (const sx of [-1, 1]) {
+        const strip = new THREE.BoxGeometry(0.07, fH - 0.8, 0.52);
+        strip.translate(sx * fW / 2, fH / 2 + 0.4, 0);
+        trimGeos.push(strip);
+        const ringT = new THREE.BoxGeometry(0.55, 0.08, 0.55);
+        ringT.translate(sx * fW / 2, fH - 0.4, 0);
+        trimGeos.push(ringT);
+        const ringB = new THREE.BoxGeometry(0.55, 0.08, 0.55);
+        ringB.translate(sx * fW / 2, 0.55, 0);
+        trimGeos.push(ringB);
+      }
+      const topTrim = new THREE.BoxGeometry(fW + 0.75, 0.07, 0.55);
+      topTrim.translate(0, fH + 0.77, 0);
+      trimGeos.push(topTrim);
+      const accentMesh = new THREE.Mesh(mergeGeometries(trimGeos, false), signAccentMat);
+      ag.add(accentMesh);
+
+      // ── Banner plane ──
+      const bannerPlane = new THREE.Mesh(new THREE.PlaneGeometry(fW * 0.8, 1.9), bannerMat);
+      bannerPlane.position.set(0, fH - 0.85, 0.28);
+      ag.add(bannerPlane);
+
+      // Place along road — wide spacing so each appears once per circuit
+      ag.position.set(0, 0, -si * 200 - 150);
+      this.scene.add(ag);
+      this.themeObjects.push(ag);
+      this.midground.push(ag);
     }
   }
 
@@ -2844,32 +3321,31 @@ export class Environment {
     }
     const variants = Environment._bbTextures;
 
-    // Per-map post/frame style
-    const styles = {
-      brazil:   { postColor: 0x8b6914, postRoughness: 0.85, frameColor: 0xa07828, frameRoughness: 0.7, postWidth: 0.25, postDepth: 0.25, panelBack: 0x6b4e1e, roadOffset: 4 },
-      usa:      { postColor: 0x888899, postRoughness: 0.2,  frameColor: 0x666677, frameRoughness: 0.15, postWidth: 0.15, postDepth: 0.15, panelBack: 0x444455, roadOffset: 1.5 },
-      peru:     { postColor: 0x7a6b50, postRoughness: 0.9,  frameColor: 0x5a4a3a, frameRoughness: 0.8, postWidth: 0.30, postDepth: 0.30, panelBack: 0x5a4a32, roadOffset: 4 },
-      shanghai: { postColor: 0x555566, postRoughness: 0.15, frameColor: 0x444455, frameRoughness: 0.1, postWidth: 0.12, postDepth: 0.12, panelBack: 0x333344, roadOffset: 2 },
-      delhi:    { postColor: 0x8b6914, postRoughness: 0.80, frameColor: 0x7a5a2a, frameRoughness: 0.7, postWidth: 0.22, postDepth: 0.22, panelBack: 0x5a4020, roadOffset: 3 },
-      momo:     { postColor: 0xeeeeee, postRoughness: 0.40, frameColor: 0xffffff, frameRoughness: 0.3, postWidth: 0.18, postDepth: 0.18, panelBack: 0xffeeff, roadOffset: 3 },
-    };
-    const s = styles[style] || styles.usa;
-    const isMetal = style === 'usa';
+    // Per-map road offset only
+    const offsets = { brazil: 4, usa: 1.5, peru: 4, shanghai: 2, delhi: 3, momo: 3 };
+    const roadOffset = offsets[style] || 2;
 
-    // Shared structural materials
-    const postMat = new THREE.MeshStandardMaterial({ color: s.postColor, roughness: s.postRoughness, metalness: isMetal ? 0.7 : 0.1 });
-    const frameMat = new THREE.MeshStandardMaterial({ color: s.frameColor, roughness: s.frameRoughness, metalness: isMetal ? 0.6 : 0.1 });
+    // Shared materials — dark metallic + gold accent (unified across all maps)
+    const pillarMat = new THREE.MeshStandardMaterial({ color: 0x1a1a22, roughness: 0.12, metalness: 0.9 });
+    const accentMat = new THREE.MeshStandardMaterial({
+      color: 0xd4a044, roughness: 0.3, metalness: 0.7,
+      emissive: 0xffaa22, emissiveIntensity: 0.08,
+    });
 
     // Shared geometries
     const postH = 5.5;
     const panelW = 3.2, panelH = 2.0;
+    const panelY = postH + panelH / 2;
     const logoScaleSmall = 0.6;
     const logoScaleLarge = 0.75;
-    const postGeo = new THREE.BoxGeometry(s.postWidth, postH, s.postDepth);
-    postGeo.translate(0, postH / 2, 0);
-    const blackFrameGeo = new THREE.BoxGeometry(panelW + 0.4, panelH + 0.4, 0.08);
-    const blackFrameMat = new THREE.MeshBasicMaterial({ color: 0x111111 });
-    const frameGeo = new THREE.BoxGeometry(panelW + 0.1, panelH + 0.1, 0.08);
+
+    const baseGeo = new THREE.BoxGeometry(0.6, 0.35, 0.6);
+    const postGeo = new THREE.BoxGeometry(0.3, postH - 0.35, 0.3);
+    const capGeo = new THREE.BoxGeometry(0.45, 0.15, 0.45);
+    const ringGeo = new THREE.BoxGeometry(0.38, 0.08, 0.38);
+    const outerFrameGeo = new THREE.BoxGeometry(panelW + 0.6, panelH + 0.6, 0.14);
+    const accentFrameGeo = new THREE.BoxGeometry(panelW + 0.45, panelH + 0.45, 0.15);
+    const backGeo = new THREE.BoxGeometry(panelW + 0.2, panelH + 0.2, 0.1);
     const logoGeoSmall = new THREE.PlaneGeometry(panelW * logoScaleSmall, panelH * logoScaleSmall);
     const logoGeoLarge = new THREE.PlaneGeometry(panelW * logoScaleLarge, panelH * logoScaleLarge);
 
@@ -2877,29 +3353,54 @@ export class Environment {
       const v = variants[i % variants.length];
       const group = new THREE.Group();
 
-      // Post
-      group.add(new THREE.Mesh(postGeo, postMat));
+      // Pedestal base
+      const base = new THREE.Mesh(baseGeo, pillarMat);
+      base.position.y = 0.175;
+      group.add(base);
 
-      // Black frame (slightly larger box behind the panel)
-      const frameMesh = new THREE.Mesh(blackFrameGeo, blackFrameMat);
-      frameMesh.position.set(0, postH + panelH / 2, 0);
-      group.add(frameMesh);
+      // Post (dark metallic pillar)
+      const post = new THREE.Mesh(postGeo, pillarMat);
+      post.position.y = 0.35 + (postH - 0.35) / 2;
+      group.add(post);
+
+      // Gold rings on post
+      const ringBot = new THREE.Mesh(ringGeo, accentMat);
+      ringBot.position.y = 0.45;
+      group.add(ringBot);
+      const ringTop = new THREE.Mesh(ringGeo, accentMat);
+      ringTop.position.y = postH - 0.2;
+      group.add(ringTop);
+
+      // Post cap
+      const cap = new THREE.Mesh(capGeo, pillarMat);
+      cap.position.y = postH + 0.075;
+      group.add(cap);
+
+      // Outer frame (dark metallic)
+      const outerFrame = new THREE.Mesh(outerFrameGeo, pillarMat);
+      outerFrame.position.set(0, panelY, -0.06);
+      group.add(outerFrame);
+
+      // Gold accent border
+      const accentFrame = new THREE.Mesh(accentFrameGeo, accentMat);
+      accentFrame.position.set(0, panelY, -0.02);
+      group.add(accentFrame);
 
       // Billboard panel — colored background
-      const panelMat = new THREE.MeshBasicMaterial({ color: v.bgColor });
-      const panelBox = new THREE.Mesh(frameGeo, panelMat);
-      panelBox.position.set(0, postH + panelH / 2, 0.06);
+      const panelMat2 = new THREE.MeshBasicMaterial({ color: v.bgColor });
+      const panelBox = new THREE.Mesh(backGeo, panelMat2);
+      panelBox.position.set(0, panelY, 0.04);
       group.add(panelBox);
 
-      // Logo (60% size, centered, well in front of the panel box)
+      // Logo (centered, in front of panel)
       const logoMat = new THREE.MeshBasicMaterial({ map: v.tex, transparent: true });
       const logo = new THREE.Mesh(v.large ? logoGeoLarge : logoGeoSmall, logoMat);
-      logo.position.set(0, postH + panelH / 2, 0.18);
+      logo.position.set(0, panelY, 0.12);
       group.add(logo);
 
       // Alternate sides
       const side = i % 2 === 0 ? 1 : -1;
-      const xOffset = RH + s.roadOffset + Math.random() * 1.5;
+      const xOffset = RH + roadOffset + Math.random() * 1.5;
       group.position.set(side * xOffset, 0, -i * SPACING - 20 - Math.random() * 20);
       group.rotation.y = side > 0 ? -0.15 : 0.15;
 
@@ -2941,6 +3442,24 @@ export class Environment {
         obj.position.z += bgMove;
         if (obj.position.z > 60) obj.position.z -= 400;
       }
+    }
+
+    // Falling snow animation
+    if (this.snowParticles) {
+      const pos = this.snowParticles.geometry.attributes.position.array;
+      const count = pos.length / 3;
+      const frame = this._parFrame;
+      for (let i = 0; i < count; i++) {
+        const i3 = i * 3;
+        pos[i3 + 1] -= delta * (1.0 + (i % 7) * 0.12); // varied fall speeds
+        pos[i3] += Math.sin(frame * 0.015 + i * 0.5) * delta * 0.25; // gentle sway
+        pos[i3 + 2] += Math.cos(frame * 0.01 + i * 0.3) * delta * 0.1; // subtle Z drift
+        if (pos[i3 + 1] < -1) {
+          pos[i3 + 1] = 26 + Math.random() * 6;
+          pos[i3] = -50 + Math.random() * 100;
+        }
+      }
+      this.snowParticles.geometry.attributes.position.needsUpdate = true;
     }
   }
 }

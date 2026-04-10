@@ -1042,6 +1042,11 @@ export class HUD {
         .hud-bl { transform: scale(0.75); transform-origin: bottom left; }
         .hud-br { transform: scale(0.75); transform-origin: bottom right; }
       }
+      @media (max-width: 900px) {
+        .hud-tl { transform: scale(1.125); transform-origin: top left; }
+        .hud-bl { transform: scale(1.125); transform-origin: bottom left; }
+        .hud-br { transform: scale(1.125); transform-origin: bottom right; }
+      }
 
       /* ══════════════════════════════════════════
          COMPACT VIEWPORT

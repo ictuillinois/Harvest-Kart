@@ -152,17 +152,16 @@ export class MapSelect {
       }
 
       .ms-cards {
-        display: flex; justify-content: center; flex-wrap: wrap;
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
         gap: clamp(10px, 1.2vw, 28px);
-        align-items: stretch;
         max-width: clamp(600px, 75vw, 1400px);
         margin: 0 auto;
       }
 
-      /* ── Card — 3 per row ── */
+      /* ── Card ── */
       .ms-card {
         cursor: pointer; user-select: none;
-        width: clamp(160px, 20vw, 380px);
         animation: msCardEnter 0.5s ease-out calc(var(--delay)) both;
       }
       @keyframes msCardEnter {
@@ -355,9 +354,10 @@ export class MapSelect {
       }
 
       /* ── Responsive ── */
-      @media (max-width: 600px) {
-        .ms-cards { flex-direction: column; align-items: center; }
-        .ms-card { width: clamp(240px, 70vw, 400px); }
+      @media (max-width: 900px) {
+        .ms-cards { grid-template-columns: repeat(2, 1fr); }
+      }
+      @media (max-width: 500px) {
         .ms-stripe { display: none; }
         .ms-hint { display: none; }
       }
@@ -399,7 +399,7 @@ export class MapSelect {
     this._keyHandler = (e) => {
       if (this.el.style.display === 'none' || this._selected || this._inputGate) return;
       let idx = this._focusIdx;
-      const cols = 3; // first row has 3 cards
+      const cols = window.innerWidth <= 900 ? 2 : 3;
       if (e.key === 'ArrowRight') idx = Math.min(idx + 1, this._cardEls.length - 1);
       else if (e.key === 'ArrowLeft') idx = Math.max(idx - 1, 0);
       else if (e.key === 'ArrowDown') idx = Math.min(idx + cols, this._cardEls.length - 1);
@@ -441,7 +441,7 @@ export class MapSelect {
         const ax = gp.axes[0] || 0;
         // G920: axes[1] is gas pedal (rest=1.0), NOT left stick Y — ignore it
         const ay = isHatWheel ? 0 : (gp.axes[1] || 0);
-        const cols = 3;
+        const cols = window.innerWidth <= 900 ? 2 : 3;
         let idx = this._focusIdx;
 
         // ── Hat switch D-pad (G920: axes[9]) ──

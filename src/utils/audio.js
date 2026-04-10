@@ -9,12 +9,12 @@ let _cancelPendingRetry = null; // cancels a blocked-autoplay retry
 
 const MUSIC_TRACKS = {
   menu:      'title.mp3',
-  brazil:    'bordeaux.mp3',
+  brazil:    'frankfurt.mp3',
   usa:       'las-vegas.mp3',
-  peru:      'frankfurt.mp3',
-  shanghai:  null, // procedural — generated via Web Audio
+  peru:      'Valicha.mp3',
+  shanghai:  'bordeaux.mp3',
   delhi:     null, // procedural — generated via Web Audio
-  momo:      null, // procedural — generated via Web Audio
+  momo:      'APT.mp3',
   qualified: 'qualified.mp3',
 };
 
@@ -31,15 +31,12 @@ export function playMusic(key) {
   // Already playing the same track? Do nothing.
   if (musicEl && !musicEl.paused && musicEl._trackKey === key) return;
   if (_delhiSource && key === 'delhi') return;
-  if (_shanghaiSource && key === 'shanghai') return;
   if (_momoSource && key === 'momo') return;
 
   _stopMusic();
 
   // Procedural tracks
   if (key === 'delhi') { _playDelhiMusic(); return; }
-  if (key === 'shanghai') { _playShanghaiMusic(); return; }
-  if (key === 'momo') { _playMomoMusic(); return; }
 
   const file = MUSIC_TRACKS[key];
   if (!file) return;

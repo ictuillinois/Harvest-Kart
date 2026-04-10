@@ -804,12 +804,11 @@ function buildStartLine() {
   const squareSize = 0.8;
   const cols = Math.floor(ROAD_W / squareSize);
   const rows = 3;
-  const pillarH = 6;
-  const pillarW = 0.4;
-  const bannerCols = 14;
-  const bannerSquare = (ROAD_W + 1.4) / bannerCols;
+  const fW = ROAD_W + 2;
+  const fH = 8;
+  const gateZ = lineZ - squareSize - 0.2;
 
-  // ── Merge all white squares (road + banner) into ONE mesh ──
+  // ── Merge all white/black checkerboard squares on road ──
   const whiteGeos = [];
   const blackGeos = [];
   for (let r = 0; r < rows; r++) {
@@ -822,16 +821,6 @@ function buildStartLine() {
       ((r + c) % 2 === 0 ? whiteGeos : blackGeos).push(g);
     }
   }
-  // Banner squares
-  for (let c = 0; c < bannerCols; c++) {
-    const g = new THREE.PlaneGeometry(bannerSquare, 0.8);
-    g.translate(
-      -ROAD_W / 2 - 0.7 + bannerSquare / 2 + c * bannerSquare,
-      pillarH - 0.7,
-      lineZ - squareSize - pillarW / 2 - 0.01,
-    );
-    (c % 2 === 0 ? whiteGeos : blackGeos).push(g);
-  }
 
   const whiteMesh = new THREE.Mesh(mergeGeometries(whiteGeos), new THREE.MeshBasicMaterial({ color: 0xffffff }));
   const blackMesh = new THREE.Mesh(mergeGeometries(blackGeos), new THREE.MeshBasicMaterial({ color: 0x111111 }));
@@ -840,38 +829,176 @@ function buildStartLine() {
   scene.add(whiteMesh, blackMesh);
   startLineObjects.push(whiteMesh, blackMesh);
 
-  // ── Gantry arch (3 meshes: 2 pillars + crossbar merged) ──
-  const pillarMat = new THREE.MeshStandardMaterial({ color: 0xdddddd, metalness: 0.6, roughness: 0.3 });
-  const gantryGeos = [];
-  // Left pillar
-  const lp = new THREE.BoxGeometry(pillarW, pillarH, pillarW);
-  lp.translate(-ROAD_W / 2 - 0.5, pillarH / 2, lineZ - squareSize);
-  gantryGeos.push(lp);
-  // Right pillar
-  const rp = new THREE.BoxGeometry(pillarW, pillarH, pillarW);
-  rp.translate(ROAD_W / 2 + 0.5, pillarH / 2, lineZ - squareSize);
-  gantryGeos.push(rp);
-  // Crossbar
-  const cb = new THREE.BoxGeometry(ROAD_W + 1.4, 0.5, pillarW);
-  cb.translate(0, pillarH, lineZ - squareSize);
-  gantryGeos.push(cb);
+  // ══════════════════════════════════════════
+  //  GATE FRAME — dark metallic + gold accent (matches billboard style)
+  // ══════════════════════════════════════════
+  const gatePillarMat = new THREE.MeshStandardMaterial({
+    color: 0x1a1a22, roughness: 0.12, metalness: 0.9,
+  });
+  const gateAccentMat = new THREE.MeshStandardMaterial({
+    color: 0xd4a044, roughness: 0.3, metalness: 0.7,
+    emissive: 0xffaa22, emissiveIntensity: 0.08,
+  });
 
-  const gantry = new THREE.Mesh(mergeGeometries(gantryGeos), pillarMat);
-  gantryGeos.forEach(g => g.dispose());
-  scene.add(gantry);
-  startLineObjects.push(gantry);
+  // ── Main structure (merged) ──
+  const structGeos = [];
+  // Pillar bases
+  for (const sx of [-1, 1]) {
+    const base = new THREE.BoxGeometry(1.0, 0.5, 1.0);
+    base.translate(sx * fW / 2, 0.25, gateZ);
+    structGeos.push(base);
+  }
+  // Main pillars
+  for (const sx of [-1, 1]) {
+    const pillar = new THREE.BoxGeometry(0.55, fH - 0.5, 0.55);
+    pillar.translate(sx * fW / 2, fH / 2 + 0.25, gateZ);
+    structGeos.push(pillar);
+  }
+  // Pillar caps
+  for (const sx of [-1, 1]) {
+    const cap = new THREE.BoxGeometry(0.75, 0.3, 0.75);
+    cap.translate(sx * fW / 2, fH + 0.15, gateZ);
+    structGeos.push(cap);
+  }
+  // Top beam
+  const topBeam = new THREE.BoxGeometry(fW + 0.8, 0.6, 0.6);
+  topBeam.translate(0, fH + 0.6, gateZ);
+  structGeos.push(topBeam);
+  // Bottom beam
+  const botBeam = new THREE.BoxGeometry(fW + 0.6, 0.25, 0.4);
+  botBeam.translate(0, fH - 2.4, gateZ);
+  structGeos.push(botBeam);
 
-  // ── Gantry lights (merged into 1 mesh) ──
+  const gateMesh = new THREE.Mesh(mergeGeometries(structGeos), gatePillarMat);
+  structGeos.forEach(g => g.dispose());
+  scene.add(gateMesh);
+  startLineObjects.push(gateMesh);
+
+  // ── Gold accent trim (merged) ──
+  const trimGeos = [];
+  for (const sx of [-1, 1]) {
+    // Vertical inlay on pillar face
+    const strip = new THREE.BoxGeometry(0.08, fH - 1, 0.58);
+    strip.translate(sx * fW / 2, fH / 2 + 0.5, gateZ);
+    trimGeos.push(strip);
+    // Ring near top
+    const ringT = new THREE.BoxGeometry(0.6, 0.1, 0.6);
+    ringT.translate(sx * fW / 2, fH - 0.5, gateZ);
+    trimGeos.push(ringT);
+    // Ring near base
+    const ringB = new THREE.BoxGeometry(0.6, 0.1, 0.6);
+    ringB.translate(sx * fW / 2, 0.6, gateZ);
+    trimGeos.push(ringB);
+  }
+  // Top beam crown strip
+  const topTrim = new THREE.BoxGeometry(fW + 0.85, 0.08, 0.65);
+  topTrim.translate(0, fH + 0.92, gateZ);
+  trimGeos.push(topTrim);
+
+  const accentMesh = new THREE.Mesh(mergeGeometries(trimGeos), gateAccentMat);
+  trimGeos.forEach(g => g.dispose());
+  scene.add(accentMesh);
+  startLineObjects.push(accentMesh);
+
+  // ── Gantry lights (red start lights on top) ──
   const lightGeos = [];
   for (let i = 0; i < 5; i++) {
-    const lg = new THREE.SphereGeometry(0.15, 5, 3);
-    lg.translate(-2 + i, pillarH + 0.4, lineZ - squareSize);
+    const lg = new THREE.SphereGeometry(0.18, 6, 4);
+    lg.translate(-2 + i, fH + 1.1, gateZ);
     lightGeos.push(lg);
   }
   const lights = new THREE.Mesh(mergeGeometries(lightGeos), new THREE.MeshBasicMaterial({ color: 0xff0000 }));
   lightGeos.forEach(g => g.dispose());
   scene.add(lights);
   startLineObjects.push(lights);
+
+  // ══════════════════════════════════════════
+  //  BANNER — "FORGING THE FUTURE" in neon purple pixelated font
+  // ══════════════════════════════════════════
+  const cvs = document.createElement('canvas');
+  cvs.width = 1024; cvs.height = 256;
+  const ctx = cvs.getContext('2d');
+
+  // Dark gradient background
+  const bg = ctx.createLinearGradient(0, 0, 1024, 0);
+  bg.addColorStop(0, '#0a0614');
+  bg.addColorStop(0.3, '#120a20');
+  bg.addColorStop(0.5, '#18102a');
+  bg.addColorStop(0.7, '#120a20');
+  bg.addColorStop(1, '#0a0614');
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, 1024, 256);
+
+  // Gold decorative border — outer
+  ctx.strokeStyle = '#d4a044';
+  ctx.lineWidth = 5;
+  ctx.strokeRect(10, 10, 1004, 236);
+  // Inner border
+  ctx.strokeStyle = '#ffcc66';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(20, 20, 984, 216);
+
+  // Corner diamonds
+  ctx.fillStyle = '#d4a044';
+  const diamond = (cx, cy, s) => {
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - s); ctx.lineTo(cx + s, cy);
+    ctx.lineTo(cx, cy + s); ctx.lineTo(cx - s, cy);
+    ctx.closePath(); ctx.fill();
+  };
+  for (const [cx, cy] of [[28, 28], [996, 28], [28, 228], [996, 228]]) diamond(cx, cy, 9);
+
+  // Main title — "FORGING THE FUTURE" in Press Start 2P, neon purple
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+
+  // Outer glow
+  ctx.shadowColor = '#7b2ff2';
+  ctx.shadowBlur = 45;
+  ctx.fillStyle = '#7b2ff2';
+  ctx.font = '900 42px "Press Start 2P", monospace';
+  ctx.fillText('FORGING THE FUTURE', 512, 105);
+
+  // Mid glow
+  ctx.shadowColor = '#9b5ff8';
+  ctx.shadowBlur = 20;
+  ctx.fillStyle = '#9b5ff8';
+  ctx.fillText('FORGING THE FUTURE', 512, 105);
+
+  // Sharp text on top — bright with white edge
+  ctx.shadowColor = '#ffffff';
+  ctx.shadowBlur = 4;
+  ctx.fillStyle = '#c89dfc';
+  ctx.fillText('FORGING THE FUTURE', 512, 105);
+
+  // Thin gold separator
+  ctx.shadowBlur = 0;
+  ctx.strokeStyle = '#d4a044';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(200, 145); ctx.lineTo(824, 145); ctx.stroke();
+
+  // Dates subtitle
+  ctx.font = '300 20px "Segoe UI", Tahoma, sans-serif';
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+  ctx.letterSpacing = '3px';
+  ctx.fillText('April 10th & April 11th, 2026', 512, 175);
+
+  // Bottom separator
+  ctx.strokeStyle = '#d4a044';
+  ctx.beginPath(); ctx.moveTo(260, 200); ctx.lineTo(764, 200); ctx.stroke();
+
+  const bannerTex = new THREE.CanvasTexture(cvs);
+  const bannerMat = new THREE.MeshBasicMaterial({ map: bannerTex });
+  const bannerPlane = new THREE.Mesh(new THREE.PlaneGeometry(fW * 0.82, 2.2), bannerMat);
+  bannerPlane.position.set(0, fH - 0.9, gateZ + 0.3);
+  scene.add(bannerPlane);
+  startLineObjects.push(bannerPlane);
+
+  // ── Warm glow light inside the gate ──
+  const glow = new THREE.PointLight(0x9966ff, 2.0, 16, 1.5);
+  glow.position.set(0, fH - 0.5, gateZ + 0.5);
+  scene.add(glow);
+  startLineObjects.push(glow);
 }
 
 function removeStartLine() {

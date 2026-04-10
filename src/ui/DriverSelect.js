@@ -343,6 +343,9 @@ export class DriverSelect {
       }
 
       /* ── Responsive ── */
+      @media (max-width: 900px) {
+        .ds-roster { grid-template-columns: repeat(3, 1fr); }
+      }
       @media (max-width: 500px) {
         .ds-roster { gap: 3px; }
         .ds-stats-bar { padding: 2px 3px; }
@@ -388,7 +391,7 @@ export class DriverSelect {
     // Keyboard navigation
     this._keyHandler = (e) => {
       if (this.el.style.display === 'none' || this._selected || this._inputGate) return;
-      const cols = 6;
+      const cols = window.innerWidth <= 900 ? 3 : 6;
       let idx = this._focusIdx;
       if (e.key === 'ArrowRight') idx = Math.min(idx + 1, this._cardEls.length - 1);
       else if (e.key === 'ArrowLeft') idx = Math.max(idx - 1, 0);
@@ -419,7 +422,6 @@ export class DriverSelect {
 
   _startGamepad() {
     if (this._gamepadPoll) return;
-    const cols = 6;
     const poll = () => {
       this._gamepadPoll = requestAnimationFrame(poll);
       if (this._selected || this.el.style.display === 'none') return;
@@ -431,6 +433,7 @@ export class DriverSelect {
         const ax = gp.axes[0] || 0;
         // G920: axes[1] is gas pedal (rest=1.0), NOT left stick Y — ignore it
         const ay = isHatWheel ? 0 : (gp.axes[1] || 0);
+        const cols = window.innerWidth <= 900 ? 3 : 6;
         let idx = this._focusIdx;
 
         // ── Hat switch D-pad (G920: axes[9]) ──
