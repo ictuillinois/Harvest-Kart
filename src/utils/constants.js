@@ -133,8 +133,8 @@ export const ROAD_SURFACE_COLORS = {
   brazil:   0xababb5,   // light gray — strong contrast with dark vehicles
   usa:      0x9a9a92,   // warm light gray
   peru:     0xa3a3ab,   // neutral light gray
-  shanghai: 0x2a2a2e,   // black asphalt — Chinese city road
-  delhi:    0x9a9a9e,   // warm gray — dusty Indian highway
+  shanghai: 0xa8a8b2,   // light gray — strong vehicle contrast
+  delhi:    0xb0b0a8,   // warm light gray — strong vehicle contrast
   momo:     0xa8a8b0,   // cool gray — snowy road
 };
 

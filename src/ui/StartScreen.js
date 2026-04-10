@@ -403,7 +403,6 @@ export class StartScreen {
           0 0 20px rgba(0,255,136,0.3),
           0 1px 0 rgba(0,0,0,0.9),
           0 3px 6px rgba(0,0,0,0.7);
-        animation: ssFlash 2s ease-in-out infinite;
       }
 
       .ss-credits {
@@ -503,12 +502,14 @@ export class StartScreen {
     this._prevBtnState.clear();
     this._prevHatActive = false;
     this._promptEl.style.opacity = '0';
+    this._promptEl.style.animation = 'none';
 
     // Unlock input and reveal prompt after 2 seconds
     clearTimeout(this._unlockTimer);
     this._unlockTimer = setTimeout(() => {
       this._inputLocked = false;
       this._promptEl.style.opacity = '1';
+      this._promptEl.style.animation = 'ssFlash 2s ease-in-out infinite';
     }, 2000);
 
     if (longFade) {
@@ -532,10 +533,12 @@ export class StartScreen {
     this._prevBtnState.clear();
     this._prevHatActive = false;
     this._promptEl.style.opacity = '0';
+    this._promptEl.style.animation = 'none';
     clearTimeout(this._unlockTimer);
     this._unlockTimer = setTimeout(() => {
       this._inputLocked = false;
       this._promptEl.style.opacity = '1';
+      this._promptEl.style.animation = 'ssFlash 2s ease-in-out infinite';
     }, 2000);
     // Restart gamepad polling fresh
     this._gamepadPoll = null;
