@@ -2,19 +2,15 @@ import { asset } from '../utils/base.js';
 
 // Sector bounding boxes in SVG coords (for zoom viewBox)
 const SECTOR_BOUNDS = [
-  { x: 0, y: 0, w: 166, h: 185 },    // Sector 0: top-left
-  { x: 194, y: 0, w: 166, h: 185 },   // Sector 1: top-right
-  { x: 0, y: 214, w: 166, h: 186 },   // Sector 2: bottom-left
-  { x: 194, y: 214, w: 166, h: 186 }, // Sector 3: bottom-right
+  { x: 0, y: 0, w: 360, h: 185 },    // Sector 0: NORTH (top half)
+  { x: 0, y: 214, w: 360, h: 186 },   // Sector 1: SOUTH (bottom half)
 ];
 
-// Navigation grid: 2 cols, 3 rows (sectors 0-3 in rows 0-1, HOME in row 2)
+// Navigation grid: 1 col, 3 rows (North, South, HOME)
 const NAV = {
-  0: { right: 1, down: 2 },
-  1: { left: 0, down: 3 },
-  2: { right: 3, up: 0, down: 4 },
-  3: { left: 2, up: 1, down: 4 },
-  4: { up: 2 }, // HOME — up goes to bottom-left sector
+  0: { down: 1 },
+  1: { up: 0, down: 2 },
+  2: { up: 1 }, // HOME
 };
 
 export class RewardScreen {
@@ -52,35 +48,23 @@ export class RewardScreen {
                 <!-- Base ground -->
                 <rect width="360" height="400" fill="#080e0b" rx="10"/>
 
-                <!-- Main roads (cross shape) -->
-                <rect x="165" y="0" width="30" height="400" fill="url(#roadGrad)"/>
+                <!-- Main road (horizontal divider) -->
                 <rect x="0" y="185" width="360" height="30" fill="url(#roadGrad)"/>
-                <!-- Road center lines -->
-                <line x1="180" y1="0" x2="180" y2="185" stroke="#2a4a38" stroke-width="1" stroke-dasharray="8,6"/>
-                <line x1="180" y1="215" x2="180" y2="400" stroke="#2a4a38" stroke-width="1" stroke-dasharray="8,6"/>
-                <line x1="0" y1="200" x2="165" y2="200" stroke="#2a4a38" stroke-width="1" stroke-dasharray="8,6"/>
-                <line x1="195" y1="200" x2="360" y2="200" stroke="#2a4a38" stroke-width="1" stroke-dasharray="8,6"/>
+                <!-- Road center line -->
+                <line x1="0" y1="200" x2="360" y2="200" stroke="#2a4a38" stroke-width="1" stroke-dasharray="8,6"/>
 
-                <!-- SECTOR 1: top-left -->
+                <!-- NORTH SECTOR -->
                 <g class="rw-sector-group" data-sector="0">
-                  <rect class="rw-sector" x="8" y="8" width="150" height="170" rx="6"/>
+                  <rect class="rw-sector" x="8" y="8" width="344" height="170" rx="6"/>
                   <rect x="25" y="30" width="22" height="32" rx="2" class="rw-building"/>
                   <rect x="55" y="22" width="18" height="40" rx="2" class="rw-building"/>
                   <rect x="80" y="35" width="28" height="26" rx="2" class="rw-building"/>
+                  <rect x="130" y="28" width="24" height="36" rx="2" class="rw-building"/>
                   <rect x="30" y="85" width="35" height="22" rx="2" class="rw-building"/>
                   <rect x="80" y="80" width="20" height="30" rx="2" class="rw-building"/>
-                  <rect x="115" y="40" width="24" height="36" rx="2" class="rw-building"/>
+                  <rect x="115" y="90" width="24" height="24" rx="2" class="rw-building"/>
                   <rect x="40" y="130" width="30" height="25" rx="2" class="rw-building"/>
                   <rect x="95" y="125" width="26" height="28" rx="2" class="rw-building"/>
-                  <circle cx="50" cy="65" r="3" class="rw-lamp"/>
-                  <circle cx="110" cy="100" r="3" class="rw-lamp"/>
-                  <circle cx="70" cy="155" r="3" class="rw-lamp"/>
-                  <text x="83" y="100" class="rw-sector-num">1</text>
-                </g>
-
-                <!-- SECTOR 2: top-right -->
-                <g class="rw-sector-group" data-sector="1">
-                  <rect class="rw-sector" x="202" y="8" width="150" height="170" rx="6"/>
                   <rect x="220" y="25" width="26" height="35" rx="2" class="rw-building"/>
                   <rect x="260" y="30" width="20" height="28" rx="2" class="rw-building"/>
                   <rect x="295" y="20" width="30" height="42" rx="2" class="rw-building"/>
@@ -89,32 +73,27 @@ export class RewardScreen {
                   <rect x="300" y="85" width="28" height="25" rx="2" class="rw-building"/>
                   <rect x="225" y="128" width="28" height="30" rx="2" class="rw-building"/>
                   <rect x="280" y="130" width="34" height="24" rx="2" class="rw-building"/>
+                  <circle cx="50" cy="65" r="3" class="rw-lamp"/>
+                  <circle cx="110" cy="100" r="3" class="rw-lamp"/>
+                  <circle cx="70" cy="155" r="3" class="rw-lamp"/>
                   <circle cx="250" cy="60" r="3" class="rw-lamp"/>
                   <circle cx="310" cy="110" r="3" class="rw-lamp"/>
                   <circle cx="240" cy="148" r="3" class="rw-lamp"/>
-                  <text x="277" y="100" class="rw-sector-num">2</text>
+                  <text x="180" y="100" class="rw-sector-num">NORTH</text>
                 </g>
 
-                <!-- SECTOR 3: bottom-left -->
-                <g class="rw-sector-group" data-sector="2">
-                  <rect class="rw-sector" x="8" y="222" width="150" height="170" rx="6"/>
+                <!-- SOUTH SECTOR -->
+                <g class="rw-sector-group" data-sector="1">
+                  <rect class="rw-sector" x="8" y="222" width="344" height="170" rx="6"/>
                   <rect x="22" y="240" width="24" height="30" rx="2" class="rw-building"/>
                   <rect x="58" y="235" width="20" height="38" rx="2" class="rw-building"/>
                   <rect x="90" y="242" width="30" height="26" rx="2" class="rw-building"/>
+                  <rect x="135" y="238" width="22" height="32" rx="2" class="rw-building"/>
                   <rect x="25" y="295" width="34" height="22" rx="2" class="rw-building"/>
                   <rect x="72" y="290" width="22" height="30" rx="2" class="rw-building"/>
                   <rect x="110" y="288" width="26" height="28" rx="2" class="rw-building"/>
                   <rect x="35" y="342" width="28" height="32" rx="2" class="rw-building"/>
                   <rect x="85" y="345" width="32" height="26" rx="2" class="rw-building"/>
-                  <circle cx="48" cy="275" r="3" class="rw-lamp"/>
-                  <circle cx="105" cy="325" r="3" class="rw-lamp"/>
-                  <circle cx="55" cy="370" r="3" class="rw-lamp"/>
-                  <text x="83" y="320" class="rw-sector-num">3</text>
-                </g>
-
-                <!-- SECTOR 4: bottom-right -->
-                <g class="rw-sector-group" data-sector="3">
-                  <rect class="rw-sector" x="202" y="222" width="150" height="170" rx="6"/>
                   <rect x="218" y="238" width="28" height="34" rx="2" class="rw-building"/>
                   <rect x="260" y="240" width="22" height="28" rx="2" class="rw-building"/>
                   <rect x="298" y="235" width="26" height="36" rx="2" class="rw-building"/>
@@ -123,13 +102,16 @@ export class RewardScreen {
                   <rect x="300" y="295" width="28" height="26" rx="2" class="rw-building"/>
                   <rect x="222" y="348" width="32" height="28" rx="2" class="rw-building"/>
                   <rect x="275" y="342" width="28" height="32" rx="2" class="rw-building"/>
+                  <circle cx="48" cy="275" r="3" class="rw-lamp"/>
+                  <circle cx="105" cy="325" r="3" class="rw-lamp"/>
+                  <circle cx="55" cy="370" r="3" class="rw-lamp"/>
                   <circle cx="245" cy="270" r="3" class="rw-lamp"/>
                   <circle cx="315" cy="320" r="3" class="rw-lamp"/>
                   <circle cx="250" cy="365" r="3" class="rw-lamp"/>
-                  <text x="277" y="320" class="rw-sector-num">4</text>
+                  <text x="180" y="320" class="rw-sector-num">SOUTH</text>
                 </g>
 
-                <!-- Center intersection lamp cluster -->
+                <!-- Center road lamp cluster -->
                 <circle cx="180" cy="200" r="5" fill="#1a3a2a" stroke="#22ffaa" stroke-width="1.5"/>
                 <circle cx="180" cy="200" r="2" fill="#22ffaa" opacity="0.6"/>
               </svg>
@@ -318,15 +300,16 @@ export class RewardScreen {
         transition: fill 0.5s, r 0.3s;
       }
 
-      /* Sector number */
+      /* Sector label */
       .rw-sector-num {
         font-family: 'Orbitron', sans-serif;
-        font-size: 36px;
+        font-size: 22px;
         font-weight: 900;
         fill: rgba(255,255,255,0.06);
         text-anchor: middle;
         dominant-baseline: central;
         pointer-events: none;
+        letter-spacing: 4px;
         transition: fill 0.5s;
       }
 
@@ -532,7 +515,7 @@ export class RewardScreen {
     this._focusIdx = idx;
     this._sectorEls.forEach(g => g.classList.remove('focused'));
     this._homeBtn.classList.remove('focused');
-    if (idx < 4) this._sectorEls[idx].classList.add('focused');
+    if (idx < 2) this._sectorEls[idx].classList.add('focused');
     else this._homeBtn.classList.add('focused');
   }
 
@@ -565,7 +548,7 @@ export class RewardScreen {
   }
 
   _confirm() {
-    if (this._focusIdx < 4) {
+    if (this._focusIdx < 2) {
       this._selectSector(this._focusIdx);
     } else {
       this._onHome();

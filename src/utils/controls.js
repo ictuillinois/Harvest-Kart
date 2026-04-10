@@ -301,6 +301,8 @@ export function setupControls(onSwitch, onRelease) {
   //    D-pad = buttons 12-15, Start = button 9
   // =================================================================
   const GP_STEER_DEADZONE = 0.15;
+  const GP_WHEEL_DEADZONE = 0.06;  // low deadzone for steering wheels (applied after center offset)
+  const GP_WHEEL_SENSITIVITY = 1.8; // amplify small wheel inputs for snappier response
   const GP_PEDAL_THRESHOLD = -0.3; // pedal axis below this = pressed (boolean)
   const GP_PEDAL_DEADZONE = 0.9;   // axis above this = pedal fully released
   let _gpLeftHeld = false;
@@ -309,6 +311,12 @@ export function setupControls(onSwitch, onRelease) {
   let _gpBrakeDown = false;
   let _gpGasAmount = 0;   // 0.0 (released) to 1.0 (fully pressed)
   let _gpBrakeAmount = 0; // 0.0 (released) to 1.0 (fully pressed)
+  let _gpSteerAmount = 0; // -1.0 (full left) to 1.0 (full right), 0 = centered
+  let _smoothSteer = 0;   // smoothed steer value (lerped toward raw each frame)
+  let _isWheelDevice = false; // true when a steering wheel (G920/G29/G923) is detected
+  let _wheelCenterOffset = 0; // auto-calibrated resting center of the steering wheel
+  let _wheelCalibrated = false; // true after we capture the resting position
+  let _wheelCalibSamples = []; // first N samples to average for calibration
 
   // Edge-detected buttons (true for one frame on rising edge)
   let _prevStart = false, _prevB = false;
@@ -328,10 +336,23 @@ export function setupControls(onSwitch, onRelease) {
 
       // ── Steering: axes[0] (universal for wheels + standard pads) ──
       const ax0 = gp.axes[0] || 0;
-      if (Math.abs(ax0) > Math.abs(steer)) steer = ax0;
 
       // ── Detect G920-style wheel: 10+ axes with hat switch on axes[9] ──
       const isHatWheel = gp.axes.length >= 10;
+      if (isHatWheel) _isWheelDevice = true;
+
+      // ── Auto-calibrate wheel center: average first 30 frames of resting position ──
+      if (isHatWheel && !_wheelCalibrated) {
+        _wheelCalibSamples.push(ax0);
+        if (_wheelCalibSamples.length >= 30) {
+          _wheelCenterOffset = _wheelCalibSamples.reduce((a, b) => a + b, 0) / _wheelCalibSamples.length;
+          _wheelCalibrated = true;
+          _wheelCalibSamples = [];
+        }
+      }
+
+      const correctedAx0 = _isWheelDevice ? ax0 - _wheelCenterOffset : ax0;
+      if (Math.abs(correctedAx0) > Math.abs(steer)) steer = correctedAx0;
 
       if (isHatWheel) {
         // ── D-pad via hat switch axis (axes[9]) ──
@@ -379,10 +400,27 @@ export function setupControls(onSwitch, onRelease) {
       if (gp.buttons[1]?.pressed) bNow = true;
     }
 
-    // Update gamepad held state
+    // Update gamepad held state — use lower deadzone for steering wheels
     const prevLeft = _gpLeftHeld, prevRight = _gpRightHeld, prevGas = _gpPedalDown;
-    _gpLeftHeld = steer < -GP_STEER_DEADZONE;
-    _gpRightHeld = steer > GP_STEER_DEADZONE;
+    const dz = _isWheelDevice ? GP_WHEEL_DEADZONE : GP_STEER_DEADZONE;
+    _gpLeftHeld = steer < -dz;
+    _gpRightHeld = steer > dz;
+    // Analog steer: remap from deadzone..1.0 → 0..1, apply sensitivity curve, smooth
+    let rawSteer = 0;
+    if (Math.abs(steer) > dz) {
+      const sign = steer < 0 ? -1 : 1;
+      const normalized = Math.min(1, (Math.abs(steer) - dz) / (1 - dz));
+      // Sensitivity curve: pow < 1 makes small inputs stronger (less stiff feel)
+      const curved = _isWheelDevice
+        ? Math.min(1, Math.pow(normalized, 0.6) * GP_WHEEL_SENSITIVITY)
+        : normalized;
+      rawSteer = sign * curved;
+    }
+    // Smooth interpolation — wheel gets faster smoothing for fluid feel
+    const smoothRate = _isWheelDevice ? 0.25 : 0.5;
+    _smoothSteer += (rawSteer - _smoothSteer) * smoothRate;
+    if (Math.abs(_smoothSteer) < 0.001) _smoothSteer = 0;
+    _gpSteerAmount = _smoothSteer;
     _gpPedalDown = gas;
     _gpBrakeDown = brake;
     _gpGasAmount = gasAmt;
@@ -415,6 +453,13 @@ export function setupControls(onSwitch, onRelease) {
     brakeAmount() { return _locked ? 0 : _gpBrakeAmount; },
     isLeftHeld()  { return !_locked && (_leftHeld || _gpLeftHeld); },
     isRightHeld() { return !_locked && (_rightHeld || _gpRightHeld); },
+    /** Analog steer: -1 (full left) to +1 (full right). Keyboard returns ±1. */
+    steerAmount() {
+      if (_locked) return 0;
+      if (_leftHeld) return -1;
+      if (_rightHeld) return 1;
+      return _gpSteerAmount;
+    },
     consumeStartPress() { if (_startJustPressed) { _startJustPressed = false; return true; } return false; },
     consumeBPress() { if (_bJustPressed) { _bJustPressed = false; return true; } return false; },
     pollGamepad,

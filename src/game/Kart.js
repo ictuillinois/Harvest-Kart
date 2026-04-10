@@ -1138,18 +1138,27 @@ export class Kart {
       }).start();
   }
 
-  /** Continuous lateral slide — called every frame when arrow is held */
-  slideLateral(delta, direction) {
-    const slideSpeed = 10; // units/sec
-    const dx = direction === 'left' ? -slideSpeed * delta : slideSpeed * delta;
+  /**
+   * Continuous lateral slide — called every frame when steering is held.
+   * @param {number} delta - frame delta time
+   * @param {string} direction - 'left' or 'right'
+   * @param {number} [amount=1] - analog intensity 0..1 (1 = full speed, e.g. keyboard)
+   */
+  slideLateral(delta, direction, amount = 1) {
+    const slideSpeed = 14; // units/sec (bumped from 10 for snappier feel)
+    const intensity = Math.abs(amount);
+    const dx = direction === 'left'
+      ? -slideSpeed * intensity * delta
+      :  slideSpeed * intensity * delta;
     const minX = LANE_POSITIONS[0] - 0.3;
     const maxX = LANE_POSITIONS[2] + 0.3;
 
     this.group.position.x = Math.max(minX, Math.min(maxX, this.group.position.x + dx));
 
-    // Tilt while sliding
-    const targetTilt = direction === 'left' ? 0.12 : -0.12;
-    this.group.rotation.z += (targetTilt - this.group.rotation.z) * 0.15;
+    // Tilt proportional to steer amount — smooth lerp
+    const maxTilt = 0.12;
+    const targetTilt = direction === 'left' ? maxTilt * intensity : -maxTilt * intensity;
+    this.group.rotation.z += (targetTilt - this.group.rotation.z) * 0.1;
 
     // Update current lane from position
     this.currentLane = this.getNearestLane();

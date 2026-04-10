@@ -215,8 +215,7 @@ function goHome() {
   kart.currentLane = 1;
   kart.isSwitching = false;
   kart.group.position.x = 0;
-  plates.resetSpawnRate();
-  plates.resetTier();
+  plates.resetAll();
   gameState.transition('menu');
 }
 
@@ -587,13 +586,19 @@ const mapSelect = new MapSelect(
     // Reset lamp posts + plates to gameplay state
     lampPosts.resetAll();
     lampPosts.setTier(0, false);
-    plates.resetSpawnRate();
-    plates.resetTier();
+    plates.resetAll();
 
     // Pre-create particles + turbo glow light
     kart.warmUp();
-    // Pre-spawn a plate to compile plate materials
+    // Pre-spawn a plate to compile plate materials, then deactivate it
+    // so it doesn't interfere with gameplay min-gap checks
     plates.spawnPlate(-50);
+    for (const p of plates.plates) {
+      if (p.userData.active) {
+        p.visible = false;
+        p.userData.active = false;
+      }
+    }
     // Pre-create engine audio graph (20 Web Audio nodes) while loading screen is visible
     preWarmEngine();
     // Pre-warm plate hit audio node types (oscillator, filter, buffer)
@@ -645,6 +650,8 @@ const mapSelect = new MapSelect(
       composer.render();
       await new Promise(r => requestAnimationFrame(r));
     }
+    // Clean up any plates spawned during warm-up dry runs
+    plates.resetAll();
 
     // Keep lamp posts visible — tier 0 is nearly invisible but keeps PointLights
     // in the render pipeline. Avoids the costly setVisible(true) on first plate hit.
@@ -757,6 +764,9 @@ const mapSelect = new MapSelect(
       gpPoll = requestAnimationFrame(pollGP);
     });
     if (startPrompt) startPrompt.classList.remove('visible');
+
+    // Ensure plates start clean — no leftover state from warm-up
+    plates.resetAll();
 
     // Transition to playing — RaceStartSequence reuses loadingOverlay
     gameState.transition('playing');
@@ -1246,12 +1256,11 @@ function animate() {
     hud.updateTacho(currentRPM, currentGear + 1);
     hud.updateTime(gameState.elapsed);
 
-    // Continuous lateral movement when arrows held
-    if (controls.isLeftHeld()) {
-      kart.slideLateral(delta, 'left');
-      gameState.currentLane = kart.currentLane;
-    } else if (controls.isRightHeld()) {
-      kart.slideLateral(delta, 'right');
+    // Continuous lateral movement — analog-aware for steering wheels
+    const steerAmt = controls.steerAmount();
+    if (steerAmt !== 0) {
+      const dir = steerAmt < 0 ? 'left' : 'right';
+      kart.slideLateral(delta, dir, Math.abs(steerAmt));
       gameState.currentLane = kart.currentLane;
     } else {
       kart.recoverTilt(delta);

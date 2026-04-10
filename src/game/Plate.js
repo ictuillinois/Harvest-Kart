@@ -317,4 +317,18 @@ export class Plate {
     this.spawnInterval = PLATE_SPAWN_INTERVAL;
     this._lastLane = 1;
   }
+
+  /** Deactivate all plates and reset spawn timer — call on map switch / game restart */
+  resetAll() {
+    for (const plate of this.plates) {
+      plate.visible = false;
+      plate.userData.active = false;
+      plate.userData.hit = false;
+      plate.userData.missed = false;
+    }
+    this.timeSinceSpawn = 0;
+    this._tier = 0;
+    this._lastLane = 1;
+    this.spawnInterval = PLATE_SPAWN_INTERVAL;
+  }
 }
