@@ -202,19 +202,23 @@ export class RewardScreen {
       .rw-content {
         position: relative; z-index: 1;
         display: flex; flex-direction: column; align-items: center;
-        gap: clamp(16px, 2.5vh, 36px);
-        padding: clamp(12px, 1.5vh, 24px) clamp(16px, 2.5vw, 40px);
+        gap: clamp(10px, 1.5vh, 24px);
+        padding: clamp(8px, 1vh, 16px) clamp(16px, 2.5vw, 40px);
         max-width: clamp(900px, 96vw, 1800px);
         width: 100%;
         height: 100%;
+        max-height: 100vh;
+        overflow: hidden;
         justify-content: center;
         animation: rwPopIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+        box-sizing: border-box;
       }
       .rw-columns {
         display: flex;
         gap: clamp(24px, 4vw, 56px);
         width: 100%;
         flex: 1;
+        min-height: 0;
         align-items: center;
         justify-content: center;
       }
@@ -223,27 +227,35 @@ export class RewardScreen {
       .rw-map-panel {
         flex: 1.3;
         max-width: 700px;
+        min-height: 0;
         display: flex; flex-direction: column; align-items: center;
+        overflow: hidden;
         animation: rwSlideUp 0.55s ease-out 0.1s both;
       }
       .rw-map-heading {
         font-family: 'Orbitron', sans-serif;
-        font-size: clamp(16px, 2vw, 30px);
+        font-size: clamp(14px, 1.8vw, 26px);
         font-weight: 700;
         color: #22ffaa;
         letter-spacing: clamp(4px, 0.6vw, 9px);
-        margin: 0 0 clamp(12px, 2vh, 28px);
+        margin: 0 0 clamp(6px, 1vh, 16px);
         text-shadow: 0 0 16px rgba(34,255,170,0.4);
+        flex-shrink: 0;
       }
       .rw-map-frame {
         width: 100%;
+        min-height: 0;
+        flex: 1;
         border-radius: clamp(14px, 1.8vw, 28px);
         border: 2.5px solid rgba(34,255,170,0.25);
         background: rgba(4,10,6,0.6);
-        padding: clamp(10px, 1.2vw, 20px);
+        padding: clamp(8px, 1vw, 16px);
         animation: rwPulseGlow 3s ease-in-out infinite;
+        display: flex;
+        align-items: center;
+        overflow: hidden;
       }
-      .rw-town { width: 100%; display: block; }
+      .rw-town { width: 100%; height: 100%; display: block; }
 
       /* Sector base */
       .rw-sector {
@@ -329,9 +341,11 @@ export class RewardScreen {
 
       /* ═══ RIGHT: CHARACTER ═══ */
       .rw-char-panel {
-        flex: 0 0 auto;
-        width: clamp(350px, 42vw, 600px);
+        flex: 0 1 auto;
+        width: clamp(300px, 38vw, 550px);
+        min-height: 0;
         display: flex; flex-direction: column; align-items: center;
+        overflow: hidden;
         animation: rwSlideUp 0.55s ease-out 0.25s both;
       }
 
@@ -344,8 +358,8 @@ export class RewardScreen {
         position: relative;
         background: linear-gradient(145deg, rgba(10,35,22,0.92), rgba(6,20,14,0.95));
         border: 2.5px solid rgba(34,255,170,0.35);
-        border-radius: clamp(18px, 2.5vw, 34px);
-        padding: clamp(22px, 3vh, 40px) clamp(24px, 3vw, 44px);
+        border-radius: clamp(14px, 2vw, 28px);
+        padding: clamp(14px, 2vh, 28px) clamp(18px, 2.5vw, 36px);
         backdrop-filter: blur(10px);
         box-shadow: 0 4px 28px rgba(0,0,0,0.4), 0 0 20px rgba(34,255,170,0.1);
         animation: rwBubblePop 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) 0.5s both;
@@ -367,10 +381,11 @@ export class RewardScreen {
 
       .rw-portrait {
         position: relative;
-        width: clamp(225px, 30vw, 425px);
+        width: clamp(180px, 24vw, 350px);
         border-radius: clamp(14px, 1.8vw, 24px);
         overflow: hidden;
-        margin-bottom: clamp(14px, 2vh, 24px);
+        margin-bottom: clamp(8px, 1.2vh, 16px);
+        flex-shrink: 1;
         animation: rwSlideUp 0.55s ease-out 0.4s both;
       }
       .rw-portrait-img { width: 100%; height: auto; display: block; }
@@ -404,11 +419,12 @@ export class RewardScreen {
       /* ═══ HOME BUTTON ═══ */
       .rw-home-btn {
         display: flex; align-items: center;
-        gap: clamp(12px, 1.5vw, 24px);
+        gap: clamp(10px, 1.2vw, 20px);
         font-family: 'Orbitron', sans-serif;
-        font-size: clamp(16px, 2.2vw, 34px);
+        font-size: clamp(14px, 2vw, 30px);
         font-weight: 700;
-        padding: clamp(16px, 2.5vh, 32px) clamp(44px, 6vw, 88px);
+        padding: clamp(12px, 1.8vh, 24px) clamp(36px, 5vw, 72px);
+        flex-shrink: 0;
         background: transparent;
         color: #22ffaa;
         border: 2.5px solid #22ffaa;
@@ -478,9 +494,14 @@ export class RewardScreen {
       @media (max-width: 950px) {
         .rw-columns { flex-direction: column-reverse; align-items: center; }
         .rw-char-panel { width: 95%; max-width: 500px; }
-        .rw-map-panel { max-width: 98%; }
-        .rw-portrait { width: clamp(180px, 45vw, 320px); }
+        .rw-map-panel { max-width: 98%; flex: 1; }
+        .rw-portrait { width: clamp(140px, 35vw, 260px); }
         .rw-hint { display: none; }
+      }
+      @media (max-height: 700px) {
+        .rw-portrait { width: clamp(120px, 18vw, 240px); }
+        .rw-dialog-bubble { padding: 10px 16px; }
+        .rw-map-heading { margin: 0 0 4px; font-size: clamp(12px, 1.5vw, 20px); }
       }
     `;
     document.head.appendChild(style);
