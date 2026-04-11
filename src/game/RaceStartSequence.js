@@ -175,9 +175,8 @@ export class RaceStartSequence {
       startEngine, onComplete, existingOverlay,
     } = this._opts;
 
-    // Lock controls during countdown (inputs blocked, but buttons visible)
+    // Lock controls during countdown (inputs blocked)
     controls.lock();
-    controls.showButtons();
 
     // Pre-race camera: higher + further back
     camera.position.y = normalCam.y + 3;

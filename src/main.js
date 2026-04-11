@@ -26,7 +26,7 @@ import { CompletionSequence } from './game/CompletionSequence.js';
 import { AMBIENT_MULTIPLIERS } from './game/LampPost.js';
 
 import { setupControls } from './utils/controls.js';
-import { playPlateHit, playLampLit, playComboBreak, playWinFanfare, playLaneSwitch, haptic, playMusic, playMapMusic, stopMusic, startEngineIdle, stopEngine, updateEngine, playGearShift, playCountdownTone, playCountdownRev, playFinalPowerOn, playStartPress, playDriverSelect, playMapSelect, playTurboBoost, startTurboEngine, stopTurboEngine, preWarmEngine, preWarmPlateAudio, setVolume, playOverrunPop, playAccelSurge } from './utils/audio.js';
+import { playPlateHit, playLampLit, playComboBreak, playWinFanfare, playLaneSwitch, haptic, playMusic, playMapMusic, stopMusic, setMusicVolume, startEngineIdle, stopEngine, updateEngine, playGearShift, playCountdownTone, playCountdownRev, playFinalPowerOn, playStartPress, playDriverSelect, playMapSelect, playTurboBoost, startTurboEngine, stopTurboEngine, preWarmEngine, preWarmPlateAudio, setVolume, playOverrunPop, playAccelSurge } from './utils/audio.js';
 import { gameRoot } from './utils/base.js';
 import {
   MIN_SPEED_MPH, MAX_SPEED_MPH, STARTING_SPEED_MPH, SCROLL_FACTOR,
@@ -580,6 +580,92 @@ loStyle.textContent = `
 document.head.appendChild(loStyle);
 document.body.appendChild(loadingOverlay);
 
+// ══════════════════════════════════════════
+//  GAMEPLAY "NOW PLAYING" WIDGET — dimmed, bottom center
+// ══════════════════════════════════════════
+const gpNowPlaying = document.createElement('div');
+gpNowPlaying.id = 'gp-now-playing';
+gpNowPlaying.innerHTML = `
+  <img class="gp-np-cover" id="gp-np-cover" src="" alt="" />
+  <div class="gp-np-info">
+    <div class="gp-np-title" id="gp-np-title"></div>
+    <div class="gp-np-artist" id="gp-np-artist"></div>
+  </div>
+`;
+Object.assign(gpNowPlaying.style, {
+  display: 'none',
+});
+
+const gpNpStyle = document.createElement('style');
+gpNpStyle.textContent = `
+  #gp-now-playing {
+    position: fixed;
+    bottom: clamp(10px, 1.5vh, 24px);
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 55;
+    display: flex;
+    align-items: center;
+    gap: clamp(10px, 1.4vw, 20px);
+    padding: clamp(8px, 1vh, 14px) clamp(16px, 2vw, 28px);
+    background: rgba(0, 0, 0, 0.35);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    opacity: 0.4;
+    pointer-events: none;
+    transition: opacity 0.4s ease;
+  }
+  .gp-np-cover {
+    width: clamp(40px, 5vw, 64px);
+    height: clamp(40px, 5vw, 64px);
+    border-radius: 4px;
+    object-fit: cover;
+    flex-shrink: 0;
+  }
+  .gp-np-info {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    min-width: 0;
+  }
+  .gp-np-title {
+    font-family: 'Orbitron', sans-serif;
+    font-size: clamp(10px, 1.2vw, 16px);
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.8);
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .gp-np-artist {
+    font-family: 'Orbitron', sans-serif;
+    font-size: clamp(8px, 0.9vw, 13px);
+    font-weight: 400;
+    color: rgba(255, 255, 255, 0.45);
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+`;
+document.head.appendChild(gpNpStyle);
+document.body.appendChild(gpNowPlaying);
+
+function showGameplayWidget() {
+  if (!_activeTrackInfo) return;
+  document.getElementById('gp-np-cover').src = _activeTrackInfo.cover;
+  document.getElementById('gp-np-title').textContent = _activeTrackInfo.title;
+  document.getElementById('gp-np-artist').textContent = _activeTrackInfo.artist;
+  gpNowPlaying.style.display = 'flex';
+}
+
+function hideGameplayWidget() {
+  gpNowPlaying.style.display = 'none';
+}
+
 const loBarFill = loadingOverlay.querySelector('#lo-bar-fill');
 const loHint = loadingOverlay.querySelector('#lo-hint');
 
@@ -617,7 +703,8 @@ const mapSelect = new MapSelect(
     await fadeToBlack();
 
     // Start random track for this map — user hears it while scene loads
-    const trackInfo = playMapMusic(mapIndex);
+    _activeTrackInfo = playMapMusic(mapIndex);
+    const trackInfo = _activeTrackInfo;
 
     // Populate "Now Playing" widget
     const npEl = loadingOverlay.querySelector('#lo-now-playing');
@@ -878,6 +965,9 @@ const winScreen = new WinScreen(() => {
   rewardScreen.show();
 });
 
+// --- Active track info for gameplay widget ---
+let _activeTrackInfo = null;
+
 // --- Controls ---
 const controls = setupControls(
   () => {},  // No instant lane switch — continuous movement only
@@ -1126,6 +1216,7 @@ gameState.on('stateChange', ({ from, to }) => {
   winScreen.hide();
   rewardScreen.hide();
   controls.hideButtons();
+  hideGameplayWidget();
 
   switch (to) {
     case 'menu':
@@ -1141,9 +1232,9 @@ gameState.on('stateChange', ({ from, to }) => {
     case 'playing':
       hud.hidePause();
       if (from === 'paused') {
-        // Resume from pause — show HUD + controls immediately
+        // Resume from pause — show HUD immediately
         hud.show();
-        controls.showButtons();
+        showGameplayWidget();
       } else {
         // Fresh game start — run countdown sequence
         // NOTE: kart lights, start line, lamp posts, plates already set up
@@ -1190,6 +1281,7 @@ gameState.on('stateChange', ({ from, to }) => {
               currentRPM = startGear.rpm;
               hud.updateSpeed(STARTING_SPEED_MPH);
               hud.updateTacho(startGear.rpm, startGear.gear + 1);
+              showGameplayWidget();
               raceStart = null;
             });
           },
@@ -1229,7 +1321,7 @@ gameState.on('stateChange', ({ from, to }) => {
       controls.unlock();
       stopEngine();
       winScreen.show(gameState.platesHit, gameState.score, gameState.maxCombo, gameState.elapsed, DRIVER_TYPES[gameState.selectedDriver]);
-      playMusic('qualified');
+      setMusicVolume(0.6 * 0.8); // dim soundtrack to 80% for end screens
       break;
   }
 });

@@ -39,11 +39,17 @@ function calcGearAccel(accStars) {
 
 export const DRIVER_PHYSICS = {
   // ── Tier 1: Maxed ──
-  alqadi: {
+  asad: {
     topSpeed: 120, gearAccel: calcGearAccel(5),
     gearThresholds: calcGearThresholds(120),
     decelRate: 4, coastFloor: 0, laneSwitchMs: 150, chargeMultiplier: 1.2,
     turboBoost: 20,
+  },
+  // ── Tier 1b: Near-max ──
+  lara: {
+    topSpeed: 115, gearAccel: calcGearAccel(5),
+    gearThresholds: calcGearThresholds(115),
+    decelRate: 4, coastFloor: 0, laneSwitchMs: 150, chargeMultiplier: 1.1,
   },
   // ── Tier 2: Second best ──
   johann: {
@@ -55,11 +61,6 @@ export const DRIVER_PHYSICS = {
     topSpeed: 96, gearAccel: calcGearAccel(4),
     gearThresholds: calcGearThresholds(96),
     decelRate: 4, coastFloor: 0, laneSwitchMs: 180, chargeMultiplier: 1.2,
-  },
-  asad: {
-    topSpeed: 105, gearAccel: calcGearAccel(5),
-    gearThresholds: calcGearThresholds(105),
-    decelRate: 6, coastFloor: 0, laneSwitchMs: 150, chargeMultiplier: 1.0,
   },
   // ── Tier 3: Evenly distributed ──
   roberto: {
@@ -92,7 +93,7 @@ export const DRIVER_PHYSICS = {
     gearThresholds: calcGearThresholds(92),
     decelRate: 5, coastFloor: 0, laneSwitchMs: 190, chargeMultiplier: 1.1,
   },
-  nazmus: {
+  ade: {
     topSpeed: 84, gearAccel: calcGearAccel(5),
     gearThresholds: calcGearThresholds(84),
     decelRate: 8, coastFloor: 0, laneSwitchMs: 150, chargeMultiplier: 1.0,
@@ -105,9 +106,9 @@ export const DRIVER_PHYSICS = {
 };
 
 // Driver ID lookup by index (matches DRIVER_TYPES order)
-// Row 1: Yihan, Roberto, Sofia, Ivan, Asad, Johann
-// Row 2: Alex, Aditya, Murryam, Nazmus, William, Al-Qadi
-const DRIVER_IDS = ['yihan', 'roberto', 'sofia', 'ivan', 'asad', 'johann', 'alex', 'aditya', 'murryam', 'nazmus', 'william', 'alqadi'];
+// Row 1: Yihan, Roberto, Lara, Ivan, Sofia, Johann
+// Row 2: Alex, Aditya, Murryam, Ade, William, Asad
+const DRIVER_IDS = ['yihan', 'roberto', 'lara', 'ivan', 'sofia', 'johann', 'alex', 'aditya', 'murryam', 'ade', 'william', 'asad'];
 export function getDriverPhysics(driverIndex) {
   return DRIVER_PHYSICS[DRIVER_IDS[driverIndex]] || DRIVER_PHYSICS.yihan;
 }
@@ -153,8 +154,8 @@ export const COLORS = {
 };
 
 // Driver definitions — all use compact vehicle in different color variations
-// Row 1: Yihan, Roberto, Sofia, Ivan, Asad, Johann
-// Row 2: Alex, Aditya, Murryam, Nazmus, William, Al-Qadi
+// Row 1: Yihan, Roberto, Lara, Ivan, Sofia, Johann
+// Row 2: Alex, Aditya, Murryam, Ade, William, Asad
 export const DRIVER_TYPES = [
   // ── Row 1 ──
   {
@@ -174,12 +175,12 @@ export const DRIVER_TYPES = [
     stats: { topSpeed: 4, acceleration: 4, efficiency: 4 },
   },
   {
-    name: 'Sofia',
-    avatar: asset('characters/Sofia.webp'),
-    accentColor: '#dd5599',
-    carBody: 0xdd5599, carAccent: 0xff77bb,
+    name: 'Lara',
+    avatar: asset('characters/Lara.webp'),
+    accentColor: '#ff3399',
+    carBody: 0xff3399, carAccent: 0xff66bb,
     vehicleType: 'compact',
-    stats: { topSpeed: 4, acceleration: 3, efficiency: 4 },
+    stats: { topSpeed: 5, acceleration: 5, efficiency: 4 },
   },
   {
     name: 'Ivan',
@@ -190,18 +191,18 @@ export const DRIVER_TYPES = [
     stats: { topSpeed: 3, acceleration: 4, efficiency: 3 },
   },
   {
-    name: 'Asad',
-    avatar: asset('characters/Asad.webp'),
-    accentColor: '#44aa66',
-    carBody: 0xe0e8e0, carAccent: 0x44aa66,
+    name: 'Sofia',
+    avatar: asset('characters/Sofia.webp'),
+    accentColor: '#dd5599',
+    carBody: 0xdd5599, carAccent: 0xff77bb,
     vehicleType: 'compact',
-    stats: { topSpeed: 5, acceleration: 5, efficiency: 3 },
+    stats: { topSpeed: 4, acceleration: 3, efficiency: 4 },
   },
   {
     name: 'Johann',
     avatar: asset('characters/Johann.webp'),
-    accentColor: '#f0ece8',
-    carBody: 0xf0ece8, carAccent: 0xffffff,
+    accentColor: '#ffd700',
+    carBody: 0xffd700, carAccent: 0xffe44d,
     vehicleType: 'compact',
     stats: { topSpeed: 5, acceleration: 4, efficiency: 4 },
   },
@@ -231,10 +232,10 @@ export const DRIVER_TYPES = [
     stats: { topSpeed: 4, acceleration: 3, efficiency: 4 },
   },
   {
-    name: 'Nazmus',
-    avatar: asset('characters/Nazmus.webp'),
-    accentColor: '#ee2222',
-    carBody: 0xee2222, carAccent: 0xff4444,
+    name: 'Ade',
+    avatar: asset('characters/Ade.webp'),
+    accentColor: '#ff2222',
+    carBody: 0xff2222, carAccent: 0xff5555,
     vehicleType: 'compact',
     stats: { topSpeed: 3, acceleration: 5, efficiency: 3 },
   },
@@ -247,10 +248,10 @@ export const DRIVER_TYPES = [
     stats: { topSpeed: 4, acceleration: 4, efficiency: 3 },
   },
   {
-    name: 'Al-Qadi',
-    avatar: asset('characters/Al-Qadi.webp'),
-    accentColor: '#1a5c2a',
-    carBody: 0x1a5c2a, carAccent: 0x2d8a4e,
+    name: 'Asad',
+    avatar: asset('characters/Asad.webp'),
+    accentColor: '#44aa66',
+    carBody: 0xe0e8e0, carAccent: 0x44aa66,
     vehicleType: 'compact',
     stats: { topSpeed: 5, acceleration: 5, efficiency: 5 },
   },

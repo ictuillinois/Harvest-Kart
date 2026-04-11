@@ -26,7 +26,7 @@ const MAP_SOUNDTRACK_POOLS = [
   ],
   // 1: USA (Chicago)
   [
-    { file: 'Taylor-Swift_The-Fate-of-Ophelia.mp3', title: 'The Fate of Ophelia', artist: 'Taylor Swift', cover: 'Taylor-Swift_The-Fate-of-Ophelia.webp', startTime: 122 },
+    { file: 'Taylor-Swift_The-Fate-of-Ophelia.mp3', title: 'The Fate of Ophelia', artist: 'Taylor Swift', cover: 'Taylor-Swift_The-Fate-of-Ophelia.webp', startTime: 121 },
     { file: 'Benson-Boone_Mystical-Magical.mp3', title: 'Mystical Magical', artist: 'Benson Boone', cover: 'Benson-Boone_Mystical-Magical.webp', startTime: 103 },
     { file: 'Kanye-West_Cant-Tell-Me-Nothing.mp3', title: "Can't Tell Me Nothing", artist: 'Kanye West', cover: 'Kanye-West_Cant-Tell-Me-Nothing.webp', startTime: 0 },
     { file: 'Laura-Branigan_Self-Control.mp3', title: 'Self Control', artist: 'Laura Branigan', cover: 'Laura-Branigan_Self-Control.webp', startTime: 89 },
@@ -59,11 +59,11 @@ const MAP_SOUNDTRACK_POOLS = [
   // 5: Momo's World
   [
     { file: 'APT.mp3', title: 'APT.', artist: 'ROSÉ & Bruno Mars', cover: 'APT-Rose.webp', startTime: 0 },
-    { file: 'Gracie-Abrams_Thats-So-True.mp3', title: "That's So True", artist: 'Gracie Abrams', cover: 'Gracie-Abrams_Thats-So-True.webp', startTime: 71 },
+    { file: 'Gracie-Abrams_Thats-So-True.mp3', title: "That's So True", artist: 'Gracie Abrams', cover: 'Gracie-Abrams_Thats-So-True.webp', startTime: 69 },
     { file: 'Billie-Eilish_Birds-of-a-Feather.mp3', title: 'Birds of a Feather', artist: 'Billie Eilish', cover: 'Billie-Eilish_Birds-of-a-Feather.webp', startTime: 41 },
-    { file: 'Dave-Raindance.mp3', title: 'Raindance', artist: 'Dave ft. Tems', cover: 'Dave-Raindance.webp', startTime: 144 },
+    { file: 'Dave-Raindance.mp3', title: 'Raindance', artist: 'Dave ft. Tems', cover: 'Dave-Raindance.webp', startTime: 143 },
     { file: 'Ravyn-Lenae_Love-Me-Not.mp3', title: 'Love Me Not', artist: 'Ravyn Lenae', cover: 'Ravyn-Lenae_Love-Me-Not.webp', startTime: 42 },
-    { file: 'Taylor-Swift_The-Fate-of-Ophelia.mp3', title: 'The Fate of Ophelia', artist: 'Taylor Swift', cover: 'Taylor-Swift_The-Fate-of-Ophelia.webp', startTime: 122 },
+    { file: 'Taylor-Swift_The-Fate-of-Ophelia.mp3', title: 'The Fate of Ophelia', artist: 'Taylor Swift', cover: 'Taylor-Swift_The-Fate-of-Ophelia.webp', startTime: 121 },
   ],
 ];
 
@@ -170,7 +170,7 @@ function _playTrackFile(track) {
   musicEl = el;
 
   el.play().then(() => {
-    _fadeInVolume(el, 0.7, 1500);
+    _fadeInVolume(el, 0.6, 1500);
   }).catch(() => {
     const retry = () => {
       _stopMusic();
@@ -197,6 +197,11 @@ function _stopMusic() {
     musicEl.src = '';
     musicEl = null;
   }
+}
+
+/** Set the background music volume (0-1). */
+export function setMusicVolume(v) {
+  if (musicEl) musicEl.volume = Math.max(0, Math.min(1, v));
 }
 
 function getCtx() {

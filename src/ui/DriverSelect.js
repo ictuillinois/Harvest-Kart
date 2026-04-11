@@ -15,7 +15,7 @@ export class DriverSelect {
     this.el.id = 'driver-select';
 
     const cards = DRIVER_TYPES.map((d, i) => {
-      const isElite = d.name === 'Al-Qadi';
+      const isElite = d.name === 'Asad';
       return `
       <div class="ds-card" data-index="${i}" style="--accent:${d.accentColor}; --delay:${i * 0.06}s">
         <div class="ds-card-inner">
