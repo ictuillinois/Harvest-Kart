@@ -218,8 +218,8 @@ export class Environment {
       case 'momo': this._buildMomo(); break;
     }
 
-    // Highway safety message signs (all maps except Momo)
-    if (theme.id !== 'momo') this._buildHighwaySigns();
+    // Highway message signs (all maps)
+    this._buildHighwaySigns();
 
     // ICT billboards along the road (all maps)
     this._buildBillboards(theme.id);
@@ -2624,199 +2624,6 @@ export class Environment {
     }
 
     // ══════════════════════════════════════════
-    //  MOMO'S WORLD GATE — polished archway with banner, lights & snow
-    // ══════════════════════════════════════════
-
-    // ── High-res banner canvas ──
-    const bannerCvs = document.createElement('canvas');
-    bannerCvs.width = 1024; bannerCvs.height = 256;
-    const bC = bannerCvs.getContext('2d');
-
-    // Gradient background: deep warm charcoal → rich burgundy
-    const bgGrad = bC.createLinearGradient(0, 0, 1024, 0);
-    bgGrad.addColorStop(0, '#1a0a12');
-    bgGrad.addColorStop(0.3, '#2d1018');
-    bgGrad.addColorStop(0.5, '#3a1420');
-    bgGrad.addColorStop(0.7, '#2d1018');
-    bgGrad.addColorStop(1, '#1a0a12');
-    bC.fillStyle = bgGrad;
-    bC.fillRect(0, 0, 1024, 256);
-
-    // Decorative gold border — outer
-    bC.strokeStyle = '#d4a044';
-    bC.lineWidth = 6;
-    bC.strokeRect(12, 12, 1000, 232);
-    // Inner border — thinner accent
-    bC.strokeStyle = '#ffcc66';
-    bC.lineWidth = 2;
-    bC.strokeRect(22, 22, 980, 212);
-
-    // Corner ornaments — small gold diamonds
-    const drawDiamond = (cx, cy, s) => {
-      bC.beginPath();
-      bC.moveTo(cx, cy - s); bC.lineTo(cx + s, cy);
-      bC.lineTo(cx, cy + s); bC.lineTo(cx - s, cy);
-      bC.closePath(); bC.fill();
-    };
-    bC.fillStyle = '#d4a044';
-    for (const [cx, cy] of [[30, 30], [994, 30], [30, 226], [994, 226]]) drawDiamond(cx, cy, 10);
-
-    // Paw print decorations flanking the text
-    const drawPaw = (cx, cy, scale) => {
-      bC.fillStyle = '#ffcc66';
-      // Pad
-      bC.beginPath();
-      bC.ellipse(cx, cy + 4 * scale, 8 * scale, 6 * scale, 0, 0, Math.PI * 2);
-      bC.fill();
-      // Toes
-      const toes = [[-6, -6], [0, -9], [6, -6]];
-      for (const [tx, ty] of toes) {
-        bC.beginPath();
-        bC.arc(cx + tx * scale, cy + ty * scale, 3.5 * scale, 0, Math.PI * 2);
-        bC.fill();
-      }
-    };
-    drawPaw(90, 128, 2.2);
-    drawPaw(934, 128, 2.2);
-
-    // Main title — layered glow for depth
-    bC.textAlign = 'center';
-    bC.textBaseline = 'middle';
-
-    // Outer glow
-    bC.shadowColor = '#ff2288';
-    bC.shadowBlur = 40;
-    bC.fillStyle = '#ff2288';
-    bC.font = 'bold 72px "Georgia", serif';
-    bC.fillText("MOMO'S WORLD", 512, 118);
-
-    // Mid glow
-    bC.shadowColor = '#ff66aa';
-    bC.shadowBlur = 20;
-    bC.fillStyle = '#ff88cc';
-    bC.fillText("MOMO'S WORLD", 512, 118);
-
-    // Sharp text on top
-    bC.shadowColor = '#ffffff';
-    bC.shadowBlur = 6;
-    bC.fillStyle = '#ffeef5';
-    bC.fillText("MOMO'S WORLD", 512, 118);
-
-    // Subtitle line
-    bC.shadowBlur = 0;
-    bC.font = 'italic 22px "Georgia", serif';
-    bC.fillStyle = '#d4a044';
-    bC.fillText('— Energy Harvesting Edition —', 512, 175);
-
-    // Thin gold separator lines above & below title
-    bC.strokeStyle = '#d4a044';
-    bC.lineWidth = 1;
-    bC.beginPath(); bC.moveTo(180, 72); bC.lineTo(844, 72); bC.stroke();
-    bC.beginPath(); bC.moveTo(250, 195); bC.lineTo(774, 195); bC.stroke();
-
-    const bannerTex = new THREE.CanvasTexture(bannerCvs);
-    const bannerMat = new THREE.MeshBasicMaterial({ map: bannerTex });
-
-    // ── Gate materials ──
-    const fW = ROAD_WIDTH + 2, fH = 8;
-    const gatePillarMat = new THREE.MeshStandardMaterial({
-      color: 0x1a1a22, roughness: 0.12, metalness: 0.9,
-    });
-    const gateAccentMat = new THREE.MeshStandardMaterial({
-      color: 0xd4a044, roughness: 0.3, metalness: 0.7,
-      emissive: 0xffaa22, emissiveIntensity: 0.08,
-    });
-    const gateSnowMat = new THREE.MeshStandardMaterial({ color: 0xf8f4f0, roughness: 0.85 });
-
-    for (let i = 0; i < 2; i++) {
-      const ag = new THREE.Group();
-
-      // ── Pillar bases (wider pedestals) ──
-      const baseL = new THREE.BoxGeometry(1.0, 0.5, 1.0);
-      baseL.translate(-fW / 2, 0.25, 0);
-      const baseR = new THREE.BoxGeometry(1.0, 0.5, 1.0);
-      baseR.translate(fW / 2, 0.25, 0);
-
-      // ── Main pillars ──
-      const pillarL = new THREE.BoxGeometry(0.55, fH - 0.5, 0.55);
-      pillarL.translate(-fW / 2, fH / 2 + 0.25, 0);
-      const pillarR = new THREE.BoxGeometry(0.55, fH - 0.5, 0.55);
-      pillarR.translate(fW / 2, fH / 2 + 0.25, 0);
-
-      // ── Pillar caps ──
-      const capL = new THREE.BoxGeometry(0.75, 0.3, 0.75);
-      capL.translate(-fW / 2, fH + 0.15, 0);
-      const capR = new THREE.BoxGeometry(0.75, 0.3, 0.75);
-      capR.translate(fW / 2, fH + 0.15, 0);
-
-      // ── Top beam (header) — thicker, substantial ──
-      const topBeam = new THREE.BoxGeometry(fW + 0.8, 0.6, 0.6);
-      topBeam.translate(0, fH + 0.6, 0);
-
-      // ── Bottom beam ──
-      const botBeam = new THREE.BoxGeometry(fW + 0.6, 0.25, 0.4);
-      botBeam.translate(0, fH - 2.2, 0);
-
-      const gateMesh = new THREE.Mesh(
-        mergeGeometries([baseL, baseR, pillarL, pillarR, capL, capR, topBeam, botBeam], false),
-        gatePillarMat,
-      );
-      ag.add(gateMesh);
-
-      // ── Gold accent trim strips on pillars ──
-      const trimGeos = [];
-      for (const sx of [-1, 1]) {
-        // Vertical gold inlay on pillar face
-        const strip = new THREE.BoxGeometry(0.08, fH - 1, 0.58);
-        strip.translate(sx * fW / 2, fH / 2 + 0.5, 0);
-        trimGeos.push(strip);
-        // Horizontal ring near top
-        const ring = new THREE.BoxGeometry(0.6, 0.1, 0.6);
-        ring.translate(sx * fW / 2, fH - 0.5, 0);
-        trimGeos.push(ring);
-        // Horizontal ring near base
-        const ringB = new THREE.BoxGeometry(0.6, 0.1, 0.6);
-        ringB.translate(sx * fW / 2, 0.6, 0);
-        trimGeos.push(ringB);
-      }
-      // Top beam gold accent strip
-      const topTrim = new THREE.BoxGeometry(fW + 0.85, 0.08, 0.65);
-      topTrim.translate(0, fH + 0.92, 0);
-      trimGeos.push(topTrim);
-      const accentMesh = new THREE.Mesh(mergeGeometries(trimGeos, false), gateAccentMat);
-      ag.add(accentMesh);
-
-      // ── Snow caps on top beam and pillar caps ──
-      const snowGeos = [];
-      const snowTop = new THREE.BoxGeometry(fW + 1.2, 0.2, 0.9);
-      snowTop.translate(0, fH + 1.0, 0);
-      snowGeos.push(snowTop);
-      for (const sx of [-1, 1]) {
-        const capSnow = new THREE.SphereGeometry(0.5, 5, 3);
-        capSnow.scale(1.0, 0.35, 1.0);
-        capSnow.translate(sx * fW / 2, fH + 0.4, 0);
-        snowGeos.push(capSnow);
-      }
-      const snowMesh = new THREE.Mesh(mergeGeometries(snowGeos, false), gateSnowMat);
-      ag.add(snowMesh);
-
-      // ── Banner — centered in the frame opening ──
-      const bannerPlane = new THREE.Mesh(new THREE.PlaneGeometry(fW * 0.78, 2.0), bannerMat);
-      bannerPlane.position.set(0, fH - 1.0, 0.32);
-      ag.add(bannerPlane);
-
-      // ── Warm glow light inside the gate ──
-      const glow = new THREE.PointLight(0xffaa66, 2.5, 18, 1.5);
-      glow.position.set(0, fH - 0.5, 0.5);
-      ag.add(glow);
-
-      ag.position.set(0, 0, -i * 150 - 50);
-      this.scene.add(ag);
-      this.themeObjects.push(ag);
-      this.foreground.push(ag);
-    }
-
-    // ══════════════════════════════════════════
     //  MOMO BILLBOARDS — 36 billboards, 17 images, 3 shapes (rect/square/hex)
     // ══════════════════════════════════════════
 
@@ -3151,7 +2958,13 @@ export class Environment {
     const fH = 7.5;
 
     // ── Sign messages with neon color themes ──
-    const signs = [
+    const isMomo = this.currentTheme?.id === 'momo';
+    const signs = isMomo ? [
+      { msg: 'MAY MOMO\nBE WITH YOU', color: '#ff33aa', glow: '#ff55cc', accent: '#ff88dd', fontSize: 48 },
+      { msg: 'MOMO\nLOVES YOU', color: '#3388ff', glow: '#4499ff', accent: '#77bbff', fontSize: 54 },
+      { msg: 'PET MOMO\nSAVE LIVES', color: '#33ff66', glow: '#44ff77', accent: '#88ffaa', fontSize: 48 },
+      { msg: "IT'S\nMOMO TIME", color: '#ff3333', glow: '#ff4444', accent: '#ff6666', fontSize: 54 },
+    ] : [
       { msg: 'DRIVE SOBER OR\nGET PULLED OVER', color: '#ff3333', glow: '#ff4444', accent: '#ff6666', fontSize: 45 },
       { msg: 'SLOW DOWN\nSAVE LIVES', color: '#33ff66', glow: '#44ff77', accent: '#88ffaa', fontSize: 54 },
       { msg: 'OBEY THE SIGN OR\nPAY THE FINE', color: '#3388ff', glow: '#4499ff', accent: '#77bbff', fontSize: 45 },
@@ -3166,7 +2979,7 @@ export class Environment {
       emissive: 0xffaa22, emissiveIntensity: 0.08,
     });
 
-    for (let si = 0; si < 3; si++) {
+    for (let si = 0; si < signs.length; si++) {
       const s = signs[si];
       const ag = new THREE.Group();
 
@@ -3293,7 +3106,8 @@ export class Environment {
       ag.add(bannerPlane);
 
       // Place along road — wide spacing so each appears once per circuit
-      ag.position.set(0, 0, -si * 200 - 150);
+      const spacing = signs.length > 3 ? 160 : 200;
+      ag.position.set(0, 0, -si * spacing - 150);
       this.scene.add(ag);
       this.themeObjects.push(ag);
       this.midground.push(ag);
