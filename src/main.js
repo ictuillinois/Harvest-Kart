@@ -26,7 +26,7 @@ import { CompletionSequence } from './game/CompletionSequence.js';
 import { AMBIENT_MULTIPLIERS } from './game/LampPost.js';
 
 import { setupControls } from './utils/controls.js';
-import { playPlateHit, playLampLit, playComboBreak, playWinFanfare, playLaneSwitch, haptic, playMusic, stopMusic, startEngineIdle, stopEngine, updateEngine, playGearShift, playCountdownTone, playCountdownRev, playFinalPowerOn, playStartPress, playDriverSelect, playMapSelect, playTurboBoost, startTurboEngine, stopTurboEngine, preWarmEngine, preWarmPlateAudio, setVolume, playOverrunPop, playAccelSurge } from './utils/audio.js';
+import { playPlateHit, playLampLit, playComboBreak, playWinFanfare, playLaneSwitch, haptic, playMusic, playMapMusic, stopMusic, startEngineIdle, stopEngine, updateEngine, playGearShift, playCountdownTone, playCountdownRev, playFinalPowerOn, playStartPress, playDriverSelect, playMapSelect, playTurboBoost, startTurboEngine, stopTurboEngine, preWarmEngine, preWarmPlateAudio, setVolume, playOverrunPop, playAccelSurge } from './utils/audio.js';
 import { gameRoot } from './utils/base.js';
 import {
   MIN_SPEED_MPH, MAX_SPEED_MPH, STARTING_SPEED_MPH, SCROLL_FACTOR,
@@ -252,6 +252,14 @@ const driverSelect = new DriverSelect(
 const loadingOverlay = document.createElement('div');
 loadingOverlay.id = 'loading-overlay';
 loadingOverlay.innerHTML = `
+  <div class="lo-now-playing" id="lo-now-playing" style="display:none">
+    <img class="lo-np-cover" id="lo-np-cover" src="" alt="" />
+    <div class="lo-np-info">
+      <div class="lo-np-label">NOW PLAYING</div>
+      <div class="lo-np-title" id="lo-np-title"></div>
+      <div class="lo-np-artist" id="lo-np-artist"></div>
+    </div>
+  </div>
   <div class="lo-content">
     <div class="lo-start-prompt" id="lo-start-prompt">PRESS ANY BUTTON TO START</div>
     <div class="lo-title">PREPARING TRACK</div>
@@ -309,7 +317,7 @@ const loStyle = document.createElement('style');
 loStyle.textContent = `
   @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&display=swap');
   .lo-content {
-    position: absolute; left: 50%; bottom: 18%;
+    position: absolute; left: 50%; bottom: 12%;
     transform: translateX(-50%);
     display: flex; flex-direction: column; align-items: center;
     gap: clamp(10px, 1.5vh, 20px);
@@ -500,6 +508,74 @@ loStyle.textContent = `
     /* no filter — avoids GPU filter pass */
   }
 
+  /* ── Now Playing widget ── */
+  .lo-now-playing {
+    position: absolute;
+    left: 50%;
+    bottom: 24%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: clamp(10px, 1.2vw, 18px);
+    padding: clamp(8px, 1vh, 14px) clamp(12px, 1.5vw, 20px);
+    background: rgba(0, 0, 0, 0.55);
+    border: 1px solid rgba(34, 255, 170, 0.15);
+    border-radius: 10px;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    box-shadow: 0 0 20px rgba(34, 255, 170, 0.08);
+    opacity: 0;
+    animation: loNpFade 0.8s ease 0.3s forwards;
+    max-width: clamp(200px, 40vw, 500px);
+  }
+  @keyframes loNpFade {
+    to { opacity: 1; }
+  }
+  .lo-np-cover {
+    width: clamp(44px, 5.5vw, 70px);
+    height: clamp(44px, 5.5vw, 70px);
+    border-radius: 6px;
+    object-fit: cover;
+    border: 1px solid rgba(34, 255, 170, 0.2);
+    box-shadow: 0 0 8px rgba(34, 255, 170, 0.15);
+    flex-shrink: 0;
+  }
+  .lo-np-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+  .lo-np-label {
+    font-family: 'Orbitron', sans-serif;
+    font-size: clamp(7px, 0.7vw, 10px);
+    font-weight: 500;
+    color: #22ffaa;
+    letter-spacing: clamp(2px, 0.3vw, 4px);
+    text-transform: uppercase;
+    text-shadow: 0 0 6px rgba(34, 255, 170, 0.4);
+  }
+  .lo-np-title {
+    font-family: 'Orbitron', sans-serif;
+    font-size: clamp(10px, 1.2vw, 18px);
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: 1px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .lo-np-artist {
+    font-family: 'Orbitron', sans-serif;
+    font-size: clamp(8px, 0.9vw, 14px);
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.5);
+    letter-spacing: 1px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
 `;
 document.head.appendChild(loStyle);
 document.body.appendChild(loadingOverlay);
@@ -515,6 +591,9 @@ function setLoadProgress(pct, hint) {
 function fadeToBlack() {
   return new Promise(resolve => {
     setLoadProgress(0, 'Initializing...');
+    // Reset "Now Playing" widget (re-populated after music starts)
+    const npEl = loadingOverlay.querySelector('#lo-now-playing');
+    if (npEl) { npEl.style.display = 'none'; npEl.style.animation = 'none'; }
     loadingOverlay.style.display = 'block';
     loadingOverlay.style.opacity = '0';
     loadingOverlay.style.pointerEvents = 'all';
@@ -537,9 +616,20 @@ const mapSelect = new MapSelect(
     // Fade to black FIRST so the build happens behind a black screen
     await fadeToBlack();
 
-    // Start track music immediately — user hears it while scene loads
-    const musicKey = MAP_MUSIC_KEYS[mapIndex] || 'brazil';
-    playMusic(musicKey);
+    // Start random track for this map — user hears it while scene loads
+    const trackInfo = playMapMusic(mapIndex);
+
+    // Populate "Now Playing" widget
+    const npEl = loadingOverlay.querySelector('#lo-now-playing');
+    if (trackInfo && npEl) {
+      loadingOverlay.querySelector('#lo-np-cover').src = trackInfo.cover;
+      loadingOverlay.querySelector('#lo-np-title').textContent = trackInfo.title;
+      loadingOverlay.querySelector('#lo-np-artist').textContent = trackInfo.artist;
+      npEl.style.display = 'flex';
+      npEl.style.animation = 'none';
+      void npEl.offsetWidth;
+      npEl.style.animation = 'loNpFade 0.8s ease 0.3s forwards';
+    }
 
     // Yield to browser so the black screen paints before heavy work
     await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
@@ -730,6 +820,9 @@ const mapSelect = new MapSelect(
 
     // ── Stage 10: Wait for user to read instructions and press any button ──
     clearLoadingOverlay();
+    // Hide "Now Playing" widget — loading is done, prompt takes its space
+    const npDone = loadingOverlay.querySelector('#lo-now-playing');
+    if (npDone) npDone.style.display = 'none';
     const startPrompt = loadingOverlay.querySelector('#lo-start-prompt');
     if (startPrompt) startPrompt.classList.add('visible');
     await new Promise(resolve => {
@@ -790,9 +883,6 @@ const controls = setupControls(
   () => {},  // No instant lane switch — continuous movement only
   () => {},  // No snap on release — player has full control
 );
-
-// Map index → music key
-const MAP_MUSIC_KEYS = ['brazil', 'usa', 'peru', 'shanghai', 'delhi', 'momo'];
 
 // ── Start line decoration ──
 let startLineObjects = [];

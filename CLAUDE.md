@@ -144,7 +144,7 @@ Neon title "AL-QADI TEAM RACING / ENERGY HARVESTING EDITION" with animated entra
 
 ### Loading & Transitions
 
-Loading screen with animated progress bar and stage hints. Track music starts during loading. Loading overlay reused by RaceStartSequence (no overlay swap). Overlay fade 0.6s with `will-change: opacity`.
+Loading screen with animated progress bar, stage hints, and "Now Playing" Spotify-like widget showing album cover, title, and artist of the current track. Track music starts during loading with a 1.5s volume fade-in from a per-track start timestamp. Widget is hidden when "PRESS ANY BUTTON TO START" prompt appears. Loading overlay reused by RaceStartSequence (no overlay swap). Overlay fade 0.6s with `will-change: opacity`.
 
 Pre-gameplay warm-up pipeline:
 1. Build kart, environment, road color, env map
@@ -189,7 +189,7 @@ V8 engine: 4 layered oscillators (45Hz fundamental, harmonics at 2x/3x/4x), lowp
 
 `LampPost.js` — 12 recycling posts (6 pairs), 5-tier system, proximity-based light culling (max 2 mobile / 3 desktop active PointLights). Posts start hidden, revealed on first plate hit via `setVisible()`. Structure meshes (pole+arm+housing) merged into single geometry per post.
 
-`audio.js` — Procedural Web Audio: V8 engine, gear shifts, plate hit, turbo boost. Background music via HTML Audio.
+`audio.js` — Procedural Web Audio: V8 engine, gear shifts, plate hit, turbo boost. Background music via HTML Audio. Per-map soundtrack pools (`MAP_SOUNDTRACK_POOLS`) with random selection, anti-repeat, start timestamps, and volume fade-in. `playMapMusic(mapIndex)` returns track metadata for the loading screen widget. Legacy `playMusic(key)` retained for menu/completion tracks only.
 
 ## 3D Assets
 
@@ -199,7 +199,7 @@ All in `public/models/`. Only actively-used models are registered in `MODEL_URLS
 - **Brazil:** palmTree (GLB)
 - **Vehicles:** 4 FBX models in `public/models/vehicles/fbx/`
 
-Character portraits in `public/characters/` (WebP). Map previews in `public/maps/` (WebP). Start screen in `public/Start_Screen.webp`. Al-Qadi portrait in `public/Al-Qadi.webp`.
+Character portraits in `public/characters/` (WebP). Map previews in `public/maps/` (WebP). Start screen in `public/Start_Screen.webp`. Al-Qadi portrait in `public/Al-Qadi.webp`. Soundtracks in `public/soundtracks/` (26 MP3s + 26 WebP album covers). Menu/completion music in `public/audio/` (title.mp3, qualified.mp3).
 
 **Unused assets have been removed.** Do not add model entries to `MODEL_URLS` without using them in game code — all entries are preloaded at startup.
 

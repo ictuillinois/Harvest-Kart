@@ -7,36 +7,112 @@ let noiseBuffer = null; // reused across all crackle sounds
 let musicEl = null;  // current <audio> element
 let _cancelPendingRetry = null; // cancels a blocked-autoplay retry
 
+// Legacy single-file tracks (menu + completion only)
 const MUSIC_TRACKS = {
   menu:      'title.mp3',
-  brazil:    'frankfurt.mp3',
-  usa:       'las-vegas.mp3',
-  peru:      'Valicha.mp3',
-  shanghai:  'bordeaux.mp3',
-  delhi:     null, // procedural — generated via Web Audio
-  momo:      'APT.mp3',
   qualified: 'qualified.mp3',
 };
 
-/** Play a background music track by key. */
+// Per-map soundtrack pools — each entry: { file, title, artist, cover, startTime }
+// Indexed by MAP_THEMES order: 0=brazil, 1=usa, 2=peru, 3=shanghai, 4=delhi, 5=momo
+const MAP_SOUNDTRACK_POOLS = [
+  // 0: Brazil (Rio de Janeiro)
+  [
+    { file: 'Fast-Furious_Tokyo-Drift.mp3', title: 'Tokyo Drift (Fast & Furious)', artist: 'Teriyaki Boyz', cover: 'Fast-Furious_Tokyo-Drift.webp', startTime: 0 },
+    { file: 'Lady-Gaga_Bad-Romance.mp3', title: 'Bad Romance', artist: 'Lady Gaga', cover: 'Lady-Gaga_Bad-Romance.webp', startTime: 154 },
+    { file: 'Six-Days.mp3', title: 'Six Days', artist: 'DJ Shadow', cover: 'Six-Days.webp', startTime: 22 },
+    { file: 'New-Order_Blue-Monday.mp3', title: 'Blue Monday', artist: 'New Order', cover: 'New-Order_Blue-Monday.webp', startTime: 22 },
+    { file: 'Zara-Larsson_Lush-Life.mp3', title: 'Lush Life', artist: 'Zara Larsson', cover: 'Zara-Larsson_Lush-Life.webp', startTime: 106 },
+  ],
+  // 1: USA (Chicago)
+  [
+    { file: 'Taylor-Swift_The-Fate-of-Ophelia.mp3', title: 'The Fate of Ophelia', artist: 'Taylor Swift', cover: 'Taylor-Swift_The-Fate-of-Ophelia.webp', startTime: 122 },
+    { file: 'Benson-Boone_Mystical-Magical.mp3', title: 'Mystical Magical', artist: 'Benson Boone', cover: 'Benson-Boone_Mystical-Magical.webp', startTime: 103 },
+    { file: 'Kanye-West_Cant-Tell-Me-Nothing.mp3', title: "Can't Tell Me Nothing", artist: 'Kanye West', cover: 'Kanye-West_Cant-Tell-Me-Nothing.webp', startTime: 0 },
+    { file: 'Laura-Branigan_Self-Control.mp3', title: 'Self Control', artist: 'Laura Branigan', cover: 'Laura-Branigan_Self-Control.webp', startTime: 89 },
+    { file: 'Olly-Alexander_Years-Years.mp3', title: 'Years & Years', artist: 'Olly Alexander', cover: 'Olly-Alexander_Years-Years.webp', startTime: 0 },
+    { file: 'Rihann_Only-Girl.mp3', title: 'Only Girl (In the World)', artist: 'Rihanna', cover: 'Rihann_Only-Girl.webp', startTime: 0 },
+    { file: 'Empire-of-the-Sun_We-Are-The-People.mp3', title: 'We Are the People', artist: 'Empire of the Sun', cover: 'Empire-of-the-Sun_We-Are-The-People.webp', startTime: 92 },
+    { file: 'Zara-Larsson_Lush-Life.mp3', title: 'Lush Life', artist: 'Zara Larsson', cover: 'Zara-Larsson_Lush-Life.webp', startTime: 106 },
+  ],
+  // 2: Peru (Cuzco)
+  [
+    { file: 'Empire-of-the-Sun_We-Are-The-People.mp3', title: 'We Are the People', artist: 'Empire of the Sun', cover: 'Empire-of-the-Sun_We-Are-The-People.webp', startTime: 92 },
+    { file: 'Tame-Impala_Borderline.mp3', title: 'Borderline', artist: 'Tame Impala', cover: 'Tame-Impala_Borderline.webp', startTime: 88 },
+    { file: 'Tame-Impala-Dracula.mp3', title: 'Dracula', artist: 'Tame Impala', cover: 'Tame-Impala-Dracula.webp', startTime: 28 },
+    { file: 'Laura-Branigan_Self-Control.mp3', title: 'Self Control', artist: 'Laura Branigan', cover: 'Laura-Branigan_Self-Control.webp', startTime: 89 },
+  ],
+  // 3: Shanghai (China)
+  [
+    { file: 'Kendrick-Lamar-SZA_luther.mp3', title: 'luther', artist: 'Kendrick Lamar, SZA', cover: 'Kendrick-Lamar-SZA_luther.webp', startTime: 33 },
+    { file: 'Selena-Gomez_Love-You-Like-a-Love-Song.mp3', title: 'Love You Like a Love Song', artist: 'Selena Gomez', cover: 'Selena-Gomez_Love-You-Like-a-Love-Song.webp', startTime: 0 },
+    { file: 'Tate-McRae_Its-ok-Im-ok.mp3', title: "It's OK I'm OK", artist: 'Tate McRae', cover: 'Tate-McRae_Its-ok-Im-ok.webp', startTime: 41 },
+    { file: 'Tate-McRae_Just-Keep-Watching.mp3', title: 'Just Keep Watching', artist: 'Tate McRae', cover: 'Tate-McRae_Just-Keep-Watching.webp', startTime: 24 },
+    { file: 'Zara-Larsson_Stateside.mp3', title: 'Stateside', artist: 'PinkPantheress, Zara Larsson', cover: 'Zara-Larsson_Stateside.webp', startTime: 135 },
+  ],
+  // 4: Delhi (India)
+  [
+    { file: 'Elvis-Presley_Burning-Love.mp3', title: 'Burning Love', artist: 'Elvis Presley', cover: 'Elvis-Presley_Burning-Love.webp', startTime: 0 },
+    { file: 'Push-It-To-The-Limit.mp3', title: 'Push It to the Limit', artist: 'Paul Engemann', cover: 'Push-It-To-The-Limit.webp', startTime: 0 },
+    { file: 'Laura-Branigan_Self-Control.mp3', title: 'Self Control', artist: 'Laura Branigan', cover: 'Laura-Branigan_Self-Control.webp', startTime: 89 },
+  ],
+  // 5: Momo's World
+  [
+    { file: 'APT.mp3', title: 'APT.', artist: 'ROSÉ & Bruno Mars', cover: 'APT-Rose.webp', startTime: 0 },
+    { file: 'Gracie-Abrams_Thats-So-True.mp3', title: "That's So True", artist: 'Gracie Abrams', cover: 'Gracie-Abrams_Thats-So-True.webp', startTime: 71 },
+    { file: 'Billie-Eilish_Birds-of-a-Feather.mp3', title: 'Birds of a Feather', artist: 'Billie Eilish', cover: 'Billie-Eilish_Birds-of-a-Feather.webp', startTime: 41 },
+    { file: 'Dave-Raindance.mp3', title: 'Raindance', artist: 'Dave ft. Tems', cover: 'Dave-Raindance.webp', startTime: 144 },
+    { file: 'Ravyn-Lenae_Love-Me-Not.mp3', title: 'Love Me Not', artist: 'Ravyn Lenae', cover: 'Ravyn-Lenae_Love-Me-Not.webp', startTime: 42 },
+    { file: 'Taylor-Swift_The-Fate-of-Ophelia.mp3', title: 'The Fate of Ophelia', artist: 'Taylor Swift', cover: 'Taylor-Swift_The-Fate-of-Ophelia.webp', startTime: 122 },
+  ],
+];
+
+// Anti-repeat: track last-played file per map
+const _lastPlayedPerMap = new Array(MAP_SOUNDTRACK_POOLS.length).fill(null);
+
+function _pickRandomTrack(mapIndex) {
+  const pool = MAP_SOUNDTRACK_POOLS[mapIndex];
+  if (!pool || pool.length === 0) return null;
+  if (pool.length === 1) return pool[0];
+  const lastFile = _lastPlayedPerMap[mapIndex];
+  const candidates = lastFile ? pool.filter(t => t.file !== lastFile) : pool;
+  const pick = candidates[Math.floor(Math.random() * candidates.length)];
+  _lastPlayedPerMap[mapIndex] = pick.file;
+  return pick;
+}
+
+// Volume fade-in helper
+let _fadeInterval = null;
+
+function _fadeInVolume(el, targetVol, durationMs) {
+  if (_fadeInterval) clearInterval(_fadeInterval);
+  const steps = 20;
+  const stepMs = durationMs / steps;
+  const stepVol = targetVol / steps;
+  let currentVol = 0;
+  el.volume = 0;
+  _fadeInterval = setInterval(() => {
+    currentVol = Math.min(currentVol + stepVol, targetVol);
+    el.volume = currentVol;
+    if (currentVol >= targetVol) {
+      clearInterval(_fadeInterval);
+      _fadeInterval = null;
+    }
+  }, stepMs);
+}
+
+/** Play a legacy background music track by key (menu/qualified only). */
 export function playMusic(key) {
   if (!(key in MUSIC_TRACKS)) return;
 
-  // Cancel any stale retry from a previous blocked playback attempt.
   if (_cancelPendingRetry) {
     _cancelPendingRetry();
     _cancelPendingRetry = null;
   }
 
-  // Already playing the same track? Do nothing.
   if (musicEl && !musicEl.paused && musicEl._trackKey === key) return;
-  if (_delhiSource && key === 'delhi') return;
-  if (_momoSource && key === 'momo') return;
 
   _stopMusic();
-
-  // Procedural tracks
-  if (key === 'delhi') { _playDelhiMusic(); return; }
 
   const file = MUSIC_TRACKS[key];
   if (!file) return;
@@ -59,644 +135,67 @@ export function playMusic(key) {
   });
 }
 
+/**
+ * Play a random soundtrack for the given map index.
+ * Returns track metadata { title, artist, cover } for the "Now Playing" widget,
+ * or null if no pool exists for this map.
+ */
+export function playMapMusic(mapIndex) {
+  if (_cancelPendingRetry) {
+    _cancelPendingRetry();
+    _cancelPendingRetry = null;
+  }
+
+  _stopMusic();
+
+  const track = _pickRandomTrack(mapIndex);
+  if (!track) return null;
+
+  _playTrackFile(track);
+
+  return {
+    title: track.title,
+    artist: track.artist,
+    cover: (import.meta.env.BASE_URL || '/') + 'soundtracks/' + track.cover,
+  };
+}
+
+function _playTrackFile(track) {
+  const el = new Audio();
+  el._trackKey = 'map_track';
+  el.src = (import.meta.env.BASE_URL || '/') + 'soundtracks/' + track.file;
+  el.loop = true;
+  el.volume = 0;
+  if (track.startTime > 0) el.currentTime = track.startTime;
+  musicEl = el;
+
+  el.play().then(() => {
+    _fadeInVolume(el, 0.7, 1500);
+  }).catch(() => {
+    const retry = () => {
+      _stopMusic();
+      _playTrackFile(track);
+    };
+    window.addEventListener('pointerdown', retry, { once: true });
+    window.addEventListener('keydown',     retry, { once: true });
+    _cancelPendingRetry = () => {
+      window.removeEventListener('pointerdown', retry);
+      window.removeEventListener('keydown',     retry);
+    };
+  });
+}
+
 /** Stop background music. */
 export function stopMusic() {
   _stopMusic();
 }
 
 function _stopMusic() {
+  if (_fadeInterval) { clearInterval(_fadeInterval); _fadeInterval = null; }
   if (musicEl) {
     musicEl.pause();
     musicEl.src = '';
     musicEl = null;
-  }
-  _stopDelhiMusic();
-  _stopShanghaiMusic();
-  _stopMomoMusic();
-}
-
-// ═══════════════════════════════════════════════
-//  DELHI — Procedural Rajasthani racing loop
-//  5-second loop: electronic bass, drums, khartal clicks, flute motif
-// ═══════════════════════════════════════════════
-let _delhiSource = null;
-let _delhiGain = null;
-let _delhiBuffer = null;
-
-function _generateDelhiBuffer() {
-  const c = getCtx();
-  const BPM = 140;
-  const beatSec = 60 / BPM;
-  const beats = 12; // ~5.14 seconds
-  const duration = beats * beatSec;
-  const sr = c.sampleRate;
-  const len = Math.ceil(duration * sr);
-  const buf = c.createBuffer(2, len, sr);
-  const L = buf.getChannelData(0);
-  const R = buf.getChannelData(1);
-
-  // Helpers
-  const write = (ch, startSec, freq, durSec, vol, type, attack, decay) => {
-    const s = Math.floor(startSec * sr);
-    const e = Math.min(s + Math.floor(durSec * sr), len);
-    const aLen = Math.floor(attack * sr);
-    const dStart = e - Math.floor(decay * sr);
-    for (let i = s; i < e; i++) {
-      const t = (i - s) / sr;
-      let sample;
-      if (type === 'sin') sample = Math.sin(2 * Math.PI * freq * t);
-      else if (type === 'saw') sample = 2 * ((freq * t) % 1) - 1;
-      else if (type === 'sq') sample = Math.sin(2 * Math.PI * freq * t) > 0 ? 1 : -1;
-      else if (type === 'tri') sample = 2 * Math.abs(2 * ((freq * t) % 1) - 1) - 1;
-      else if (type === 'noise') sample = Math.random() * 2 - 1;
-      else sample = Math.sin(2 * Math.PI * freq * t);
-      // Envelope
-      let env = 1;
-      if (i - s < aLen) env = (i - s) / aLen;
-      if (i > dStart) env *= (e - i) / (e - dStart);
-      sample *= vol * env;
-      if (ch === 0 || ch === 2) L[i % len] += sample;
-      if (ch === 1 || ch === 2) R[i % len] += sample;
-    }
-  };
-
-  // ═══════════════════════════════════════
-  //  PURE PUNJABI BHANGRA — heavy dhol, tumbi, chimta, bass drops
-  // ═══════════════════════════════════════
-
-  // ── DHOL — the backbone. Heavy bass side (Ghe) + treble side (Ke/Na) ──
-  // Classic bhangra chaal pattern
-  const dholGhe = [ // bass hits
-    { b: 0, v: 0.6 },
-    { b: 0.25, v: 0.3 },   // dha-ghe bounce
-    { b: 1.5, v: 0.4 },
-    { b: 2, v: 0.55 },
-    { b: 2.25, v: 0.25 },
-    { b: 3, v: 0.6 },
-    { b: 3.25, v: 0.3 },
-    { b: 4, v: 0.55 },
-    { b: 4.5, v: 0.35 },
-    { b: 5, v: 0.4 },
-    { b: 6, v: 0.6 },
-    { b: 6.25, v: 0.3 },
-    { b: 7, v: 0.45 },
-    { b: 7.5, v: 0.3 },
-    { b: 8, v: 0.55 },
-    { b: 8.25, v: 0.25 },
-    { b: 9, v: 0.6 },
-    { b: 9.25, v: 0.3 },
-    { b: 10, v: 0.5 },
-    // fill into loop
-    { b: 10.5, v: 0.35 }, { b: 10.75, v: 0.4 },
-    { b: 11, v: 0.45 }, { b: 11.25, v: 0.35 }, { b: 11.5, v: 0.5 }, { b: 11.75, v: 0.4 },
-  ];
-  for (const h of dholGhe) {
-    const t = h.b * beatSec;
-    write(2, t, 55, 0.16, h.v, 'sin', 0.002, 0.13);       // deep boom
-    write(2, t, 110, 0.04, h.v * 0.5, 'sin', 0.001, 0.03); // punch
-    write(2, t, 40, 0.08, h.v * 0.3, 'sin', 0.002, 0.06);  // sub rumble
-  }
-
-  const dholKe = [ // treble stick hits
-    { b: 0.5, v: 0.3 }, { b: 1, v: 0.35 }, { b: 1.75, v: 0.2 },
-    { b: 2.5, v: 0.3 }, { b: 3.5, v: 0.35 }, { b: 4.25, v: 0.25 },
-    { b: 5, v: 0.35 }, { b: 5.5, v: 0.25 }, { b: 5.75, v: 0.2 },
-    { b: 6.5, v: 0.3 }, { b: 7.25, v: 0.25 },
-    { b: 8.5, v: 0.3 }, { b: 9.5, v: 0.35 }, { b: 9.75, v: 0.2 },
-  ];
-  for (const h of dholKe) {
-    const t = h.b * beatSec;
-    write(2, t, 300, 0.05, h.v, 'noise', 0.001, 0.04);     // sharp crack
-    write(2, t, 500, 0.03, h.v * 0.5, 'tri', 0.001, 0.02); // ring
-  }
-
-  // ── TUMBI — the iconic Punjabi one-string (Mundian Tu Bach Ke vibe) ──
-  const tumbiNotes = [
-    { b: 0, note: 587.3 },     // D5
-    { b: 0.75, note: 523.3 },  // C5
-    { b: 1.5, note: 440 },     // A4
-    { b: 2, note: 587.3 },     // D5
-    { b: 3, note: 659.3 },     // E5
-    { b: 3.5, note: 587.3 },   // D5
-    { b: 4, note: 523.3 },     // C5
-    { b: 4.75, note: 440 },    // A4
-    { b: 5.5, note: 523.3 },   // C5
-    { b: 6, note: 587.3 },     // D5
-    { b: 6.75, note: 659.3 },  // E5
-    { b: 7.5, note: 587.3 },   // D5
-    { b: 8, note: 523.3 },     // C5
-    { b: 8.5, note: 440 },     // A4
-    { b: 9, note: 587.3 },     // D5
-    { b: 9.75, note: 659.3 },  // E5
-    { b: 10.5, note: 587.3 },  // D5
-    { b: 11, note: 523.3 },    // C5
-    { b: 11.5, note: 587.3 },  // D5 (pickup)
-  ];
-  for (const tn of tumbiNotes) {
-    const t = tn.b * beatSec;
-    write(2, t, tn.note, 0.14, 0.2, 'saw', 0.002, 0.12);         // bright twang
-    write(2, t, tn.note * 2.01, 0.07, 0.08, 'sq', 0.002, 0.06);  // nasal harmonic
-    write(2, t, tn.note * 0.998, 0.1, 0.05, 'sin', 0.003, 0.08); // buzz detune
-    write(2, t, tn.note * 3, 0.04, 0.03, 'sin', 0.001, 0.03);    // high twang
-  }
-
-  // ── CHIMTA — fire tongs jingle (every upbeat + extra on fills) ──
-  const chimtaBeats = [0.5, 1.5, 2.5, 3.5, 4.5, 5.5, 6.5, 7.5, 8.5, 9.5, 10.5, 11.5,
-                       10.75, 11.25, 11.75]; // extra on fill
-  for (const b of chimtaBeats) {
-    const t = b * beatSec;
-    write(0, t, 7000, 0.04, 0.1, 'sq', 0.001, 0.035);
-    write(1, t, 9000, 0.03, 0.07, 'sin', 0.001, 0.025);
-    write(2, t, 5500, 0.05, 0.05, 'noise', 0.001, 0.04);
-  }
-
-  // ── ELECTRONIC BASS — 808-style sub bass on root notes ──
-  const bassHits = [
-    { b: 0, note: 73.4 },    // D2
-    { b: 2, note: 73.4 },
-    { b: 3, note: 65.4 },    // C2
-    { b: 4, note: 73.4 },
-    { b: 6, note: 82.4 },    // E2
-    { b: 7, note: 73.4 },
-    { b: 8, note: 73.4 },
-    { b: 9, note: 65.4 },
-    { b: 10, note: 73.4 },
-    { b: 11, note: 82.4 },
-  ];
-  for (const bh of bassHits) {
-    const t = bh.b * beatSec;
-    write(2, t, bh.note, beatSec * 0.9, 0.3, 'sin', 0.005, 0.15);  // deep 808
-    write(2, t, bh.note * 2, beatSec * 0.5, 0.12, 'saw', 0.005, 0.1); // grit
-  }
-
-  // ── CLAPS — crowd energy on 2 and 4 pattern ──
-  for (const b of [2, 4, 6, 8, 10]) {
-    const t = b * beatSec;
-    write(2, t, 2000, 0.04, 0.22, 'noise', 0.001, 0.035);
-    write(2, t + 0.008, 3000, 0.03, 0.12, 'noise', 0.001, 0.025);
-  }
-
-  // ── HI-HAT — 16th notes, accented for drive ──
-  for (let b = 0; b < beats * 4; b++) {
-    const t = b * beatSec / 4;
-    const v = b % 4 === 0 ? 0.1 : b % 2 === 0 ? 0.06 : 0.04;
-    write(2, t, 10000, 0.018, v, 'noise', 0.001, 0.014);
-  }
-
-  // ── SYNTH HORN STAB — bhangra brass hits for hype ──
-  for (const b of [0, 4, 8]) {
-    const t = b * beatSec;
-    write(2, t, 293.7, 0.15, 0.18, 'saw', 0.005, 0.12);   // D4
-    write(2, t, 440, 0.15, 0.12, 'saw', 0.005, 0.12);     // A4
-    write(2, t, 587.3, 0.12, 0.08, 'saw', 0.005, 0.10);   // D5
-    write(2, t, 293.7 * 1.005, 0.12, 0.06, 'sq', 0.005, 0.10); // detune width
-  }
-
-  // ── ALGOZA (double flute) — short melody between tumbi phrases ──
-  const algoza = [
-    { b: 1, note: 880, dur: 0.15 },     // A5
-    { b: 1.25, note: 784, dur: 0.12 },  // G5
-    { b: 5, note: 880, dur: 0.15 },
-    { b: 5.25, note: 784, dur: 0.12 },
-    { b: 7, note: 880, dur: 0.2 },
-    { b: 7.5, note: 784, dur: 0.15 },
-    { b: 7.75, note: 698.5, dur: 0.12 },// F5
-    { b: 11, note: 880, dur: 0.15 },
-    { b: 11.25, note: 784, dur: 0.12 },
-  ];
-  for (const a of algoza) {
-    const t = a.b * beatSec;
-    write(2, t, a.note, a.dur, 0.1, 'tri', 0.01, 0.06);
-    write(2, t, a.note * 1.005, a.dur, 0.05, 'sin', 0.01, 0.05); // second pipe detune
-  }
-
-  // Normalize to prevent clipping
-  let maxL = 0, maxR = 0;
-  for (let i = 0; i < len; i++) {
-    if (Math.abs(L[i]) > maxL) maxL = Math.abs(L[i]);
-    if (Math.abs(R[i]) > maxR) maxR = Math.abs(R[i]);
-  }
-  const peak = Math.max(maxL, maxR, 0.01);
-  const norm = 0.85 / peak;
-  for (let i = 0; i < len; i++) { L[i] *= norm; R[i] *= norm; }
-
-  return buf;
-}
-
-function _playDelhiMusic() {
-  _stopDelhiMusic();
-  const c = getCtx();
-  if (!_delhiBuffer) _delhiBuffer = _generateDelhiBuffer();
-  _delhiGain = c.createGain();
-  _delhiGain.gain.value = 0.45;
-  _delhiGain.connect(c.destination);
-  _delhiSource = c.createBufferSource();
-  _delhiSource.buffer = _delhiBuffer;
-  _delhiSource.loop = true;
-  _delhiSource.connect(_delhiGain);
-  _delhiSource.start();
-}
-
-function _stopDelhiMusic() {
-  if (_delhiSource) {
-    try { _delhiSource.stop(); } catch (_) {}
-    _delhiSource.disconnect();
-    _delhiSource = null;
-  }
-  if (_delhiGain) {
-    _delhiGain.disconnect();
-    _delhiGain = null;
-  }
-}
-
-// ═══════════════════════════════════════════════
-//  SHANGHAI — Chinese pentatonic racing loop
-//  Erhu melody, guzheng plucks, electronic drums, pentatonic bass
-// ═══════════════════════════════════════════════
-let _shanghaiSource = null;
-let _shanghaiGain = null;
-let _shanghaiBuffer = null;
-
-function _generateShanghaiBuffer() {
-  const c = getCtx();
-  const BPM = 138;
-  const beatSec = 60 / BPM;
-  const beats = 12;
-  const duration = beats * beatSec;
-  const sr = c.sampleRate;
-  const len = Math.ceil(duration * sr);
-  const buf = c.createBuffer(2, len, sr);
-  const L = buf.getChannelData(0);
-  const R = buf.getChannelData(1);
-
-  const write = (ch, startSec, freq, durSec, vol, type, attack, decay) => {
-    const s = Math.floor(startSec * sr);
-    const e = Math.min(s + Math.floor(durSec * sr), len);
-    const aLen = Math.floor(attack * sr);
-    const dStart = e - Math.floor(decay * sr);
-    for (let i = s; i < e; i++) {
-      const t = (i - s) / sr;
-      let sample;
-      if (type === 'sin') sample = Math.sin(2 * Math.PI * freq * t);
-      else if (type === 'saw') sample = 2 * ((freq * t) % 1) - 1;
-      else if (type === 'sq') sample = Math.sin(2 * Math.PI * freq * t) > 0 ? 1 : -1;
-      else if (type === 'tri') sample = 2 * Math.abs(2 * ((freq * t) % 1) - 1) - 1;
-      else if (type === 'noise') sample = Math.random() * 2 - 1;
-      else sample = Math.sin(2 * Math.PI * freq * t);
-      let env = 1;
-      if (i - s < aLen) env = (i - s) / aLen;
-      if (i > dStart) env *= (e - i) / (e - dStart);
-      sample *= vol * env;
-      if (ch === 0 || ch === 2) L[i % len] += sample;
-      if (ch === 1 || ch === 2) R[i % len] += sample;
-    }
-  };
-
-  // Chinese pentatonic scale: C D E G A (no F or B)
-  // C4=261.6, D4=293.7, E4=329.6, G4=392, A4=440
-
-  // ── KICK — punchy electronic ──
-  const kickBeats = [0, 2, 3, 4, 6, 7, 8, 10, 11];
-  for (const b of kickBeats) {
-    const t = b * beatSec;
-    write(2, t, 55, 0.14, 0.5, 'sin', 0.002, 0.11);
-    write(2, t, 110, 0.03, 0.3, 'sin', 0.001, 0.025);
-  }
-
-  // ── HI-HAT — 16th notes ──
-  for (let b = 0; b < beats * 4; b++) {
-    const t = b * beatSec / 4;
-    const v = b % 4 === 0 ? 0.1 : b % 2 === 0 ? 0.06 : 0.035;
-    write(2, t, 10000, 0.018, v, 'noise', 0.001, 0.014);
-  }
-
-  // ── CLAP on 2 and 6 ──
-  for (const b of [2, 6, 10]) {
-    const t = b * beatSec;
-    write(2, t, 2000, 0.04, 0.18, 'noise', 0.001, 0.035);
-  }
-
-  // ── BASS — pentatonic root pattern ──
-  const bassNotes = [130.8, 130.8, 146.8, 130.8, 196, 196, 146.8, 130.8, 130.8, 196, 220, 196];
-  for (let b = 0; b < beats; b++) {
-    const t = b * beatSec;
-    write(2, t, bassNotes[b], beatSec * 0.75, 0.28, 'saw', 0.008, 0.12);
-    write(2, t, bassNotes[b] / 2, beatSec * 0.6, 0.2, 'sin', 0.008, 0.12);
-  }
-
-  // ── GUZHENG PLUCKS — fast pentatonic arpeggio (bright, metallic) ──
-  const guzhengNotes = [
-    { b: 0, note: 523.3 },     // C5
-    { b: 0.5, note: 587.3 },   // D5
-    { b: 1, note: 659.3 },     // E5
-    { b: 1.75, note: 784 },    // G5
-    { b: 2.5, note: 880 },     // A5
-    { b: 3, note: 784 },       // G5
-    { b: 3.5, note: 659.3 },   // E5
-    { b: 4, note: 523.3 },     // C5
-    { b: 4.75, note: 587.3 },  // D5
-    { b: 5.5, note: 784 },     // G5
-    { b: 6, note: 880 },       // A5
-    { b: 6.5, note: 1046.5 },  // C6
-    { b: 7, note: 880 },       // A5
-    { b: 7.5, note: 784 },     // G5
-    { b: 8, note: 659.3 },     // E5
-    { b: 8.75, note: 523.3 },  // C5
-    { b: 9.5, note: 587.3 },   // D5
-    { b: 10, note: 784 },      // G5
-    { b: 10.5, note: 880 },    // A5
-    { b: 11, note: 784 },      // G5
-    { b: 11.5, note: 659.3 },  // E5
-  ];
-  for (const gn of guzhengNotes) {
-    const t = gn.b * beatSec;
-    // Bright metallic pluck
-    write(2, t, gn.note, 0.16, 0.16, 'tri', 0.002, 0.14);
-    write(2, t, gn.note * 2, 0.08, 0.05, 'sin', 0.001, 0.07);
-    // Sympathetic ring
-    write(2, t, gn.note * 1.005, 0.1, 0.04, 'sin', 0.003, 0.08);
-  }
-
-  // ── ERHU — singing melody (long sustained notes with vibrato) ──
-  const erhuNotes = [
-    { b: 0, note: 523.3, dur: 0.5 },    // C5
-    { b: 1, note: 659.3, dur: 0.4 },    // E5
-    { b: 2, note: 784, dur: 0.6 },      // G5 (long)
-    { b: 3.5, note: 880, dur: 0.4 },    // A5
-    { b: 4.5, note: 784, dur: 0.5 },    // G5
-    { b: 5.5, note: 659.3, dur: 0.35 }, // E5
-    // Response
-    { b: 6.5, note: 880, dur: 0.5 },    // A5
-    { b: 7.5, note: 1046.5, dur: 0.4 }, // C6
-    { b: 8.5, note: 880, dur: 0.55 },   // A5 (long)
-    { b: 9.5, note: 784, dur: 0.35 },   // G5
-    { b: 10.5, note: 659.3, dur: 0.4 }, // E5
-    { b: 11.5, note: 523.3, dur: 0.35 },// C5 (pickup)
-  ];
-  for (const en of erhuNotes) {
-    const t = en.b * beatSec;
-    // Main tone (saw for nasal erhu quality)
-    write(2, t, en.note, en.dur, 0.12, 'saw', 0.03, 0.08);
-    // Vibrato (detuned wobble)
-    write(2, t, en.note * 1.006, en.dur, 0.05, 'sin', 0.03, 0.08);
-    // Soft octave below
-    write(2, t, en.note * 0.5, en.dur * 0.5, 0.03, 'tri', 0.03, 0.06);
-  }
-
-  // ── GONG — on beat 0 (loop start marker) ──
-  write(2, 0, 100, 0.8, 0.12, 'sin', 0.005, 0.7);
-  write(2, 0, 200, 0.5, 0.06, 'sin', 0.005, 0.45);
-  write(2, 0, 50, 0.6, 0.08, 'sin', 0.005, 0.5);
-
-  // ── WOODBLOCK — rhythmic clicks (Chinese percussion) ──
-  const woodBeats = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
-  for (const b of woodBeats) {
-    const t = b * beatSec;
-    write(2, t, 1200, 0.02, 0.1, 'sq', 0.001, 0.015);
-    write(2, t + beatSec * 0.5, 1500, 0.015, 0.06, 'sq', 0.001, 0.012);
-  }
-
-  // ── CYMBALS — on beats 4 and 8 ──
-  for (const b of [4, 8]) {
-    const t = b * beatSec;
-    write(2, t, 4000, 0.15, 0.06, 'noise', 0.001, 0.13);
-    write(0, t, 6000, 0.1, 0.03, 'sin', 0.001, 0.08);
-  }
-
-  // Normalize
-  let maxL = 0, maxR = 0;
-  for (let i = 0; i < len; i++) {
-    if (Math.abs(L[i]) > maxL) maxL = Math.abs(L[i]);
-    if (Math.abs(R[i]) > maxR) maxR = Math.abs(R[i]);
-  }
-  const peak = Math.max(maxL, maxR, 0.01);
-  const norm = 0.85 / peak;
-  for (let i = 0; i < len; i++) { L[i] *= norm; R[i] *= norm; }
-
-  return buf;
-}
-
-function _playShanghaiMusic() {
-  _stopShanghaiMusic();
-  const c = getCtx();
-  if (!_shanghaiBuffer) _shanghaiBuffer = _generateShanghaiBuffer();
-  _shanghaiGain = c.createGain();
-  _shanghaiGain.gain.value = 0.45;
-  _shanghaiGain.connect(c.destination);
-  _shanghaiSource = c.createBufferSource();
-  _shanghaiSource.buffer = _shanghaiBuffer;
-  _shanghaiSource.loop = true;
-  _shanghaiSource.connect(_shanghaiGain);
-  _shanghaiSource.start();
-}
-
-function _stopShanghaiMusic() {
-  if (_shanghaiSource) {
-    try { _shanghaiSource.stop(); } catch (_) {}
-    _shanghaiSource.disconnect();
-    _shanghaiSource = null;
-  }
-  if (_shanghaiGain) {
-    _shanghaiGain.disconnect();
-    _shanghaiGain = null;
-  }
-}
-
-// ═══════════════════════════════════════════════
-//  MOMO'S WORLD — Whimsical sunset lullaby racing loop
-//  Celesta melody, music box plucks, soft pads, playful percussion
-// ═══════════════════════════════════════════════
-let _momoSource = null;
-let _momoGain = null;
-let _momoBuffer = null;
-
-function _generateMomoBuffer() {
-  const c = getCtx();
-  const BPM = 128;
-  const beatSec = 60 / BPM;
-  const beats = 16;
-  const duration = beats * beatSec;
-  const sr = c.sampleRate;
-  const len = Math.ceil(duration * sr);
-  const buf = c.createBuffer(2, len, sr);
-  const L = buf.getChannelData(0);
-  const R = buf.getChannelData(1);
-
-  const write = (ch, startSec, freq, durSec, vol, type, attack, decay) => {
-    const s = Math.floor(startSec * sr);
-    const e = Math.min(s + Math.floor(durSec * sr), len);
-    const aLen = Math.floor(attack * sr);
-    const dStart = e - Math.floor(decay * sr);
-    for (let i = s; i < e; i++) {
-      const t = (i - s) / sr;
-      let sample;
-      if (type === 'sin') sample = Math.sin(2 * Math.PI * freq * t);
-      else if (type === 'saw') sample = 2 * ((freq * t) % 1) - 1;
-      else if (type === 'sq') sample = Math.sin(2 * Math.PI * freq * t) > 0 ? 1 : -1;
-      else if (type === 'tri') sample = 2 * Math.abs(2 * ((freq * t) % 1) - 1) - 1;
-      else if (type === 'noise') sample = Math.random() * 2 - 1;
-      else sample = Math.sin(2 * Math.PI * freq * t);
-      let env = 1;
-      if (i - s < aLen) env = (i - s) / aLen;
-      if (i > dStart) env *= (e - i) / (e - dStart);
-      sample *= vol * env;
-      if (ch === 0 || ch === 2) L[i % len] += sample;
-      if (ch === 1 || ch === 2) R[i % len] += sample;
-    }
-  };
-
-  // F major / D minor pentatonic — warm, playful, sunset feel
-  // F4=349.2, G4=392, A4=440, C5=523.3, D5=587.3, F5=698.5
-
-  // ── KICK — soft, bouncy ──
-  const kickBeats = [0, 2, 4, 6, 8, 10, 12, 14];
-  for (const b of kickBeats) {
-    const t = b * beatSec;
-    write(2, t, 60, 0.12, 0.35, 'sin', 0.002, 0.10);
-    write(2, t, 120, 0.025, 0.2, 'sin', 0.001, 0.02);
-  }
-
-  // ── HI-HAT — light taps, 8th notes ──
-  for (let b = 0; b < beats * 2; b++) {
-    const t = b * beatSec / 2;
-    const v = b % 2 === 0 ? 0.06 : 0.035;
-    write(2, t, 9000, 0.015, v, 'noise', 0.001, 0.012);
-  }
-
-  // ── CLAP — soft on 2 and 6 (playful) ──
-  for (const b of [2, 6, 10, 14]) {
-    const t = b * beatSec;
-    write(2, t, 2500, 0.03, 0.12, 'noise', 0.001, 0.025);
-  }
-
-  // ── BASS — warm bouncy line ──
-  //          F3    F3    A3    F3    C4    C4    A3    G3
-  //          F3    F3    A3    G3    F3    A3    C4    G3
-  const bassNotes = [
-    174.6, 174.6, 220, 174.6, 261.6, 261.6, 220, 196,
-    174.6, 174.6, 220, 196, 174.6, 220, 261.6, 196,
-  ];
-  for (let b = 0; b < beats; b++) {
-    const t = b * beatSec;
-    write(2, t, bassNotes[b], beatSec * 0.7, 0.22, 'tri', 0.008, 0.10);
-    write(2, t, bassNotes[b] / 2, beatSec * 0.5, 0.15, 'sin', 0.008, 0.10);
-  }
-
-  // ── CELESTA / MUSIC BOX — bright, twinkling melody ──
-  const celestaNotes = [
-    { b: 0, note: 698.5 },     // F5
-    { b: 0.5, note: 784 },     // G5
-    { b: 1, note: 880 },       // A5
-    { b: 1.75, note: 1046.5 }, // C6
-    { b: 2.5, note: 880 },     // A5
-    { b: 3, note: 784 },       // G5
-    { b: 3.5, note: 698.5 },   // F5
-    { b: 4, note: 1046.5 },    // C6
-    { b: 4.5, note: 1174.7 },  // D6
-    { b: 5, note: 1046.5 },    // C6
-    { b: 5.75, note: 880 },    // A5
-    { b: 6.5, note: 784 },     // G5
-    { b: 7, note: 880 },       // A5
-    { b: 7.5, note: 698.5 },   // F5
-    // Second phrase (response — higher register)
-    { b: 8, note: 880 },       // A5
-    { b: 8.5, note: 1046.5 },  // C6
-    { b: 9, note: 1174.7 },    // D6
-    { b: 9.75, note: 1396.9 }, // F6
-    { b: 10.5, note: 1174.7 }, // D6
-    { b: 11, note: 1046.5 },   // C6
-    { b: 11.5, note: 880 },    // A5
-    { b: 12, note: 1046.5 },   // C6
-    { b: 12.5, note: 880 },    // A5
-    { b: 13, note: 784 },      // G5
-    { b: 13.75, note: 698.5 }, // F5
-    { b: 14.5, note: 784 },    // G5
-    { b: 15, note: 880 },      // A5
-    { b: 15.5, note: 698.5 },  // F5 (pickup)
-  ];
-  for (const cn of celestaNotes) {
-    const t = cn.b * beatSec;
-    // Bright bell-like tone (sin + octave harmonic)
-    write(2, t, cn.note, 0.18, 0.14, 'sin', 0.002, 0.16);
-    write(2, t, cn.note * 2, 0.10, 0.04, 'sin', 0.001, 0.09);
-    // Soft shimmer (detuned)
-    write(2, t, cn.note * 1.003, 0.12, 0.03, 'sin', 0.003, 0.10);
-  }
-
-  // ── PAD — warm sustained chord (F major → Dm) ──
-  const padChords = [
-    { b: 0, notes: [349.2, 440, 523.3], dur: 4 },   // F major
-    { b: 4, notes: [261.6, 329.6, 392], dur: 4 },    // C major
-    { b: 8, notes: [293.7, 349.2, 440], dur: 4 },    // Dm
-    { b: 12, notes: [261.6, 329.6, 392], dur: 4 },   // C major
-  ];
-  for (const pc of padChords) {
-    const t = pc.b * beatSec;
-    for (const n of pc.notes) {
-      write(2, t, n, pc.dur * beatSec, 0.06, 'sin', 0.15, 0.3);
-      write(2, t, n * 0.998, pc.dur * beatSec, 0.03, 'sin', 0.15, 0.3);
-    }
-  }
-
-  // ── XYLOPHONE ACCENTS — playful pings ──
-  const xyloBeats = [1, 3, 5, 7, 9, 11, 13, 15];
-  const xyloNotes = [880, 1046.5, 784, 698.5, 1174.7, 880, 1046.5, 698.5];
-  for (let i = 0; i < xyloBeats.length; i++) {
-    const t = (xyloBeats[i] + 0.5) * beatSec;
-    write(i % 2 === 0 ? 0 : 1, t, xyloNotes[i], 0.08, 0.08, 'tri', 0.001, 0.07);
-  }
-
-  // ── CHIME — gentle wind chime on beats 0 and 8 ──
-  for (const b of [0, 8]) {
-    const t = b * beatSec;
-    write(2, t, 2093, 0.3, 0.04, 'sin', 0.005, 0.28);
-    write(2, t + 0.05, 2637, 0.25, 0.03, 'sin', 0.005, 0.23);
-    write(2, t + 0.1, 3136, 0.2, 0.02, 'sin', 0.005, 0.18);
-  }
-
-  // ── BARK — tiny playful yelp on beat 4 and 12 ──
-  for (const b of [4, 12]) {
-    const t = b * beatSec;
-    write(2, t, 800, 0.04, 0.08, 'sq', 0.002, 0.03);
-    write(2, t + 0.04, 1000, 0.03, 0.06, 'sq', 0.002, 0.025);
-  }
-
-  // Normalize
-  let maxL = 0, maxR = 0;
-  for (let i = 0; i < len; i++) {
-    if (Math.abs(L[i]) > maxL) maxL = Math.abs(L[i]);
-    if (Math.abs(R[i]) > maxR) maxR = Math.abs(R[i]);
-  }
-  const peak = Math.max(maxL, maxR, 0.01);
-  const norm = 0.85 / peak;
-  for (let i = 0; i < len; i++) { L[i] *= norm; R[i] *= norm; }
-
-  return buf;
-}
-
-function _playMomoMusic() {
-  _stopMomoMusic();
-  const c = getCtx();
-  if (!_momoBuffer) _momoBuffer = _generateMomoBuffer();
-  _momoGain = c.createGain();
-  _momoGain.gain.value = 0.45;
-  _momoGain.connect(c.destination);
-  _momoSource = c.createBufferSource();
-  _momoSource.buffer = _momoBuffer;
-  _momoSource.loop = true;
-  _momoSource.connect(_momoGain);
-  _momoSource.start();
-}
-
-function _stopMomoMusic() {
-  if (_momoSource) {
-    try { _momoSource.stop(); } catch (_) {}
-    _momoSource.disconnect();
-    _momoSource = null;
-  }
-  if (_momoGain) {
-    _momoGain.disconnect();
-    _momoGain = null;
   }
 }
 
