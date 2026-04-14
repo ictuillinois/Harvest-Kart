@@ -13,6 +13,10 @@ export class IntroScreen {
         <p id="intro-tagline">FORGING THE FUTURE</p>
         <p id="intro-dates">April 10th &amp; April 11th, 2026</p>
       </div>
+      <div id="intro-phase-yihan" class="intro-phase">
+        <img id="intro-yihan-photo" src="${asset('Yihan.webp')}" alt="Yihan" draggable="false" />
+        <p id="intro-yihan-message">THANK YOU YIHAN</p>
+      </div>
       <div id="intro-phase2" class="intro-phase">
         <p id="intro-ict-title">In Association with</p>
         <img id="intro-logo" src="${asset('ICT-Logo.png')}" alt="ICT Logo" draggable="false" />
@@ -39,6 +43,35 @@ export class IntroScreen {
 
       /* ── Phase 1: EOH ── */
       #intro-phase1 { gap: clamp(2px, 0.4vh, 8px); }
+
+      /* ── Phase Yihan ── */
+      #intro-phase-yihan { gap: clamp(16px, 3vh, 40px); }
+
+      #intro-yihan-photo {
+        width: clamp(160px, 22vw, 420px);
+        max-height: 55vh;
+        object-fit: contain;
+        opacity: 0;
+        transition: opacity 1s ease;
+        user-select: none;
+        pointer-events: none;
+        box-shadow: 0 0 40px rgba(255, 255, 255, 0.2);
+      }
+
+      #intro-yihan-message {
+        margin: 0;
+        opacity: 0;
+        color: #fff;
+        font-family: 'Press Start 2P', 'Impact', sans-serif;
+        font-size: clamp(16px, 2.4vw, 48px);
+        font-weight: 900;
+        letter-spacing: clamp(4px, 0.6vw, 12px);
+        text-transform: uppercase;
+        text-shadow:
+          0 0 12px rgba(255, 255, 255, 0.5),
+          0 0 30px rgba(123, 47, 242, 0.4);
+        transition: opacity 0.8s ease;
+      }
 
       /* ── Phase 2: ICT Logo ── */
       #intro-phase2 { gap: clamp(16px, 3vh, 40px); }
@@ -137,6 +170,10 @@ export class IntroScreen {
       const tagline     = this.el.querySelector('#intro-tagline');
       const dates       = this.el.querySelector('#intro-dates');
 
+      const phaseYihan   = this.el.querySelector('#intro-phase-yihan');
+      const yihanPhoto   = this.el.querySelector('#intro-yihan-photo');
+      const yihanMessage = this.el.querySelector('#intro-yihan-message');
+
       const phase2   = this.el.querySelector('#intro-phase2');
       const ictTitle = this.el.querySelector('#intro-ict-title');
       const logo     = this.el.querySelector('#intro-logo');
@@ -156,25 +193,35 @@ export class IntroScreen {
       // 6000ms — phase 1 fades out
       setTimeout(() => { phase1.style.opacity = '0'; }, 6000);
 
+      // ── Phase Yihan ──
+
+      // 7000ms — show Yihan phase, stagger elements in
+      setTimeout(() => { phaseYihan.style.opacity = '1'; }, 7000);
+      setTimeout(() => { yihanPhoto.style.opacity = '1'; }, 7200);
+      setTimeout(() => { yihanMessage.style.opacity = '1'; }, 7700);
+
+      // 11000ms — Yihan phase fades out
+      setTimeout(() => { phaseYihan.style.opacity = '0'; }, 11000);
+
       // ── Phase 2: ICT logo ──
 
-      // 7000ms — show phase 2, stagger elements in
-      setTimeout(() => { phase2.style.opacity = '1'; }, 7000);
-      setTimeout(() => { ictTitle.style.opacity = '1'; }, 7300);
-      setTimeout(() => { logo.style.opacity = '1'; }, 7500);
-      setTimeout(() => { presents.style.opacity = '1'; }, 7500);
+      // 12000ms — show phase 2, stagger elements in
+      setTimeout(() => { phase2.style.opacity = '1'; }, 12000);
+      setTimeout(() => { ictTitle.style.opacity = '1'; }, 12300);
+      setTimeout(() => { logo.style.opacity = '1'; }, 12500);
+      setTimeout(() => { presents.style.opacity = '1'; }, 12500);
 
-      // 11500ms — whole screen fades out
+      // 16500ms — whole screen fades out
       setTimeout(() => {
         this.el.style.transition = 'opacity 0.9s ease';
         this.el.style.opacity = '0';
-      }, 11500);
+      }, 16500);
 
-      // 12400ms — done; caller shows start screen
+      // 17400ms — done; caller shows start screen
       setTimeout(() => {
         this.el.remove();
         resolve();
-      }, 12400);
+      }, 17400);
     });
   }
 }
